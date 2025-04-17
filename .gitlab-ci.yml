@@ -7,8 +7,10 @@
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 stages:
 - test
+- build
 sast:
   stage: test
 include:
 - template: Security/SAST.gitlab-ci.yml
 - component: $CI_SERVER_FQDN/components/dependency-scanning/swift@0.6.0
+- component: $CI_SERVER_FQDN/to-be-continuous/renovate/gitlab-ci-renovate@1.5.0
