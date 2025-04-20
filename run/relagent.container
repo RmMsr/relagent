@@ -3,7 +3,6 @@ Description=Relagent chat server
 
 [Container]
 Image=registry.gitlab.com/rmmsr/relagent
-#Image=relagent
 PublishPort=3000:7860
 Environment=OPENROUTER_API_KEY
 AutoUpdate=Registry

@@ -19,9 +19,9 @@ def main() -> None:
     subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
     print("Reloaded user systemd")
 
-    # Start the service (the service name is relagent.container)
+    # Start the service (the service name is relagent.service)
     subprocess.run(['systemctl', '--user', 'start', 'relagent.service'], check=True)
     print("Started relagent service")
-
+    
 if __name__ == "__main__":
     main()
