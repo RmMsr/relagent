@@ -1,0 +1,9 @@
+[server]
+# address = 0.0.0.0
+# port = 7860
+
+[provider]
+# See: https://docs.litellm.ai/docs/providers
+# model = 
+# api_base = 
+# api_key = 

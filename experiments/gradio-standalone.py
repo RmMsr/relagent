@@ -1,15 +1,11 @@
 #!/usr/bin/env python
 
-import os
-
 import gradio as gr
 from agents import get_agent
 from models import get_model
+from settings import get_setting, get_setting_int
 
-SERVER_NAME = os.environ.get("SERVER_NAME", None)
-SERVER_PORT = int(os.environ.get("SERVER_PORT", 7860))
-
-model = get_model(use_case="multi_free")
+model = get_model(use_case="free")
 
 agent = get_agent(model=model)
 
@@ -24,16 +20,22 @@ def chat_multimodal(message: dict, history: list[dict]) -> str:
 
 
 interface = gr.ChatInterface(
-    fn=chat_multimodal,
+    fn=chat_text,
     type="messages",
-    multimodal=True,
+    multimodal=False,
     cache_mode="lazy",
     # textbox=gr.MultimodalTextbox(file_count="multiple", file_types=["image"], sources=["upload", "microphone"]),
     title="Simple Agent",
     description="A chat agent that can answer questions and run web searches.",
 )
 
-interface.launch(
-    server_name=SERVER_NAME,
-    server_port=SERVER_PORT,
-)
+if __name__ == "__main__":
+    address = get_setting('server', 'address')
+    port = get_setting_int('server', 'port', default=7860)
+    print(
+        f"Starting server on {address if address else '<default>'}:{port if port else '<default>'}..."
+    )
+    interface.launch(
+        server_name=address,
+        server_port=port,
+    )
