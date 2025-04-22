@@ -2,7 +2,7 @@
 Description=Relagent chat server
 
 [Container]
-Image=gitlab.com/rmmsr/relagent
+Image=registry.gitlab.com/rmmsr/relagent
 AutoUpdate=Registry
 PublishPort=3000:7860
 Volume=%h/.config/relagent/settings.ini:/root/.config/relagent/settings.ini:ro
