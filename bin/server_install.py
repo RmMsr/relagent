@@ -18,7 +18,7 @@ def main() -> None:
     print(f"Copied {container_file} to {container_dest_dir}")
 
     # Settings file
-    settings_file = os.path.join(project_root, 'settings.ini')
+    settings_file = os.path.join(project_root, 'settings.ini.template')
     settings_dest_dir = Path.home() / '.config' / 'relagent'
     settings_dest_dir.mkdir(parents=True, exist_ok=True)
     settings_dest_file = settings_dest_dir / 'settings.ini'
