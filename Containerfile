@@ -4,7 +4,7 @@ WORKDIR /app
 
 EXPOSE 7860
 
-ENV PATH="/app/.venv/bin:$PATH" SERVER_NAME="0.0.0.0"
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y
 
