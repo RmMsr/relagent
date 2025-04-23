@@ -35,6 +35,7 @@ def main() -> None:
     # Enable and setup podman auto update
     enable_systemd_user_unit(unit_name=AUTO_UPDATE_TIMER)
     override_systemd_user_unit(unit_name=AUTO_UPDATE_TIMER, override_src=project_root / 'run' / 'podman-auto-update.override.conf')
+    start_service(AUTO_UPDATE_TIMER)
 
     # Reload and start service
     reload_systemd()
@@ -72,7 +73,7 @@ def reload_systemd():
     print("Reloaded user systemd")
 
 def start_service(service_name: str):
-    run_subprocess(['systemctl', '--user', 'start', service_name])
+    run_subprocess(['systemctl', '--user', 'restart', service_name])
     print(f"Started {service_name}")
 
 if __name__ == "__main__":
