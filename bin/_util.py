@@ -11,11 +11,15 @@ def find_container_framework() -> str:
     print(f"Using framework {framework}")
     return framework
 
-def run_subprocess(args: list[str], *, cwd: str | None = None) -> None:
+def run_subprocess(args: list[str], *, cwd: str | None = None, input: str | None = None, quiet: bool = False) -> bool:
     try:
-        subprocess.run(args=args, cwd=cwd, check=True)
+        kwargs = {}
+        if quiet:
+            kwargs['stdout'] = subprocess.DEVNULL
+            kwargs['stderr'] = subprocess.DEVNULL
+        return subprocess.run(args=args, cwd=cwd, input=input, check=True, **kwargs).returncode == 0
     except subprocess.CalledProcessError as e:
         command = ' '.join(args)
         print(f"{command} failed with exit code {e.returncode}.", file=sys.stderr)
         print(f"Command: {command}", file=sys.stderr)
-        sys.exit(1)
+        return False
