@@ -8,5 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
-.aider*
 .env
+
+# Temporary files
+.gradio
+
+# Development tools
+.aider*
+.vscode

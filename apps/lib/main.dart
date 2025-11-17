@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:relagent/pages/simple_chat.dart';
+
+import '/config/app_config.dart';
 
 void main() {
-  runApp(const MainApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  AppConfig.load();
+  runApp(const MyApp());
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello World!'),
-        ),
+    return MaterialApp(
+      title: 'Relagent',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent),
       ),
+      home: const SimpleChatPage(title: 'Simple chart'),
     );
   }
 }
