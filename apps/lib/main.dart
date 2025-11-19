@@ -1,12 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:relagent/pages/simple_chat.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '/config/app_config.dart';
+import '/providers/settings_provider.dart';
+import '/router/app_router.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  AppConfig.load();
-  runApp(const MyApp());
+
+  // Load static app config (ASR model, etc.)
+  await AppConfig.load();
+
+  // Initialize SharedPreferences for user settings
+  final sharedPreferences = await SharedPreferences.getInstance();
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -14,12 +30,12 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Relagent',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent),
       ),
-      home: const SimpleChatPage(title: 'Simple chart'),
+      routerConfig: appRouter,
     );
   }
 }

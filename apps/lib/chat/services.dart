@@ -2,18 +2,20 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:relagent/chat/models.dart';
-import 'package:relagent/config/app_config.dart';
 
 enum InputClassification { request, abort, confirm, ignore, clientControl }
 
-Future<ChatMessage> getChatResponse(List<ChatMessage> history) async {
-  final uri = Uri.parse('${AppConfig.simpleChatBaseUrl}/chat/completions');
+Future<ChatMessage> getChatResponse(
+  List<ChatMessage> history, {
+  required String baseUrl,
+  required String model,
+}) async {
+  final uri = Uri.parse('$baseUrl/chat/completions');
   var messages = [];
   for (ChatMessage m in history) {
     messages.add({'role': m.role.name, 'content': m.text});
   }
-  final modelName = AppConfig.simpleChatModel;
-  final body = {'messages': messages, 'model': modelName};
+  final body = {'messages': messages, 'model': model};
   final response = await http.post(
     uri,
     body: jsonEncode(body),
@@ -21,7 +23,7 @@ Future<ChatMessage> getChatResponse(List<ChatMessage> history) async {
   );
 
   if (response.statusCode >= 300) {
-    throw Exception('Failed to send message');
+    throw Exception('Failed to send message: ${response.statusCode}');
   }
 
   final Map<String, dynamic> responseJson;
