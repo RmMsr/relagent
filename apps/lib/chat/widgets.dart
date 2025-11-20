@@ -84,8 +84,15 @@ class ChatInputState extends State<ChatInput> {
 
 class ChatHistory extends StatelessWidget {
   final List<ChatMessage> messages;
+  final bool showAssistantPending;
+  final Function(String)? onRetry;
 
-  const ChatHistory({super.key, required this.messages});
+  const ChatHistory({
+    super.key,
+    required this.messages,
+    this.showAssistantPending = false,
+    this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -94,6 +101,8 @@ class ChatHistory extends StatelessWidget {
 
     for (var m in messages) {
       final time = DateFormat.Hms().format(m.timestamp);
+      final isError = m.role == ChatRole.error;
+      final isUser = m.role == ChatRole.user;
 
       chatWidgets.add(
         Container(
@@ -105,21 +114,68 @@ class ChatHistory extends StatelessWidget {
           ),
         ),
       );
+
+      // Message bubble with optional retry button for user messages
       chatWidgets.add(
         SizedBox(
           width: double.infinity,
-          child: Container(
-            padding: EdgeInsets.all(10),
-            margin: EdgeInsets.only(left: 10, right: 10, bottom: 20),
-            decoration: BoxDecoration(
-              shape: BoxShape.rectangle,
-              borderRadius: BorderRadius.all(Radius.circular(5)),
-              color: theme.splashColor,
-            ),
-            child: GptMarkdown(m.text, style: theme.textTheme.bodyMedium),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.all(10),
+                  margin: EdgeInsets.only(left: 10, right: 10, bottom: 20),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.rectangle,
+                    borderRadius: BorderRadius.all(Radius.circular(5)),
+                    color: isError
+                        ? theme.colorScheme.errorContainer.withValues(alpha: 0.3)
+                        : theme.splashColor,
+                  ),
+                  child: isError
+                      ? Text(
+                          m.text,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.error,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                      : GptMarkdown(m.text, style: theme.textTheme.bodyMedium),
+                ),
+              ),
+              // Add retry button for user messages
+              if (isUser && onRetry != null)
+                Container(
+                  margin: EdgeInsets.only(right: 10, top: 5),
+                  child: IconButton(
+                    icon: Icon(Icons.refresh, size: 20),
+                    iconSize: 20,
+                    padding: EdgeInsets.all(4),
+                    constraints: BoxConstraints(),
+                    tooltip: 'Retry',
+                    onPressed: () => onRetry!(m.text),
+                  ),
+                ),
+            ],
           ),
         ),
       );
+    }
+
+    // Add pending assistant placeholder if waiting for response
+    if (showAssistantPending) {
+      chatWidgets.add(
+        Container(
+          alignment: Alignment.bottomCenter,
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            '- assistant -',
+            style: theme.textTheme.labelSmall,
+          ),
+        ),
+      );
+      chatWidgets.add(const AssistantPendingPlaceholder());
     }
 
     return Column(
@@ -128,6 +184,70 @@ class ChatHistory extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       spacing: 10,
       children: chatWidgets,
+    );
+  }
+}
+
+class AssistantPendingPlaceholder extends StatefulWidget {
+  const AssistantPendingPlaceholder({super.key});
+
+  @override
+  State<AssistantPendingPlaceholder> createState() =>
+      _AssistantPendingPlaceholderState();
+}
+
+class _AssistantPendingPlaceholderState
+    extends State<AssistantPendingPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _opacityAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var theme = Theme.of(context);
+
+    return AnimatedBuilder(
+      animation: _opacityAnimation,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _opacityAnimation.value,
+          child: SizedBox(
+            width: double.infinity,
+            child: Container(
+              padding: EdgeInsets.all(10),
+              margin: EdgeInsets.only(left: 10, right: 10, bottom: 20),
+              decoration: BoxDecoration(
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.all(Radius.circular(5)),
+                color: theme.splashColor,
+              ),
+              child: Text(
+                '...',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -5,16 +5,52 @@ import 'package:go_router/go_router.dart';
 import '/chat/widgets.dart';
 import '/providers/chat_provider.dart';
 
-class ChatPage extends ConsumerWidget {
+class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChatPage> createState() => _ChatPageState();
+}
+
+class _ChatPageState extends ConsumerState<ChatPage> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      // Schedule scroll after the current frame to ensure the UI has been built
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final chatState = ref.watch(chatProvider);
+
+    // Scroll to bottom whenever messages or pending state changes
+    ref.listen<ChatState>(chatProvider, (previous, next) {
+      if (previous?.messages.length != next.messages.length ||
+          previous?.showAssistantPending != next.showAssistantPending) {
+        _scrollToBottom();
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chat'),
+        title: const Text('Simple Chat'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -34,48 +70,25 @@ class ChatPage extends ConsumerWidget {
           children: [
             Expanded(
               child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.only(bottom: 8),
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 60),
-                    child: ChatHistory(messages: chatState.messages),
+                  ChatHistory(
+                    messages: chatState.messages,
+                    showAssistantPending: chatState.showAssistantPending,
+                    onRetry: (text) {
+                      ref.read(chatProvider.notifier).retryMessage(text);
+                    },
                   ),
                 ],
               ),
             ),
-            if (chatState.error != null)
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                color: Colors.red.shade100,
-                child: Row(
-                  children: [
-                    const Icon(Icons.error, color: Colors.red),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Error: ${chatState.error}',
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        ref.read(chatProvider.notifier).clearError();
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            if (chatState.isLoading)
-              const LinearProgressIndicator(),
+            ChatInput(
+              onSubmitted: (text) {
+                ref.read(chatProvider.notifier).sendMessage(text);
+              },
+            ),
           ],
-        ),
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-        child: ChatInput(
-          onSubmitted: (text) {
-            ref.read(chatProvider.notifier).sendMessage(text);
-          },
         ),
       ),
     );

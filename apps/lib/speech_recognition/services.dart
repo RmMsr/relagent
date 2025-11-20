@@ -22,7 +22,12 @@ class ASR {
 
   final ValueChanged<String> textRecognized;
   final VoidCallback textFinished;
-  ASR({required this.textRecognized, required this.textFinished});
+  final VoidCallback? onRecordingStarted;
+  ASR({
+    required this.textRecognized,
+    required this.textFinished,
+    this.onRecordingStarted,
+  });
 
   void init() {
     _audioRecorder = AudioRecorder();
@@ -117,6 +122,9 @@ class ASR {
 
   void _updateRecordState(RecordState recordState) {
     _recordState = recordState;
+    if (recordState == RecordState.record) {
+      onRecordingStarted?.call();
+    }
   }
 
   Future<bool> _isEncoderSupported(AudioEncoder encoder) async {

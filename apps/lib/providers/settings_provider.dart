@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,8 +14,9 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 });
 
 /// Settings provider that persists to SharedPreferences
-final settingsProvider =
-    StateNotifierProvider<SettingsNotifier, Settings>((ref) {
+final settingsProvider = StateNotifierProvider<SettingsNotifier, Settings>((
+  ref,
+) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return SettingsNotifier(prefs);
 });
@@ -34,25 +36,28 @@ class SettingsNotifier extends StateNotifier<Settings> {
         state = Settings.fromJson(json);
       } catch (e) {
         // If loading fails, keep defaults
-        print('Failed to load settings: $e');
+        debugPrint('Failed to load settings: $e');
       }
     }
   }
 
-  Future<void> updateChatBaseUrl(String url) async {
-    state = state.copyWith(chatBaseUrl: url);
+  Future<void> updateSimpleChatBaseUrl(String url) async {
+    state = state.copyWith(simpleChatBaseUrl: url);
     await _saveSettings();
   }
 
-  Future<void> updateChatModel(String model) async {
-    state = state.copyWith(chatModel: model);
+  Future<void> updateSimpleChatModel(String model) async {
+    state = state.copyWith(simpleChatModel: model);
     await _saveSettings();
   }
 
-  Future<void> updateSettings({String? chatBaseUrl, String? chatModel}) async {
+  Future<void> updateSettings({
+    String? simpleChatBaseUrl,
+    String? simpleChatModel,
+  }) async {
     state = state.copyWith(
-      chatBaseUrl: chatBaseUrl,
-      chatModel: chatModel,
+      simpleChatBaseUrl: simpleChatBaseUrl,
+      simpleChatModel: simpleChatModel,
     );
     await _saveSettings();
   }

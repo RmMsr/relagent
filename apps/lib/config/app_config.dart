@@ -9,12 +9,6 @@ class AppConfig {
   // Download it from: https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models
   static late final String speechRecognitionStreamingAsrModelName;
 
-  // URL to an legacy OpenAI compatible API endpoint
-  static late final String simpleChatBaseUrl;
-
-  // Model name that is usable with the simple chat API endpoint
-  static late final String simpleChatModel;
-
   static load() async {
     final config = jsonDecode(
       await rootBundle.loadString('assets/config.json'),
@@ -22,7 +16,5 @@ class AppConfig {
 
     speechRecognitionStreamingAsrModelName =
         config['speech_recognition']['streaming_asr_model'];
-    simpleChatBaseUrl = config['simple_chat']['base_url'];
-    simpleChatModel = config['simple_chat']['model'];
   }
 }

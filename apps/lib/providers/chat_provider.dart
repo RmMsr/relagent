@@ -8,11 +8,13 @@ class ChatState {
   final List<ChatMessage> messages;
   final bool isLoading;
   final String? error;
+  final bool showAssistantPending;
 
   const ChatState({
     required this.messages,
     this.isLoading = false,
     this.error,
+    this.showAssistantPending = false,
   });
 
   factory ChatState.initial() {
@@ -23,11 +25,13 @@ class ChatState {
     List<ChatMessage>? messages,
     bool? isLoading,
     String? error,
+    bool? showAssistantPending,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      showAssistantPending: showAssistantPending ?? this.showAssistantPending,
     );
   }
 }
@@ -50,6 +54,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       messages: [...state.messages, userMessage],
       isLoading: true,
       error: null,
+      showAssistantPending: true,
     );
 
     try {
@@ -59,20 +64,23 @@ class ChatNotifier extends StateNotifier<ChatState> {
       // Get response from chat service
       final response = await getChatResponse(
         state.messages,
-        baseUrl: settings.chatBaseUrl,
-        model: settings.chatModel,
+        baseUrl: settings.simpleChatBaseUrl,
+        model: settings.simpleChatModel,
       );
 
       // Add assistant response
       state = state.copyWith(
         messages: [...state.messages, response],
         isLoading: false,
+        showAssistantPending: false,
       );
     } catch (e) {
-      // Handle error
+      // Handle error - add error message to chat history
+      final errorMessage = ChatMessage.error(e.toString());
       state = state.copyWith(
+        messages: [...state.messages, errorMessage],
         isLoading: false,
-        error: e.toString(),
+        showAssistantPending: false,
       );
     }
   }
@@ -83,5 +91,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   void clearError() {
     state = state.copyWith(error: null);
+  }
+
+  // Retry sending a specific user message
+  Future<void> retryMessage(String text) async {
+    await sendMessage(text);
   }
 }

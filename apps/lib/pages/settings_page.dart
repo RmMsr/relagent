@@ -20,8 +20,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void initState() {
     super.initState();
     final settings = ref.read(settingsProvider);
-    _baseUrlController = TextEditingController(text: settings.chatBaseUrl);
-    _modelController = TextEditingController(text: settings.chatModel);
+    _baseUrlController = TextEditingController(
+      text: settings.simpleChatBaseUrl,
+    );
+    _modelController = TextEditingController(text: settings.simpleChatModel);
   }
 
   @override
@@ -34,15 +36,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _saveSettings() async {
     if (!_formKey.currentState!.validate()) return;
 
-    await ref.read(settingsProvider.notifier).updateSettings(
-          chatBaseUrl: _baseUrlController.text.trim(),
-          chatModel: _modelController.text.trim(),
+    await ref
+        .read(settingsProvider.notifier)
+        .updateSettings(
+          simpleChatBaseUrl: _baseUrlController.text.trim(),
+          simpleChatModel: _modelController.text.trim(),
         );
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settings saved')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Settings saved')));
       context.pop();
     }
   }
@@ -50,22 +54,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _resetToDefaults() async {
     await ref.read(settingsProvider.notifier).resetToDefaults();
     final settings = ref.read(settingsProvider);
-    _baseUrlController.text = settings.chatBaseUrl;
-    _modelController.text = settings.chatModel;
+    _baseUrlController.text = settings.simpleChatBaseUrl;
+    _modelController.text = settings.simpleChatModel;
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reset to defaults')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Reset to defaults')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
+      appBar: AppBar(title: const Text('Settings')),
       body: Form(
         key: _formKey,
         child: ListView(

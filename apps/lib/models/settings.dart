@@ -1,40 +1,40 @@
 class Settings {
-  final String chatBaseUrl;
-  final String chatModel;
+  // URL to an legacy OpenAI compatible API endpoint
+  final String simpleChatBaseUrl;
+
+  // Model name that is usable with the simple chat API endpoint
+  final String simpleChatModel;
 
   const Settings({
-    required this.chatBaseUrl,
-    required this.chatModel,
+    required this.simpleChatBaseUrl,
+    required this.simpleChatModel,
   });
 
   factory Settings.defaults() {
     return const Settings(
-      chatBaseUrl: 'http://localhost:1234/v1',
-      chatModel: 'qwen2.5-coder:7b',
+      simpleChatBaseUrl: 'http://localhost:1234/api/v1',
+      simpleChatModel: 'gpt-oss-20b-mxfp4-GGUF',
     );
   }
 
-  Settings copyWith({
-    String? chatBaseUrl,
-    String? chatModel,
-  }) {
+  Settings copyWith({String? simpleChatBaseUrl, String? simpleChatModel}) {
     return Settings(
-      chatBaseUrl: chatBaseUrl ?? this.chatBaseUrl,
-      chatModel: chatModel ?? this.chatModel,
+      simpleChatBaseUrl: simpleChatBaseUrl ?? this.simpleChatBaseUrl,
+      simpleChatModel: simpleChatModel ?? this.simpleChatModel,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'chatBaseUrl': chatBaseUrl,
-      'chatModel': chatModel,
+      'simpleChatBaseUrl': simpleChatBaseUrl,
+      'simpleChatModel': simpleChatModel,
     };
   }
 
   factory Settings.fromJson(Map<String, dynamic> json) {
     return Settings(
-      chatBaseUrl: json['chatBaseUrl'] as String,
-      chatModel: json['chatModel'] as String,
+      simpleChatBaseUrl: json['simpleChatBaseUrl'] as String,
+      simpleChatModel: json['simpleChatModel'] as String,
     );
   }
 
@@ -42,10 +42,10 @@ class Settings {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is Settings &&
-        other.chatBaseUrl == chatBaseUrl &&
-        other.chatModel == chatModel;
+        other.simpleChatBaseUrl == simpleChatBaseUrl &&
+        other.simpleChatModel == simpleChatModel;
   }
 
   @override
-  int get hashCode => Object.hash(chatBaseUrl, chatModel);
+  int get hashCode => Object.hash(simpleChatBaseUrl, simpleChatModel);
 }

@@ -1,4 +1,4 @@
-enum ChatRole { user, assistant }
+enum ChatRole { user, assistant, error }
 
 class ChatMessage {
   final String text;
@@ -11,6 +11,14 @@ class ChatMessage {
     DateTime? timestamp,
   }) {
     this.timestamp = timestamp ?? DateTime.now();
+  }
+
+  // Factory for creating error messages
+  factory ChatMessage.error(String errorText) {
+    return ChatMessage(
+      errorText,
+      role: ChatRole.error,
+    );
   }
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {

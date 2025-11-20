@@ -5,6 +5,29 @@ import 'package:relagent/chat/models.dart';
 
 enum InputClassification { request, abort, confirm, ignore, clientControl }
 
+class ChatApiException implements Exception {
+  final String userMessage;
+  final String technicalDetails;
+  final String? url;
+
+  ChatApiException({
+    required this.userMessage,
+    required this.technicalDetails,
+    this.url,
+  });
+
+  @override
+  String toString() {
+    final buffer = StringBuffer();
+    buffer.writeln(userMessage);
+    if (url != null) {
+      buffer.writeln('URL: $url');
+    }
+    buffer.write('Details: $technicalDetails');
+    return buffer.toString();
+  }
+}
+
 Future<ChatMessage> getChatResponse(
   List<ChatMessage> history, {
   required String baseUrl,
@@ -12,36 +35,84 @@ Future<ChatMessage> getChatResponse(
 }) async {
   final uri = Uri.parse('$baseUrl/chat/completions');
   var messages = [];
+  String? lastContent;
+  ChatRole? lastRole;
+
   for (ChatMessage m in history) {
+    // Skip error messages when sending to API
+    if (m.role == ChatRole.error) continue;
+
+    // Skip consecutive duplicate messages to keep context small
+    if (m.text == lastContent && m.role == lastRole) continue;
+
     messages.add({'role': m.role.name, 'content': m.text});
+    lastContent = m.text;
+    lastRole = m.role;
   }
   final body = {'messages': messages, 'model': model};
-  final response = await http.post(
-    uri,
-    body: jsonEncode(body),
-    headers: {'content-type': 'application/json'},
-  );
+
+  final http.Response response;
+  try {
+    response = await http.post(
+      uri,
+      body: jsonEncode(body),
+      headers: {'content-type': 'application/json'},
+    );
+  } catch (e) {
+    throw ChatApiException(
+      userMessage: 'Could not connect to the chat server',
+      technicalDetails: e.toString(),
+      url: uri.toString(),
+    );
+  }
 
   if (response.statusCode >= 300) {
-    throw Exception('Failed to send message: ${response.statusCode}');
+    String userMessage;
+    if (response.statusCode == 404) {
+      userMessage = 'Chat endpoint not found (check your settings)';
+    } else if (response.statusCode >= 500) {
+      userMessage = 'Server error occurred';
+    } else if (response.statusCode == 401 || response.statusCode == 403) {
+      userMessage = 'Authentication failed';
+    } else {
+      userMessage = 'Request failed';
+    }
+
+    throw ChatApiException(
+      userMessage: userMessage,
+      technicalDetails: 'HTTP ${response.statusCode}',
+      url: uri.toString(),
+    );
   }
 
   final Map<String, dynamic> responseJson;
   try {
     responseJson = jsonDecode(response.body) as Map<String, dynamic>;
-  } on FormatException {
-    throw Exception('Failed to parse response');
+  } on FormatException catch (e) {
+    throw ChatApiException(
+      userMessage: 'Server returned invalid response',
+      technicalDetails: 'JSON parsing failed: ${e.message}',
+      url: uri.toString(),
+    );
   }
 
   final choices = responseJson['choices'];
   if (choices! is Map || choices.isEmpty) {
-    throw Exception('Response contains no choices');
+    throw ChatApiException(
+      userMessage: 'Server returned an empty response',
+      technicalDetails: 'Response contains no choices',
+      url: uri.toString(),
+    );
   }
 
   final finalChoice = choices.last;
 
   if (finalChoice is! Map || finalChoice['message'] == null) {
-    throw Exception('Choice has no message');
+    throw ChatApiException(
+      userMessage: 'Server returned malformed response',
+      technicalDetails: 'Choice has no message field',
+      url: uri.toString(),
+    );
   }
 
   return ChatMessage.fromJson(choices.last['message']);

@@ -1,9 +1,5 @@
 {
     "speech_recognition": {
         "streaming_asr_model": "sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06"
-    },
-    "simple_chat": {
-        "base_url": "http://localhost:8000/api/v1",
-        "model": "gpt-oss-20b-mxfp4-GGUF"
     }
 }
