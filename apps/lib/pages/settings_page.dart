@@ -36,7 +36,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _saveSettings() async {
     if (!_formKey.currentState!.validate()) return;
 
-    await ref
+    final success = await ref
         .read(settingsProvider.notifier)
         .updateSettings(
           simpleChatBaseUrl: _baseUrlController.text.trim(),
@@ -44,23 +44,117 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         );
 
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Settings saved')));
-      context.pop();
+      final ThemeData theme = Theme.of(context);
+      if (success) {
+        ScaffoldMessenger.of(context).showMaterialBanner(
+          MaterialBanner(
+            content: const Text('Settings saved successfully'),
+            backgroundColor: theme.colorScheme.secondaryContainer,
+            actions: [
+              TextButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                },
+                child: Text(
+                  'OK',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        // Auto-dismiss after a short delay
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+            context.pop();
+          }
+        });
+      } else {
+        ScaffoldMessenger.of(context).showMaterialBanner(
+          MaterialBanner(
+            content: const Text(
+              'Failed to save settings. Check console for details.',
+            ),
+            backgroundColor: theme.colorScheme.errorContainer,
+            actions: [
+              TextButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                },
+                child: Text(
+                  'DISMISS',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
   Future<void> _resetToDefaults() async {
-    await ref.read(settingsProvider.notifier).resetToDefaults();
+    final success = await ref.read(settingsProvider.notifier).resetToDefaults();
     final settings = ref.read(settingsProvider);
     _baseUrlController.text = settings.simpleChatBaseUrl;
     _modelController.text = settings.simpleChatModel;
 
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Reset to defaults')));
+      final ThemeData theme = Theme.of(context);
+      if (success) {
+        ScaffoldMessenger.of(context).showMaterialBanner(
+          MaterialBanner(
+            content: const Text('Reset to defaults successfully'),
+            backgroundColor: theme.colorScheme.secondaryContainer,
+            actions: [
+              TextButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                },
+                child: Text(
+                  'OK',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        // Auto-dismiss after a short delay
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+          }
+        });
+      } else {
+        ScaffoldMessenger.of(context).showMaterialBanner(
+          MaterialBanner(
+            content: const Text(
+              'Failed to save default settings. Check console for details.',
+            ),
+            backgroundColor: theme.colorScheme.errorContainer,
+            actions: [
+              TextButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                },
+                child: Text(
+                  'DISMISS',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -87,6 +181,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 helperText: 'OpenAI-compatible API endpoint',
               ),
               keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () {
+                // Move to next field
+                FocusScope.of(context).nextFocus();
+              },
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter an API base URL';
@@ -107,6 +206,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 border: OutlineInputBorder(),
                 helperText: 'Model to use for chat completions',
               ),
+              textInputAction: TextInputAction.done,
+              onEditingComplete: () {
+                // Save settings when pressing Enter on last field
+                _saveSettings();
+              },
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter a model name';

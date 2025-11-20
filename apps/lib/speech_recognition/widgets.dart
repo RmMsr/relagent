@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '/speech_recognition/services.dart';
+import 'package:record/record.dart';
 
-enum RecordingState { idle, initializing, recording }
+import '/speech_recognition/services.dart';
 
 class RecorderButton extends StatefulWidget {
   final ValueChanged<String> onTextRecognized;
@@ -19,7 +19,8 @@ class RecorderButton extends StatefulWidget {
 
 class RecorderButtonState extends State<RecorderButton>
     with SingleTickerProviderStateMixin {
-  RecordingState _state = RecordingState.idle;
+  RecordState _recordState = RecordState.stop;
+  bool _isInitializing = false;
   ASR? _asr;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -32,38 +33,43 @@ class RecorderButtonState extends State<RecorderButton>
       vsync: this,
     );
     _pulseAnimation = Tween<double>(begin: 0.4, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _pulseController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _asr?.dispose();
     super.dispose();
   }
 
-  void _onRecordingStarted() {
+  void _onRecordStateChanged(RecordState state) {
     if (mounted) {
       setState(() {
-        _state = RecordingState.recording;
+        _recordState = state;
+        _isInitializing = false;
       });
-      _pulseController.repeat(reverse: true);
+
+      if (state == RecordState.record) {
+        _pulseController.repeat(reverse: true);
+      } else {
+        _pulseController.stop();
+        _pulseController.reset();
+      }
     }
   }
 
   void _startRecording() async {
     setState(() {
-      _state = RecordingState.initializing;
+      _isInitializing = true;
     });
 
     if (_asr == null) {
       _asr = ASR(
         textRecognized: widget.onTextRecognized,
         textFinished: widget.onTextFinished,
-        onRecordingStarted: _onRecordingStarted,
+        onRecordStateChanged: _onRecordStateChanged,
       );
       _asr!.init();
     }
@@ -72,11 +78,6 @@ class RecorderButtonState extends State<RecorderButton>
 
   void _stopRecording() {
     _asr!.stop();
-    _pulseController.stop();
-    _pulseController.reset();
-    setState(() {
-      _state = RecordingState.idle;
-    });
   }
 
   @override
@@ -84,41 +85,37 @@ class RecorderButtonState extends State<RecorderButton>
     final ThemeData theme = Theme.of(context);
 
     Widget icon;
-    switch (_state) {
-      case RecordingState.idle:
-        icon = Icon(Icons.mic, color: theme.colorScheme.primary);
-        break;
-      case RecordingState.initializing:
-        icon = SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            color: theme.colorScheme.primary,
-          ),
-        );
-        break;
-      case RecordingState.recording:
-        icon = AnimatedBuilder(
-          animation: _pulseAnimation,
-          builder: (context, child) {
-            return Opacity(
-              opacity: _pulseAnimation.value,
-              child: Icon(
-                Icons.stop_circle,
-                color: Colors.red,
-              ),
-            );
-          },
-        );
-        break;
+    if (_isInitializing) {
+      // Show loading spinner while initializing
+      icon = SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.5,
+          color: theme.colorScheme.primary,
+        ),
+      );
+    } else if (_recordState == RecordState.record) {
+      // Show pulsing stop button while recording
+      icon = AnimatedBuilder(
+        animation: _pulseAnimation,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _pulseAnimation.value,
+            child: Icon(Icons.stop_circle, color: Colors.red),
+          );
+        },
+      );
+    } else {
+      // Show mic icon when idle
+      icon = Icon(Icons.mic, color: theme.colorScheme.primary);
     }
 
     return IconButton(
-      onPressed: _state == RecordingState.initializing
+      onPressed: _isInitializing
           ? null
           : () {
-              _state == RecordingState.recording
+              _recordState == RecordState.record
                   ? _stopRecording()
                   : _startRecording();
             },

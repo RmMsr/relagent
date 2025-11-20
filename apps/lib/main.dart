@@ -15,6 +15,10 @@ void main() async {
   // Initialize SharedPreferences for user settings
   final sharedPreferences = await SharedPreferences.getInstance();
 
+  // Log SharedPreferences keys for debugging
+  debugPrint('SharedPreferences initialized');
+  debugPrint('Existing keys: ${sharedPreferences.getKeys()}');
+
   runApp(
     ProviderScope(
       overrides: [

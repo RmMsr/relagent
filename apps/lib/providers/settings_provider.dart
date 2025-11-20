@@ -29,29 +29,34 @@ class SettingsNotifier extends StateNotifier<Settings> {
   }
 
   void _loadSettings() {
-    final jsonString = _prefs.getString(_settingsKey);
-    if (jsonString != null) {
-      try {
+    try {
+      final jsonString = _prefs.getString(_settingsKey);
+      if (jsonString != null) {
+        debugPrint('Loading settings from SharedPreferences...');
         final json = jsonDecode(jsonString) as Map<String, dynamic>;
         state = Settings.fromJson(json);
-      } catch (e) {
-        // If loading fails, keep defaults
-        debugPrint('Failed to load settings: $e');
+        debugPrint('Settings loaded successfully: ${state.simpleChatBaseUrl}');
+      } else {
+        debugPrint('No saved settings found, using defaults');
       }
+    } catch (e, stackTrace) {
+      // If loading fails, keep defaults
+      debugPrint('Failed to load settings: $e');
+      debugPrint('Stack trace: $stackTrace');
     }
   }
 
-  Future<void> updateSimpleChatBaseUrl(String url) async {
+  Future<bool> updateSimpleChatBaseUrl(String url) async {
     state = state.copyWith(simpleChatBaseUrl: url);
-    await _saveSettings();
+    return await _saveSettings();
   }
 
-  Future<void> updateSimpleChatModel(String model) async {
+  Future<bool> updateSimpleChatModel(String model) async {
     state = state.copyWith(simpleChatModel: model);
-    await _saveSettings();
+    return await _saveSettings();
   }
 
-  Future<void> updateSettings({
+  Future<bool> updateSettings({
     String? simpleChatBaseUrl,
     String? simpleChatModel,
   }) async {
@@ -59,16 +64,40 @@ class SettingsNotifier extends StateNotifier<Settings> {
       simpleChatBaseUrl: simpleChatBaseUrl,
       simpleChatModel: simpleChatModel,
     );
-    await _saveSettings();
+    return await _saveSettings();
   }
 
-  Future<void> _saveSettings() async {
-    final jsonString = jsonEncode(state.toJson());
-    await _prefs.setString(_settingsKey, jsonString);
+  Future<bool> _saveSettings() async {
+    try {
+      debugPrint('Saving settings to SharedPreferences...');
+      final jsonString = jsonEncode(state.toJson());
+      final success = await _prefs.setString(_settingsKey, jsonString);
+
+      if (success) {
+        debugPrint('Settings saved successfully');
+        // Verify the save by reading it back
+        final verified = _prefs.getString(_settingsKey);
+        if (verified == jsonString) {
+          debugPrint('Save verified: data persisted correctly');
+        } else {
+          debugPrint('WARNING: Save verification failed - data may not be persisted');
+          return false;
+        }
+      } else {
+        debugPrint('ERROR: setString returned false - save failed');
+        return false;
+      }
+
+      return success;
+    } catch (e, stackTrace) {
+      debugPrint('ERROR: Failed to save settings: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return false;
+    }
   }
 
-  Future<void> resetToDefaults() async {
+  Future<bool> resetToDefaults() async {
     state = Settings.defaults();
-    await _saveSettings();
+    return await _saveSettings();
   }
 }

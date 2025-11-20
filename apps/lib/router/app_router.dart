@@ -9,17 +9,14 @@ final appRouter = GoRouter(
   routes: [
     GoRoute(
       path: '/',
-      name: 'chat',
-      pageBuilder: (context, state) => const MaterialPage(
-        child: ChatPage(),
-      ),
+      name: 'simple chat',
+      pageBuilder: (context, state) => const MaterialPage(child: ChatPage()),
     ),
     GoRoute(
       path: '/settings',
       name: 'settings',
-      pageBuilder: (context, state) => const MaterialPage(
-        child: SettingsPage(),
-      ),
+      pageBuilder: (context, state) =>
+          const MaterialPage(child: SettingsPage()),
     ),
   ],
 );

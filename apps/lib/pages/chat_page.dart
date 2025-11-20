@@ -58,7 +58,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ),
           if (chatState.messages.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.clear_all),
+              icon: const Icon(Icons.delete),
               onPressed: () {
                 ref.read(chatProvider.notifier).clearChat();
               },
