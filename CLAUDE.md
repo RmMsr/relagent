@@ -1,121 +1,73 @@
-# CLAUDE.md
+# Relagent Project Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides high-level guidance for working with the Relagent codebase.
 
 ## Project Overview
 
-Relagent is a "Relatable Agentic Minion" - a multi-platform Flutter app (Android/iOS/Linux) with speech recognition capabilities that connects to any OpenAI-compatible chat API server.
+Relagent ("Relatable Agentic Minion") is a privacy-focused AI assistant project consisting of:
+- **Flutter mobile/desktop app** (primary focus) - Multi-platform frontend with on-device speech recognition
+- **Backend server** (obsolete, being replaced) - Original Python-based chat server, no longer actively developed
 
-**Note**: The `experiments/`, `bin/`, and `run/` directories contain experimental/legacy backend code and can be ignored.
+The current development focus is on the Flutter app, which connects to any OpenAI-compatible API server.
 
-## Architecture
+## Repository Structure
 
-The Flutter app is located in the `apps/` directory and uses **Riverpod** for state management:
-
-### Core Structure
-- **lib/main.dart**: App entry point, initializes SharedPreferences and ProviderScope
-- **lib/router/app_router.dart**: go_router navigation configuration
-- **lib/pages/chat_page.dart**: Main chat interface (default page)
-- **lib/pages/settings_page.dart**: Settings page for API configuration
-- **lib/providers/**: Riverpod state providers
-  - **chat_provider.dart**: Chat state (messages, loading, errors)
-  - **settings_provider.dart**: User settings (API endpoint, model)
-- **lib/models/settings.dart**: Settings data class
-- **lib/chat/**: Chat models, widgets, and services for OpenAI-compatible API communication
-- **lib/speech_recognition/**: Sherpa-ONNX integration for on-device streaming ASR
-- **lib/config/app_config.dart**: Static configuration (ASR model only)
-
-### State Management
-The app uses **Riverpod** for state management, providing:
-- Compile-time safe state access
-- Programmatic action triggering without BuildContext
-- Separation of business logic from UI
-- Easy testing and maintainability
-
-### Navigation
-- **/** (root): Chat page (default)
-- **/settings**: Settings page (accessed via menu icon in chat)
-
-## Configuration
-
-### Static Configuration (ASR Model)
-Located in `apps/assets/config.json` - loaded at app startup:
-- **speech_recognition.streaming_asr_model**: Name of bundled Sherpa-ONNX ASR model directory (not user-editable)
-
-### User Settings (API Configuration)
-Managed via settings page, persisted to SharedPreferences:
-- **Chat Base URL**: OpenAI-compatible API endpoint (e.g., http://localhost:1234/v1)
-- **Chat Model**: Model name to use with that endpoint (e.g., qwen2.5-coder:7b)
-
-Default settings are used on first launch and can be reset via the settings page.
-
-## Development Commands
-
-All Flutter development happens in the `apps/` directory:
-
-```bash
-cd apps
-
-# Setup - create config from template
-cp assets/config.template.json assets/config.json
-# Edit config.json to configure chat API endpoint and ASR model
-
-# Get dependencies
-flutter pub get
-
-# Run on connected device/emulator
-flutter run
-
-# Build for specific platform
-flutter build apk        # Android
-flutter build ios        # iOS
-flutter build linux      # Linux desktop
-
-# Run tests
-flutter test
+```
+relagent/
+├── apps/                    # Flutter application
+│   ├── lib/                # Dart source code
+│   │   ├── main.dart      # App entry point
+│   │   ├── providers/     # Riverpod state management
+│   │   ├── pages/         # UI screens
+│   │   ├── chat/          # Chat functionality
+│   │   └── speech_recognition/  # Sherpa-ONNX ASR integration
+│   ├── assets/            # App assets (config, ASR models)
+│   └── CLAUDE.md          # Detailed Flutter app documentation
+├── docs/                   # Project documentation
+│   ├── development.md     # Development values and priorities
+│   ├── vision.md          # Project vision and use cases
+│   └── goals.md           # Project goals and principles
+├── bin/                    # Backend scripts (obsolete)
+└── README.md              # Main project readme
 ```
 
-## Important Patterns
+## Technology Stack
 
-### State Management with Riverpod
-The app uses Riverpod StateNotifierProvider pattern:
+**Frontend (Active Development):**
+- **Flutter** - Multi-platform framework (Android, iOS, Linux)
+- **Riverpod** - State management
+- **go_router** - Navigation
+- **Sherpa-ONNX** - On-device streaming speech recognition
+- **SharedPreferences** - Settings persistence
 
-**Accessing State in Widgets:**
-```dart
-class MyWidget extends ConsumerWidget {
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watch for state changes (rebuilds on change)
-    final chatState = ref.watch(chatProvider);
+**Backend (Obsolete):**
+- Python-based server (being phased out)
+- Any OpenAI-compatible server can be used instead (LM Studio, Ollama, vLLM, etc.)
 
-    // Read once without watching (for actions)
-    final settings = ref.read(settingsProvider);
+## Documentation Guide
 
-    return ...
-  }
-}
-```
+- **[apps/CLAUDE.md](apps/CLAUDE.md)** - Comprehensive Flutter app architecture, patterns, and development guide
+- **[README.md](README.md)** - Installation instructions, features, and quick start
+- **[docs/development.md](docs/development.md)** - Development values, priorities, and environment setup
+- **[docs/vision.md](docs/vision.md)** - Project vision and future direction
+- **[docs/goals.md](docs/goals.md)** - Project motivation and guiding principles (privacy, open source, accessibility)
 
-**Triggering Actions:**
-```dart
-// From anywhere with WidgetRef:
-ref.read(chatProvider.notifier).sendMessage("Hello");
-ref.read(settingsProvider.notifier).updateChatBaseUrl("http://...");
+## Key Principles
 
-// From outside widget tree (using ProviderContainer):
-container.read(chatProvider.notifier).clearChat();
-```
+This project prioritizes:
+- **Privacy and data sovereignty** - All processing happens locally or on user-controlled servers
+- **Simplicity** - Easy to understand, minimal dependencies, readable code
+- **Open source** - 100% open source with open-weight AI models
+- **Accessibility** - Runnable on consumer-grade hardware
 
-### Speech Recognition
-The app uses Sherpa-ONNX for on-device streaming ASR. Models are downloaded from [k2-fsa/sherpa-onnx releases](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) and bundled in `apps/assets/`. The model directory name must match the static config in `assets/config.json`.
+For detailed development principles, see [docs/development.md](docs/development.md).
 
-### Configuration Management
-Two types of configuration:
-1. **Static Config** (`AppConfig`): Loaded from `assets/config.json` at startup, contains ASR model path (not user-editable)
-2. **User Settings** (`SettingsProvider`): Managed via Riverpod, persisted to SharedPreferences, editable in settings page
+## Getting Started
 
-### Adding New Features
-When adding features that need state management:
-1. Create a model in `lib/models/` if needed
-2. Create a provider in `lib/providers/` using StateNotifierProvider
-3. Access state in widgets using `ref.watch()` (for reactive updates) or `ref.read()` (for one-time reads)
-4. Trigger actions using `ref.read(provider.notifier).method()`
+1. **For Flutter app development**: See [apps/CLAUDE.md](apps/CLAUDE.md) for architecture and patterns
+2. **For project vision and goals**: Review docs in `docs/` directory
+3. **For installation**: Follow instructions in [README.md](README.md)
+
+## Backend Status
+
+The original Python-based backend in `bin/` is obsolete and being replaced. The Flutter app now connects directly to any OpenAI-compatible API server (LM Studio, Ollama, vLLM, etc.). Backend-related code and documentation should be considered deprecated.
