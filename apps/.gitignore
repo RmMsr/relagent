@@ -47,3 +47,4 @@ app.*.map.json
 # Non versioned assets
 /assets/config.json
 /assets/sherpa*
+/assets/kokoro*
