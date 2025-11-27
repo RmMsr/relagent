@@ -5,6 +5,7 @@ This file provides high-level guidance for working with the Relagent codebase.
 ## Project Overview
 
 Relagent ("Relatable Agentic Minion") is a privacy-focused AI assistant project consisting of:
+
 - **Flutter mobile/desktop app** (primary focus) - Multi-platform frontend with on-device speech recognition
 - **Backend server** (obsolete, being replaced) - Original Python-based chat server, no longer actively developed
 
@@ -34,6 +35,7 @@ relagent/
 ## Technology Stack
 
 **Frontend (Active Development):**
+
 - **Flutter** - Multi-platform framework (Android, iOS, Linux)
 - **Riverpod** - State management
 - **go_router** - Navigation
@@ -41,6 +43,7 @@ relagent/
 - **SharedPreferences** - Settings persistence
 
 **Backend (Obsolete):**
+
 - Python-based server (being phased out)
 - Any OpenAI-compatible server can be used instead (LM Studio, Ollama, vLLM, etc.)
 
@@ -55,6 +58,7 @@ relagent/
 ## Key Principles
 
 This project prioritizes:
+
 - **Privacy and data sovereignty** - All processing happens locally or on user-controlled servers
 - **Simplicity** - Easy to understand, minimal dependencies, readable code
 - **Open source** - 100% open source with open-weight AI models
@@ -67,6 +71,10 @@ For detailed development principles, see [docs/development.md](docs/development.
 1. **For Flutter app development**: See [apps/CLAUDE.md](apps/CLAUDE.md) for architecture and patterns
 2. **For project vision and goals**: Review docs in `docs/` directory
 3. **For installation**: Follow instructions in [README.md](README.md)
+
+## Language
+
+App and documentation should be in a friendly, inviting and non-offensing tone. Do not use: master, slave, one-shot, white-list
 
 ## Backend Status
 
