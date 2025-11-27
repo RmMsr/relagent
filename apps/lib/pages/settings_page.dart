@@ -14,6 +14,8 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   late TextEditingController _baseUrlController;
   late TextEditingController _modelController;
+  late TextEditingController _ttsSpeakerIdController;
+  late double _ttsSpeed;
   final _formKey = GlobalKey<FormState>();
 
   @override
@@ -24,12 +26,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       text: settings.simpleChatBaseUrl,
     );
     _modelController = TextEditingController(text: settings.simpleChatModel);
+    _ttsSpeakerIdController = TextEditingController(
+      text: settings.ttsSpeakerId.toString(),
+    );
+    _ttsSpeed = settings.ttsSpeed;
   }
 
   @override
   void dispose() {
     _baseUrlController.dispose();
     _modelController.dispose();
+    _ttsSpeakerIdController.dispose();
     super.dispose();
   }
 
@@ -41,6 +48,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         .updateSettings(
           simpleChatBaseUrl: _baseUrlController.text.trim(),
           simpleChatModel: _modelController.text.trim(),
+          ttsSpeakerId: int.parse(_ttsSpeakerIdController.text.trim()),
+          ttsSpeed: _ttsSpeed,
         );
 
     if (mounted) {
@@ -103,6 +112,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final settings = ref.read(settingsProvider);
     _baseUrlController.text = settings.simpleChatBaseUrl;
     _modelController.text = settings.simpleChatModel;
+    _ttsSpeakerIdController.text = settings.ttsSpeakerId.toString();
+    setState(() {
+      _ttsSpeed = settings.ttsSpeed;
+    });
 
     if (mounted) {
       final ThemeData theme = Theme.of(context);
@@ -217,6 +230,58 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'TTS Settings',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _ttsSpeakerIdController,
+              decoration: const InputDecoration(
+                labelText: 'TTS Speaker ID',
+                hintText: '0',
+                border: OutlineInputBorder(),
+                helperText: 'Voice ID for text-to-speech (0-based)',
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter a speaker ID';
+                }
+                final id = int.tryParse(value.trim());
+                if (id == null || id < 0) {
+                  return 'Speaker ID must be a non-negative integer';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'TTS Speed: ${_ttsSpeed.toStringAsFixed(2)}x',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Slider(
+                  value: _ttsSpeed,
+                  min: 0.5,
+                  max: 2.0,
+                  divisions: 30,
+                  label: '${_ttsSpeed.toStringAsFixed(2)}x',
+                  onChanged: (value) {
+                    setState(() {
+                      _ttsSpeed = value;
+                    });
+                  },
+                ),
+                Text(
+                  'Controls playback speed (0.5x - 2.0x)',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             Row(

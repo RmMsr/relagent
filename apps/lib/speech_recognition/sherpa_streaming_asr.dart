@@ -14,7 +14,7 @@ Future<sherpa_onnx.OnlineRecognizer> createOnlineRecognizer() async {
 }
 
 Future<sherpa_onnx.OnlineModelConfig> getOnlineModelConfig() async {
-  final modelDir = 'assets/${AppConfig.speechRecognitionStreamingAsrModelName}';
+  final modelDir = AppConfig.speechRecognitionStreamingAsrModelName;
   // Inference models need to be accessible on the file system
   return sherpa_onnx.OnlineModelConfig(
     transducer: sherpa_onnx.OnlineTransducerModelConfig(

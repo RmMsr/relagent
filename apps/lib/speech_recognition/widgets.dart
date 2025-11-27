@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:record/record.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '/speech_recognition/services.dart';
+import '/models/settings.dart';
+import '/providers/recording_provider.dart';
+import '/providers/settings_provider.dart';
 
-class RecorderButton extends StatefulWidget {
+class RecorderButton extends ConsumerStatefulWidget {
   final ValueChanged<String> onTextRecognized;
   final VoidCallback onTextFinished;
 
@@ -14,14 +16,11 @@ class RecorderButton extends StatefulWidget {
   });
 
   @override
-  RecorderButtonState createState() => RecorderButtonState();
+  ConsumerState<RecorderButton> createState() => RecorderButtonState();
 }
 
-class RecorderButtonState extends State<RecorderButton>
+class RecorderButtonState extends ConsumerState<RecorderButton>
     with SingleTickerProviderStateMixin {
-  RecordState _recordState = RecordState.stop;
-  bool _isInitializing = false;
-  ASR? _asr;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -40,63 +39,88 @@ class RecorderButtonState extends State<RecorderButton>
   @override
   void dispose() {
     _pulseController.dispose();
-    _asr?.dispose();
     super.dispose();
   }
 
-  void _onRecordStateChanged(RecordState state) {
-    if (mounted) {
-      setState(() {
-        _recordState = state;
-        _isInitializing = false;
-      });
+  void _handleButtonPress() {
+    final voiceMode = ref.read(settingsProvider).voiceMode;
+    final recordingState = ref.read(recordingProvider);
 
-      if (state == RecordState.record) {
-        _pulseController.repeat(reverse: true);
+    if (voiceMode == VoiceMode.listening ||
+        voiceMode == VoiceMode.conversation) {
+      // In continuous modes: button toggles mode OFF
+      final newMode = voiceMode == VoiceMode.listening
+          ? VoiceMode.silent
+          : VoiceMode.reading;
+      ref.read(settingsProvider.notifier).updateVoiceMode(newMode);
+    } else {
+      // In one-shot modes: button starts/stops recording
+      if (recordingState.isRecording) {
+        ref.read(recordingProvider.notifier).stopOneShot();
       } else {
-        _pulseController.stop();
-        _pulseController.reset();
+        ref.read(recordingProvider.notifier).startOneShot();
       }
     }
-  }
-
-  void _startRecording() async {
-    setState(() {
-      _isInitializing = true;
-    });
-
-    if (_asr == null) {
-      _asr = ASR(
-        textRecognized: widget.onTextRecognized,
-        textFinished: widget.onTextFinished,
-        onRecordStateChanged: _onRecordStateChanged,
-      );
-      _asr!.init();
-    }
-    _asr!.start();
-  }
-
-  void _stopRecording() {
-    _asr!.stop();
   }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final voiceMode = ref.watch(settingsProvider).voiceMode;
+    final recordingState = ref.watch(recordingProvider);
 
+    // Update text in parent when recognized text changes
+    ref.listen<RecordingState>(recordingProvider, (previous, next) {
+      // Update text field with recognized text
+      if (previous?.recognizedText != next.recognizedText) {
+        widget.onTextRecognized(next.recognizedText);
+      }
+
+      // In continuous modes, when textToSubmit appears, submit it
+      if (next.textToSubmit != null &&
+          previous?.textToSubmit != next.textToSubmit) {
+        // Update text field one more time to show what's being submitted
+        widget.onTextRecognized(next.textToSubmit!);
+        // Submit the text
+        widget.onTextFinished();
+        // Clear the textToSubmit flag
+        ref.read(recordingProvider.notifier).clearTextToSubmit();
+      }
+    });
+
+    // Start/stop pulse animation based on recording state
+    if (recordingState.isRecording) {
+      if (!_pulseController.isAnimating) {
+        _pulseController.repeat(reverse: true);
+      }
+    } else {
+      if (_pulseController.isAnimating) {
+        _pulseController.stop();
+        _pulseController.reset();
+      }
+    }
+
+    // Determine icon based on what action will happen when button is pressed
     Widget icon;
-    if (_isInitializing) {
-      // Show loading spinner while initializing
-      icon = SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.5,
-          color: theme.colorScheme.primary,
-        ),
+    String tooltip;
+
+    if (voiceMode == VoiceMode.listening ||
+        voiceMode == VoiceMode.conversation) {
+      // In continuous modes: button will toggle mode OFF
+      // Show "mic off" to indicate it will stop listening
+      icon = AnimatedBuilder(
+        animation: _pulseAnimation,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _pulseAnimation.value,
+            child: Icon(Icons.mic_off, color: theme.colorScheme.primary),
+          );
+        },
       );
-    } else if (_recordState == RecordState.record) {
-      // Show pulsing stop button while recording
+      tooltip = 'Stop listening';
+    } else if (recordingState.isRecording) {
+      // Currently recording in single mode: button will stop
+      // Show stop icon
       icon = AnimatedBuilder(
         animation: _pulseAnimation,
         builder: (context, child) {
@@ -106,20 +130,18 @@ class RecorderButtonState extends State<RecorderButton>
           );
         },
       );
+      tooltip = 'Stop recording';
     } else {
-      // Show mic icon when idle
+      // Idle in single mode: button will start recording
+      // Show mic icon to indicate it will start
       icon = Icon(Icons.mic, color: theme.colorScheme.primary);
+      tooltip = 'Start recording';
     }
 
     return IconButton(
-      onPressed: _isInitializing
-          ? null
-          : () {
-              _recordState == RecordState.record
-                  ? _stopRecording()
-                  : _startRecording();
-            },
+      onPressed: _handleButtonPress,
       icon: icon,
+      tooltip: tooltip,
     );
   }
 }

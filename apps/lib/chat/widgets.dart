@@ -4,6 +4,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 import 'package:relagent/chat/models.dart';
 
+import '/providers/tts_provider.dart';
 import '/speech_recognition/widgets.dart';
 
 class ChatInput extends StatefulWidget {
@@ -86,79 +87,30 @@ class ChatHistory extends StatelessWidget {
   final List<ChatMessage> messages;
   final bool showAssistantPending;
   final Function(String)? onRetry;
+  final Function(String, String)? onSpeak;
+  final PlaybackStatus Function(String)? getPlaybackStatus;
 
   const ChatHistory({
     super.key,
     required this.messages,
     this.showAssistantPending = false,
     this.onRetry,
+    this.onSpeak,
+    this.getPlaybackStatus,
   });
 
   @override
   Widget build(BuildContext context) {
-    var theme = Theme.of(context);
-    var chatWidgets = <Widget>[];
+    final theme = Theme.of(context);
+    final chatWidgets = <Widget>[];
 
-    for (var m in messages) {
-      final time = DateFormat.Hms().format(m.timestamp);
-      final isError = m.role == ChatRole.error;
-      final isUser = m.role == ChatRole.user;
-
+    for (final message in messages) {
       chatWidgets.add(
-        Container(
-          alignment: Alignment.bottomCenter,
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            '- $time: ${m.role.name} -',
-            style: theme.textTheme.labelSmall,
-          ),
-        ),
-      );
-
-      // Message bubble with optional retry button for user messages
-      chatWidgets.add(
-        SizedBox(
-          width: double.infinity,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Container(
-                  padding: EdgeInsets.all(10),
-                  margin: EdgeInsets.only(left: 10, right: 10, bottom: 20),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.rectangle,
-                    borderRadius: BorderRadius.all(Radius.circular(5)),
-                    color: isError
-                        ? theme.colorScheme.errorContainer.withValues(alpha: 0.3)
-                        : theme.splashColor,
-                  ),
-                  child: isError
-                      ? Text(
-                          m.text,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.error,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        )
-                      : GptMarkdown(m.text, style: theme.textTheme.bodyMedium),
-                ),
-              ),
-              // Add retry button for user messages
-              if (isUser && onRetry != null)
-                Container(
-                  margin: EdgeInsets.only(right: 10, top: 5),
-                  child: IconButton(
-                    icon: Icon(Icons.refresh, size: 20),
-                    iconSize: 20,
-                    padding: EdgeInsets.all(4),
-                    constraints: BoxConstraints(),
-                    tooltip: 'Retry',
-                    onPressed: () => onRetry!(m.text),
-                  ),
-                ),
-            ],
-          ),
+        ChatMessageBubble(
+          message: message,
+          onRetry: onRetry,
+          onSpeak: onSpeak,
+          getPlaybackStatus: getPlaybackStatus,
         ),
       );
     }
@@ -170,7 +122,7 @@ class ChatHistory extends StatelessWidget {
           alignment: Alignment.bottomCenter,
           padding: EdgeInsets.symmetric(horizontal: 20),
           child: Text(
-            '- assistant -',
+            ChatRole.assistant.name,
             style: theme.textTheme.labelSmall,
           ),
         ),
@@ -184,6 +136,215 @@ class ChatHistory extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       spacing: 10,
       children: chatWidgets,
+    );
+  }
+}
+
+class ChatMessageBubble extends StatelessWidget {
+  final ChatMessage message;
+  final Function(String)? onRetry;
+  final Function(String, String)? onSpeak;
+  final PlaybackStatus Function(String)? getPlaybackStatus;
+
+  const ChatMessageBubble({
+    super.key,
+    required this.message,
+    this.onRetry,
+    this.onSpeak,
+    this.getPlaybackStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final time = DateFormat.Hms().format(message.timestamp);
+    final isError = message.role == ChatRole.error;
+    final isUser = message.role == ChatRole.user;
+    final messageId = message.timestamp.millisecondsSinceEpoch.toString();
+    final playbackStatus =
+        getPlaybackStatus?.call(messageId) ?? PlaybackStatus.idle;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Message header
+        Container(
+          alignment: Alignment.bottomCenter,
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            '${message.role.name} @ $time',
+            style: theme.textTheme.labelSmall,
+          ),
+        ),
+        // Message bubble with action buttons
+        SizedBox(
+          width: double.infinity,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // TTS button for assistant messages (on the left)
+              if (message.role == ChatRole.assistant && onSpeak != null)
+                _buildTtsButton(theme, playbackStatus, messageId),
+              // Message content
+              Expanded(child: _buildMessageContent(theme, isError)),
+              // Retry button for user messages (on the right)
+              if (isUser && onRetry != null)
+                Container(
+                  margin: EdgeInsets.only(right: 10, top: 5),
+                  child: IconButton(
+                    icon: Icon(Icons.refresh, size: 20),
+                    iconSize: 20,
+                    padding: EdgeInsets.all(4),
+                    constraints: BoxConstraints(),
+                    tooltip: 'Retry',
+                    onPressed: () => onRetry!(message.text),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTtsButton(
+    ThemeData theme,
+    PlaybackStatus playbackStatus,
+    String messageId,
+  ) {
+    // Determine icon, tooltip, and color based on playback status
+    final IconData ttsIcon;
+    final String ttsTooltip;
+    final Color? iconColor;
+
+    switch (playbackStatus) {
+      case PlaybackStatus.playing:
+        ttsIcon = Icons.pause;
+        ttsTooltip = 'Pause';
+        iconColor = theme.colorScheme.primary;
+        break;
+      case PlaybackStatus.paused:
+        ttsIcon = Icons.play_arrow;
+        ttsTooltip = 'Resume';
+        iconColor = theme.colorScheme.secondary;
+        break;
+      case PlaybackStatus.generating:
+        ttsIcon = Icons.hourglass_empty;
+        ttsTooltip = 'Generating audio...';
+        iconColor = null;
+        break;
+      case PlaybackStatus.completed:
+      case PlaybackStatus.idle:
+        ttsIcon = Icons.volume_up;
+        ttsTooltip = 'Read aloud';
+        iconColor = null;
+        break;
+    }
+
+    return Container(
+      margin: EdgeInsets.only(left: 10, top: 5),
+      child: playbackStatus == PlaybackStatus.generating
+          ? _GeneratingIndicator(tooltip: ttsTooltip)
+          : IconButton(
+              icon: Icon(ttsIcon, size: 20, color: iconColor),
+              iconSize: 20,
+              padding: EdgeInsets.all(4),
+              constraints: BoxConstraints(),
+              tooltip: ttsTooltip,
+              onPressed: () => onSpeak!(message.text, messageId),
+            ),
+    );
+  }
+
+  Widget _buildMessageContent(ThemeData theme, bool isError) {
+    return Container(
+      alignment: message.role == ChatRole.user
+          ? Alignment.centerRight
+          : Alignment.centerLeft,
+      padding: EdgeInsets.all(10),
+      margin: EdgeInsets.only(left: 10, right: 10, bottom: 20),
+      decoration: BoxDecoration(
+        shape: BoxShape.rectangle,
+        borderRadius: BorderRadius.all(Radius.circular(5)),
+        color: switch (message.role) {
+          ChatRole.user => theme.colorScheme.onInverseSurface.withValues(
+            alpha: 0.6,
+          ),
+          ChatRole.assistant => null,
+          ChatRole.error => theme.colorScheme.errorContainer.withValues(
+            alpha: 0.3,
+          ),
+        },
+      ),
+      child: isError
+          ? Text(
+              message.text,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.error,
+                fontStyle: FontStyle.italic,
+              ),
+            )
+          : SelectableRegion(
+              selectionControls: MaterialTextSelectionControls(),
+              child: GptMarkdown(
+                message.text,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+    );
+  }
+}
+
+class _GeneratingIndicator extends StatefulWidget {
+  final String tooltip;
+
+  const _GeneratingIndicator({required this.tooltip});
+
+  @override
+  State<_GeneratingIndicator> createState() => _GeneratingIndicatorState();
+}
+
+class _GeneratingIndicatorState extends State<_GeneratingIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _animation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: widget.tooltip,
+      child: AnimatedBuilder(
+        animation: _animation,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _animation.value,
+            child: Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.hourglass_empty, size: 20),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -210,9 +371,10 @@ class _AssistantPendingPlaceholderState
       vsync: this,
     )..repeat(reverse: true);
 
-    _opacityAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _opacityAnimation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -240,10 +402,7 @@ class _AssistantPendingPlaceholderState
                 borderRadius: BorderRadius.all(Radius.circular(5)),
                 color: theme.splashColor,
               ),
-              child: Text(
-                '...',
-                style: theme.textTheme.bodyMedium,
-              ),
+              child: Text('...', style: theme.textTheme.bodyMedium),
             ),
           ),
         );

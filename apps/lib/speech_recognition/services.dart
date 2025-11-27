@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:record/record.dart';
+import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
+
 import '/speech_recognition/sherpa_streaming_asr.dart';
 import '/speech_recognition/utils.dart';
-import 'package:record/record.dart';
-
-import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
 class ASR {
   late final AudioRecorder _audioRecorder;
@@ -93,7 +93,6 @@ class ASR {
             final text = _recognizer!.getResult(_stream!).text;
 
             if (text != '') {
-              debugPrint('Recognized text: $text');
               textRecognized(text);
             }
 
@@ -119,9 +118,9 @@ class ASR {
     await _audioRecorder.stop();
   }
 
-  // Future<void> _pause() => _audioRecorder.pause();
+  Future<void> pause() => _audioRecorder.pause();
 
-  // Future<void> _resume() => _audioRecorder.resume();
+  Future<void> resume() => _audioRecorder.resume();
 
   void _updateRecordState(RecordState recordState) {
     _recordState = recordState;

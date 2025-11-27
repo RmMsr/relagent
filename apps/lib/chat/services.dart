@@ -97,7 +97,7 @@ Future<ChatMessage> getChatResponse(
   }
 
   final choices = responseJson['choices'];
-  if (choices! is Map || choices.isEmpty) {
+  if (choices is! List || choices.isEmpty) {
     throw ChatApiException(
       userMessage: 'Server returned an empty response',
       technicalDetails: 'Response contains no choices',

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/chat/models.dart';
 import '/chat/services.dart';
 import '/providers/settings_provider.dart';
+import '/providers/tts_provider.dart';
 
 class ChatState {
   final List<ChatMessage> messages;
@@ -74,6 +75,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
         isLoading: false,
         showAssistantPending: false,
       );
+
+      // Auto-queue the assistant response for TTS playback if in auto-playback mode
+      if (settings.isAutoPlayback) {
+        final messageId = response.timestamp.millisecondsSinceEpoch.toString();
+        ref.read(ttsProvider.notifier).enqueue(response.text, messageId);
+      }
     } catch (e) {
       // Handle error - add error message to chat history
       final errorMessage = ChatMessage.error(e.toString());
@@ -87,6 +94,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   void clearChat() {
     state = ChatState.initial();
+    // Trigger TTS cleanup when chat is cleared
+    ref.read(ttsProvider.notifier).onChatCleared();
   }
 
   void clearError() {

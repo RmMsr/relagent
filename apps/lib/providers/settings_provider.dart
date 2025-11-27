@@ -56,13 +56,34 @@ class SettingsNotifier extends StateNotifier<Settings> {
     return await _saveSettings();
   }
 
+  Future<bool> updateTtsSpeakerId(int speakerId) async {
+    state = state.copyWith(ttsSpeakerId: speakerId);
+    return await _saveSettings();
+  }
+
+  Future<bool> updateTtsSpeed(double speed) async {
+    state = state.copyWith(ttsSpeed: speed);
+    return await _saveSettings();
+  }
+
+  Future<bool> updateVoiceMode(VoiceMode mode) async {
+    state = state.copyWith(voiceMode: mode);
+    return await _saveSettings();
+  }
+
   Future<bool> updateSettings({
     String? simpleChatBaseUrl,
     String? simpleChatModel,
+    int? ttsSpeakerId,
+    double? ttsSpeed,
+    VoiceMode? voiceMode,
   }) async {
     state = state.copyWith(
       simpleChatBaseUrl: simpleChatBaseUrl,
       simpleChatModel: simpleChatModel,
+      ttsSpeakerId: ttsSpeakerId,
+      ttsSpeed: ttsSpeed,
+      voiceMode: voiceMode,
     );
     return await _saveSettings();
   }

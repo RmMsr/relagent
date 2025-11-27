@@ -1,6 +1,6 @@
 name: relagent
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 version: 0.1.0
 
 environment:
@@ -21,6 +21,9 @@ dependencies:
   record: ^6.1.2
   shared_preferences: ^2.3.5
   sherpa_onnx: ^1.12.17
+  just_audio: ^0.9.38
+  just_audio_media_kit: ^2.1.0 # just_audio linux support
+  media_kit_libs_linux: ^1.2.1 # just_audio linux support
 
 dev_dependencies:
   flutter_test:
@@ -34,6 +37,9 @@ flutter:
   assets:
     - assets/config.json
     - assets/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06/
+    - assets/kokoro-en-v0_19/ # - assets/kokoro-en-v0_19/espeak-ng-data/
+    - assets/kokoro-en-v0_19/espeak-ng-data/
+    - assets/kokoro-en-v0_19/espeak-ng-data/lang/gmw/
 
 flutter_launcher_icons:
   android: true

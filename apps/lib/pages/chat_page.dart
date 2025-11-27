@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '/chat/widgets.dart';
 import '/providers/chat_provider.dart';
+import '/providers/tts_provider.dart';
+import '/widgets/voice_mode_selector.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -39,6 +41,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatProvider);
+    final ttsState = ref.watch(ttsProvider);
 
     // Scroll to bottom whenever messages or pending state changes
     ref.listen<ChatState>(chatProvider, (previous, next) {
@@ -50,8 +53,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Simple Chat'),
         actions: [
+          const VoiceModeSelector(),
+          const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => context.push('/settings'),
@@ -79,6 +83,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     onRetry: (text) {
                       ref.read(chatProvider.notifier).retryMessage(text);
                     },
+                    onSpeak: (text, messageId) {
+                      ref
+                          .read(ttsProvider.notifier)
+                          .togglePlayPause(text, messageId);
+                    },
+                    getPlaybackStatus: (messageId) =>
+                        ttsState.getMessageState(messageId).status,
                   ),
                 ],
               ),
