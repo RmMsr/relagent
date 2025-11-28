@@ -42,6 +42,8 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent),
       ),
       routerConfig: appRouter,
+      // Performance overlay - shows FPS and frame rendering time
+      showPerformanceOverlay: true,
     );
   }
 }

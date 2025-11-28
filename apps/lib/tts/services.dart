@@ -1,17 +1,21 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
 import '/tts/audio_source.dart';
-import '/tts/sherpa_tts.dart';
+import '/tts/tts_isolate_worker.dart';
 
 class TtsService {
+  final TtsIsolateWorker _worker = TtsIsolateWorker();
   bool _isInitialized = false;
-  sherpa_onnx.OfflineTts? _tts;
   final Map<String, AudioPlayer> _players = {};
   final Map<String, Uint8List> _audioCache = {};
+
+  // LRU cache management (max 20 messages)
+  final int _maxCacheItems = 20;
+  final List<String> _cacheOrder = [];
 
   final ValueChanged<String>? onPlaybackStarted;
   final ValueChanged<String>? onPlaybackFinished;
@@ -25,13 +29,17 @@ class TtsService {
 
   Future<void> _init() async {
     if (!_isInitialized) {
+      developer.Timeline.startSync('TTS_BackgroundInitialization');
       try {
-        sherpa_onnx.initBindings();
-        _tts = await createOfflineTts();
+        // This now happens in a background isolate with BackgroundIsolateBinaryMessenger!
+        await _worker.initialize();
         _isInitialized = true;
+        debugPrint('TTS initialized in background isolate');
       } catch (e) {
         debugPrint('Failed to initialize TTS: $e');
         rethrow;
+      } finally {
+        developer.Timeline.finishSync();
       }
     }
   }
@@ -45,17 +53,28 @@ class TtsService {
 
       // Generate audio if not already cached
       if (!_audioCache.containsKey(messageId)) {
-        final audio = _tts!.generate(text: text, sid: speakerId, speed: speed);
+        developer.Timeline.startSync('TTS_BackgroundGeneration', arguments: {
+          'text_length': text.length,
+          'message_id': messageId,
+        });
 
-        if (audio.samples.isEmpty) {
-          debugPrint('Generated audio is empty');
-          onError?.call(messageId, 'Failed to generate audio');
+        try {
+          // This now happens in a background isolate - won't block the UI!
+          final wavBytes = await _worker.generateAudio(
+            text: text,
+            speakerId: speakerId,
+            speed: speed,
+          );
+          developer.Timeline.finishSync();
+
+          // Add to cache with LRU eviction
+          _addToCache(messageId, wavBytes);
+        } catch (e) {
+          developer.Timeline.finishSync();
+          debugPrint('Failed to generate audio: $e');
+          onError?.call(messageId, 'Failed to generate audio: $e');
           return false;
         }
-
-        // Convert to WAV bytes and cache in memory
-        final wavBytes = generateWavBytes(audio);
-        _audioCache[messageId] = wavBytes;
       }
 
       // Create player and play
@@ -146,14 +165,32 @@ class TtsService {
     }
   }
 
+  /// Add audio to cache with LRU eviction
+  void _addToCache(String messageId, Uint8List audio) {
+    // Remove oldest item if cache is full
+    if (_cacheOrder.length >= _maxCacheItems) {
+      final oldest = _cacheOrder.removeAt(0);
+      _audioCache.remove(oldest);
+      debugPrint('TTS cache evicted: $oldest');
+    }
+
+    // Remove messageId if it already exists (to update position)
+    _cacheOrder.remove(messageId);
+
+    // Add to end (most recently used)
+    _cacheOrder.add(messageId);
+    _audioCache[messageId] = audio;
+  }
+
   void cleanup(Set<String> messageIdsToRemove) {
     for (final messageId in messageIdsToRemove) {
       // Dispose player
       final player = _players.remove(messageId);
       player?.dispose();
 
-      // Remove audio from cache
+      // Remove audio from cache and order tracking
       _audioCache.remove(messageId);
+      _cacheOrder.remove(messageId);
     }
   }
 
@@ -165,7 +202,9 @@ class TtsService {
 
     // Clear audio cache
     _audioCache.clear();
+    _cacheOrder.clear();
 
-    _tts?.free();
+    // Dispose the background worker isolate
+    _worker.dispose();
   }
 }

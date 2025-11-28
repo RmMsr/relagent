@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -42,11 +43,24 @@ class ASR {
 
   Future<void> start() async {
     if (!_isInitialized) {
-      sherpa_onnx.initBindings();
-      _recognizer = await createOnlineRecognizer();
-      _stream = _recognizer?.createStream();
+      developer.Timeline.startSync('ASR_Initialization');
+      try {
+        developer.Timeline.startSync('ASR_InitBindings');
+        sherpa_onnx.initBindings();
+        developer.Timeline.finishSync();
 
-      _isInitialized = true;
+        developer.Timeline.startSync('ASR_CreateRecognizer');
+        _recognizer = await createOnlineRecognizer();
+        developer.Timeline.finishSync();
+
+        developer.Timeline.startSync('ASR_CreateStream');
+        _stream = _recognizer?.createStream();
+        developer.Timeline.finishSync();
+
+        _isInitialized = true;
+      } finally {
+        developer.Timeline.finishSync();
+      }
     }
 
     try {
@@ -82,6 +96,8 @@ class ASR {
 
         stream.listen(
           (data) {
+            developer.Timeline.startSync('ASR_ProcessAudioChunk');
+
             final samplesFloat32 = convertBytesToFloat32(
               Uint8List.fromList(data),
             );
@@ -103,6 +119,8 @@ class ASR {
               _recognizer!.reset(_stream!);
               textFinished();
             }
+
+            developer.Timeline.finishSync();
           },
           onDone: () {
             debugPrint('stream stopped.');
