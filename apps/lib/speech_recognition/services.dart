@@ -70,6 +70,9 @@ class ASR {
         debugPrint(devs.toString());
 
         final config = RecordConfig(
+          androidConfig: AndroidRecordConfig(
+            audioManagerMode: AudioManagerMode.modeNormal,
+          ),
           encoder: encoder,
           sampleRate: 16000,
           numChannels: 1,

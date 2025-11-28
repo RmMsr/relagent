@@ -21,7 +21,7 @@ dependencies:
   record: ^6.1.2
   shared_preferences: ^2.3.5
   sherpa_onnx: ^1.12.17
-  just_audio: ^0.9.38
+  just_audio: ^0.10.5
   just_audio_media_kit: ^2.1.0 # just_audio linux support
   media_kit_libs_linux: ^1.2.1 # just_audio linux support
 
