@@ -74,6 +74,7 @@ class SettingsNotifier extends StateNotifier<Settings> {
   Future<bool> updateSettings({
     String? simpleChatBaseUrl,
     String? simpleChatModel,
+    String? primeMessage,
     int? ttsSpeakerId,
     double? ttsSpeed,
     VoiceMode? voiceMode,
@@ -81,6 +82,7 @@ class SettingsNotifier extends StateNotifier<Settings> {
     state = state.copyWith(
       simpleChatBaseUrl: simpleChatBaseUrl,
       simpleChatModel: simpleChatModel,
+      primeMessage: primeMessage,
       ttsSpeakerId: ttsSpeakerId,
       ttsSpeed: ttsSpeed,
       voiceMode: voiceMode,
@@ -101,7 +103,9 @@ class SettingsNotifier extends StateNotifier<Settings> {
         if (verified == jsonString) {
           debugPrint('Save verified: data persisted correctly');
         } else {
-          debugPrint('WARNING: Save verification failed - data may not be persisted');
+          debugPrint(
+            'WARNING: Save verification failed - data may not be persisted',
+          );
           return false;
         }
       } else {

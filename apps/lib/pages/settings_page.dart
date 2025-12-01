@@ -14,6 +14,7 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   late TextEditingController _baseUrlController;
   late TextEditingController _modelController;
+  late TextEditingController _primeMessageController;
   late TextEditingController _ttsSpeakerIdController;
   late double _ttsSpeed;
   final _formKey = GlobalKey<FormState>();
@@ -26,6 +27,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       text: settings.simpleChatBaseUrl,
     );
     _modelController = TextEditingController(text: settings.simpleChatModel);
+    _primeMessageController = TextEditingController(
+      text: settings.primeMessage,
+    );
     _ttsSpeakerIdController = TextEditingController(
       text: settings.ttsSpeakerId.toString(),
     );
@@ -36,6 +40,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void dispose() {
     _baseUrlController.dispose();
     _modelController.dispose();
+    _primeMessageController.dispose();
     _ttsSpeakerIdController.dispose();
     super.dispose();
   }
@@ -48,6 +53,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         .updateSettings(
           simpleChatBaseUrl: _baseUrlController.text.trim(),
           simpleChatModel: _modelController.text.trim(),
+          primeMessage: _primeMessageController.text.trim(),
           ttsSpeakerId: int.parse(_ttsSpeakerIdController.text.trim()),
           ttsSpeed: _ttsSpeed,
         );
@@ -112,6 +118,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final settings = ref.read(settingsProvider);
     _baseUrlController.text = settings.simpleChatBaseUrl;
     _modelController.text = settings.simpleChatModel;
+    _primeMessageController.text = settings.primeMessage;
     _ttsSpeakerIdController.text = settings.ttsSpeakerId.toString();
     setState(() {
       _ttsSpeed = settings.ttsSpeed;
@@ -227,6 +234,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter a model name';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _primeMessageController,
+              decoration: const InputDecoration(
+                labelText: 'Prime Message',
+                hintText: 'System prompt sent with every request',
+                border: OutlineInputBorder(),
+                helperText: 'Customize how the assistant should behave',
+              ),
+              minLines: 5,
+              maxLines: 12,
+              textInputAction: TextInputAction.newline,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Prime message cannot be empty';
                 }
                 return null;
               },

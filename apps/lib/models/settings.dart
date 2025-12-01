@@ -1,8 +1,8 @@
 enum VoiceMode {
-  silent,       // One-shot recording, no auto-playback
-  listening,    // Continuous recording, no auto-playback
+  silent, // One-shot recording, no auto-playback
+  listening, // Continuous recording, no auto-playback
   conversation, // Continuous recording + auto-playback
-  reading,      // One-shot recording + auto-playback
+  reading, // One-shot recording + auto-playback
 }
 
 class Settings {
@@ -11,6 +11,9 @@ class Settings {
 
   // Model name that is usable with the simple chat API endpoint
   final String simpleChatModel;
+
+  // Initial prompt sent at the beginning of every chat session
+  final String primeMessage;
 
   // TTS settings
   final int ttsSpeakerId;
@@ -22,6 +25,7 @@ class Settings {
   const Settings({
     required this.simpleChatBaseUrl,
     required this.simpleChatModel,
+    required this.primeMessage,
     required this.ttsSpeakerId,
     required this.ttsSpeed,
     required this.voiceMode,
@@ -31,6 +35,7 @@ class Settings {
     return const Settings(
       simpleChatBaseUrl: 'http://localhost:1234/api/v1',
       simpleChatModel: 'gpt-oss-20b-mxfp4-GGUF',
+      primeMessage: _defaultPrimeMessage,
       ttsSpeakerId: 0,
       ttsSpeed: 1.0,
       voiceMode: VoiceMode.conversation, // Conversation mode by default
@@ -40,6 +45,7 @@ class Settings {
   Settings copyWith({
     String? simpleChatBaseUrl,
     String? simpleChatModel,
+    String? primeMessage,
     int? ttsSpeakerId,
     double? ttsSpeed,
     VoiceMode? voiceMode,
@@ -47,6 +53,7 @@ class Settings {
     return Settings(
       simpleChatBaseUrl: simpleChatBaseUrl ?? this.simpleChatBaseUrl,
       simpleChatModel: simpleChatModel ?? this.simpleChatModel,
+      primeMessage: primeMessage ?? this.primeMessage,
       ttsSpeakerId: ttsSpeakerId ?? this.ttsSpeakerId,
       ttsSpeed: ttsSpeed ?? this.ttsSpeed,
       voiceMode: voiceMode ?? this.voiceMode,
@@ -64,6 +71,7 @@ class Settings {
     return {
       'simpleChatBaseUrl': simpleChatBaseUrl,
       'simpleChatModel': simpleChatModel,
+      'primeMessage': primeMessage,
       'ttsSpeakerId': ttsSpeakerId,
       'ttsSpeed': ttsSpeed,
       'voiceMode': voiceMode.name,
@@ -90,6 +98,7 @@ class Settings {
     return Settings(
       simpleChatBaseUrl: json['simpleChatBaseUrl'] as String,
       simpleChatModel: json['simpleChatModel'] as String,
+      primeMessage: (json['primeMessage'] as String?) ?? _defaultPrimeMessage,
       ttsSpeakerId: (json['ttsSpeakerId'] as int?) ?? 0,
       ttsSpeed: (json['ttsSpeed'] as num?)?.toDouble() ?? 1.0,
       voiceMode: mode,
@@ -102,6 +111,7 @@ class Settings {
     return other is Settings &&
         other.simpleChatBaseUrl == simpleChatBaseUrl &&
         other.simpleChatModel == simpleChatModel &&
+        other.primeMessage == primeMessage &&
         other.ttsSpeakerId == ttsSpeakerId &&
         other.ttsSpeed == ttsSpeed &&
         other.voiceMode == voiceMode;
@@ -109,10 +119,34 @@ class Settings {
 
   @override
   int get hashCode => Object.hash(
-        simpleChatBaseUrl,
-        simpleChatModel,
-        ttsSpeakerId,
-        ttsSpeed,
-        voiceMode,
-      );
+    simpleChatBaseUrl,
+    simpleChatModel,
+    primeMessage,
+    ttsSpeakerId,
+    ttsSpeed,
+    voiceMode,
+  );
 }
+
+const _defaultPrimeMessage = '''
+Hi, you can call me Jane. We communicate via audio. Please expect some
+spelling problems, incomplete messages or repetition. Often this is due to
+text recognition or connection errors. Please assume repetition of content
+from the last message is not needed.
+
+Example: The video game name "Zelda" might be falsely recognized as "sel da"
+or "cell da". Still you should be able to figure out what was actually meant.
+
+Example: You receive a simple "?" or just words that does not form a sentence
+or choice in the current context like "green" or "when I". Then just ignore it
+or let me know you got an incomplete message.
+
+You are assisting me in daily tasks. Please answer quick and brief in 1-3
+sentences unless otherwise specified. Feel free to ask back in order to give
+quality answers. Be transparent if you are unsure or need clarification.
+
+Example: You recognize I am asking about snow cat. Before telling me much about
+the animal, ask me if I want to learn more about the animal. Maybe I meant the
+transportation vehicle instead. Be mindfull of the time it takes to listen to
+the wrong answer.
+''';

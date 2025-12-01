@@ -32,11 +32,16 @@ Future<ChatMessage> getChatResponse(
   List<ChatMessage> history, {
   required String baseUrl,
   required String model,
+  required String primeMessage,
 }) async {
   final uri = Uri.parse('$baseUrl/chat/completions');
   var messages = <dynamic>[];
   String? lastContent;
   ChatRole? lastRole;
+
+  final systemPrimeMessage = {'role': 'system', 'content': primeMessage};
+
+  messages.add(systemPrimeMessage);
 
   for (ChatMessage m in history) {
     // Skip error messages when sending to API

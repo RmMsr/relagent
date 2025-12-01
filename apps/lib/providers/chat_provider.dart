@@ -68,6 +68,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         state.messages,
         baseUrl: settings.simpleChatBaseUrl,
         model: settings.simpleChatModel,
+        primeMessage: settings.primeMessage,
       );
 
       // Add assistant response
