@@ -15,19 +15,13 @@ class AudioCoordinatorState {
   final AudioMode mode;
   final String? error;
 
-  const AudioCoordinatorState({
-    required this.mode,
-    this.error,
-  });
+  const AudioCoordinatorState({required this.mode, this.error});
 
   factory AudioCoordinatorState.initial() {
     return const AudioCoordinatorState(mode: AudioMode.idle);
   }
 
-  AudioCoordinatorState copyWith({
-    AudioMode? mode,
-    String? Function()? error,
-  }) {
+  AudioCoordinatorState copyWith({AudioMode? mode, String? Function()? error}) {
     return AudioCoordinatorState(
       mode: mode ?? this.mode,
       error: error != null ? error() : this.error,
@@ -43,8 +37,8 @@ class AudioCoordinatorState {
 
 final audioCoordinatorProvider =
     StateNotifierProvider<AudioCoordinator, AudioCoordinatorState>((ref) {
-  return AudioCoordinator(ref);
-});
+      return AudioCoordinator(ref);
+    });
 
 class AudioCoordinator extends StateNotifier<AudioCoordinatorState> {
   final Ref ref;
@@ -62,7 +56,7 @@ class AudioCoordinator extends StateNotifier<AudioCoordinatorState> {
       // Transition to idle, which will trigger TTS to stop
       state = const AudioCoordinatorState(mode: AudioMode.idle);
       // Give TTS a moment to stop
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
     }
 
     if (state.mode != AudioMode.idle) {
@@ -89,7 +83,7 @@ class AudioCoordinator extends StateNotifier<AudioCoordinatorState> {
       // Transition to idle, which will trigger Recording to stop
       state = const AudioCoordinatorState(mode: AudioMode.idle);
       // Give Recording a moment to stop
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
     }
 
     if (state.mode != AudioMode.idle) {

@@ -86,8 +86,8 @@ class ChatInputState extends State<ChatInput> {
 class ChatHistory extends StatelessWidget {
   final List<ChatMessage> messages;
   final bool showAssistantPending;
-  final Function(String)? onRetry;
-  final Function(String, String)? onSpeak;
+  final void Function(String)? onRetry;
+  final void Function(String, String)? onSpeak;
   final PlaybackStatus Function(String)? getPlaybackStatus;
 
   const ChatHistory({
@@ -142,8 +142,8 @@ class ChatHistory extends StatelessWidget {
 
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
-  final Function(String)? onRetry;
-  final Function(String, String)? onSpeak;
+  final void Function(String)? onRetry;
+  final void Function(String, String)? onSpeak;
   final PlaybackStatus Function(String)? getPlaybackStatus;
 
   const ChatMessageBubble({

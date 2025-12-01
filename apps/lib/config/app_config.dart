@@ -13,7 +13,7 @@ class AppConfig {
   // Download it from: https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models
   static late final String ttsModelName;
 
-  static load() async {
+  static Future<void> load() async {
     final config = jsonDecode(
       await rootBundle.loadString('assets/config.json'),
     );

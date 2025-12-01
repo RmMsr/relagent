@@ -34,7 +34,7 @@ Future<ChatMessage> getChatResponse(
   required String model,
 }) async {
   final uri = Uri.parse('$baseUrl/chat/completions');
-  var messages = [];
+  var messages = <dynamic>[];
   String? lastContent;
   ChatRole? lastRole;
 

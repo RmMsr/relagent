@@ -43,7 +43,7 @@ class MyApp extends StatelessWidget {
       ),
       routerConfig: appRouter,
       // Performance overlay - shows FPS and frame rendering time
-      showPerformanceOverlay: true,
+      showPerformanceOverlay: false,
     );
   }
 }
