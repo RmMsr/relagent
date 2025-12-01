@@ -93,6 +93,7 @@ class ASR {
         );
 
         final stream = await _audioRecorder.startStream(config);
+        String? lastText;
 
         stream.listen(
           (data) {
@@ -111,7 +112,8 @@ class ASR {
             }
             final text = _recognizer!.getResult(_stream!).text;
 
-            if (text != '') {
+            if (text != '' && text != lastText) {
+              lastText = text;
               textRecognized(text);
             }
 

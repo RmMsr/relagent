@@ -177,6 +177,10 @@ class TtsIsolateWorker {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
+    // CRITICAL: Pre-cache model files in main isolate BEFORE spawning worker
+    // Background isolates can't access rootBundle, so files must be cached first
+    await preCacheTtsModelFiles(modelName: AppConfig.ttsModelName);
+
     debugPrint('[TTS Manager] Spawning worker isolate...');
     final receivePort = ReceivePort();
 
@@ -189,6 +193,7 @@ class TtsIsolateWorker {
     _isolate = await Isolate.spawn(
       _ttsWorkerIsolate,
       _IsolateTask(receivePort.sendPort, rootIsolateToken),
+      errorsAreFatal: false, // Prevent isolate crashes from taking down the app
     );
 
     // Get the worker's SendPort

@@ -65,8 +65,10 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
     });
 
     // Listen to coordinator state changes - stop/resume as needed
-    ref.listen<AudioCoordinatorState>(audioCoordinatorProvider,
-        (previous, next) {
+    ref.listen<AudioCoordinatorState>(audioCoordinatorProvider, (
+      previous,
+      next,
+    ) {
       // Handle forced stop (coordinator needs to play audio)
       if (state.isRecording &&
           previous?.mode == AudioMode.recording &&
@@ -239,10 +241,7 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
     try {
       _initASR();
       await _asr!.start();
-      state = state.copyWith(
-        isRecording: true,
-        error: null,
-      );
+      state = state.copyWith(isRecording: true, error: null);
       debugPrint('RecordingProvider: Internal start completed');
     } catch (e) {
       debugPrint('RecordingProvider: Internal start failed: $e');

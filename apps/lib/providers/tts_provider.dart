@@ -420,6 +420,10 @@ class TtsNotifier extends StateNotifier<TtsState> {
       // Normal queue processing
       _processQueue();
     }
+
+    // Reset completed message to idle after queue processing
+    // This ensures the UI doesn't continue showing the pause icon
+    _updateMessageState(messageId, status: PlaybackStatus.idle);
   }
 
   void _handleError(String messageId, String error) {
