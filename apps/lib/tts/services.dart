@@ -44,6 +44,11 @@ class TtsService {
     }
   }
 
+  /// Public method to pre-initialize TTS in background
+  Future<void> initialize() async {
+    await _init();
+  }
+
   Future<bool> speak(String text, String messageId) async {
     await _init();
 

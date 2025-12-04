@@ -156,6 +156,15 @@ class TtsNotifier extends StateNotifier<TtsState> {
     }
   }
 
+  /// Pre-initialize TTS in background to minimize wait time when first needed
+  Future<void> preInitialize() async {
+    debugPrint('TtsProvider: Pre-initializing TTS...');
+    final service = _getService();
+    // Start background initialization
+    await service.initialize();
+    debugPrint('TtsProvider: TTS pre-initialization complete');
+  }
+
   Future<void> togglePlayPause(String text, String messageId) async {
     final service = _getService();
     final messageState = state.getMessageState(messageId);

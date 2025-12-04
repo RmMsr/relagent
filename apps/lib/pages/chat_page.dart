@@ -25,6 +25,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     // This ensures we don't start recording during app initialization
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(recordingProvider.notifier).checkAutoStart();
+      // Pre-initialize TTS in background to minimize wait time on first use
+      ref.read(ttsProvider.notifier).preInitialize();
     });
   }
 
