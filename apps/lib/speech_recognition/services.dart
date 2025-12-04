@@ -10,7 +10,8 @@ import '/speech_recognition/sherpa_streaming_asr.dart';
 import '/speech_recognition/utils.dart';
 
 class ASR {
-  late final AudioRecorder _audioRecorder;
+  AudioRecorder? _audioRecorder;
+  bool _isAudioRecorderInitialized = false;
 
   bool _isInitialized = false;
 
@@ -34,11 +35,15 @@ class ASR {
   });
 
   void init() {
+    if (_isAudioRecorderInitialized) return;
+
     _audioRecorder = AudioRecorder();
 
-    _recordSub = _audioRecorder.onStateChanged().listen((recordState) {
+    _recordSub = _audioRecorder!.onStateChanged().listen((recordState) {
       _updateRecordState(recordState);
     });
+
+    _isAudioRecorderInitialized = true;
   }
 
   Future<void> start() async {
@@ -64,7 +69,7 @@ class ASR {
     }
 
     try {
-      if (await _audioRecorder.hasPermission()) {
+      if (await _audioRecorder!.hasPermission()) {
         const availableEncoders = [AudioEncoder.pcm16bits, AudioEncoder.aacLc];
         AudioEncoder? supportedEncoder;
         for (final e in availableEncoders) {
@@ -80,7 +85,7 @@ class ASR {
         }
 
         final AudioEncoder encoder = supportedEncoder;
-        final devs = await _audioRecorder.listInputDevices();
+        final devs = await _audioRecorder!.listInputDevices();
         debugPrint(devs.toString());
 
         final config = RecordConfig(
@@ -92,7 +97,7 @@ class ASR {
           numChannels: 1,
         );
 
-        final stream = await _audioRecorder.startStream(config);
+        final stream = await _audioRecorder!.startStream(config);
         String? lastText;
 
         stream.listen(
@@ -138,12 +143,12 @@ class ASR {
     _stream!.free();
     _stream = _recognizer!.createStream();
 
-    await _audioRecorder.stop();
+    await _audioRecorder!.stop();
   }
 
-  Future<void> pause() => _audioRecorder.pause();
+  Future<void> pause() => _audioRecorder!.pause();
 
-  Future<void> resume() => _audioRecorder.resume();
+  Future<void> resume() => _audioRecorder!.resume();
 
   void _updateRecordState(RecordState recordState) {
     _recordState = recordState;
@@ -151,14 +156,14 @@ class ASR {
   }
 
   Future<bool> _isEncoderSupported(AudioEncoder encoder) async {
-    final isSupported = await _audioRecorder.isEncoderSupported(encoder);
+    final isSupported = await _audioRecorder!.isEncoderSupported(encoder);
 
     if (!isSupported) {
       debugPrint('${encoder.name} is not supported on this platform.');
       debugPrint('Supported encoders are:');
 
       for (final e in AudioEncoder.values) {
-        if (await _audioRecorder.isEncoderSupported(e)) {
+        if (await _audioRecorder!.isEncoderSupported(e)) {
           debugPrint('- ${e.name}');
         }
       }
@@ -169,7 +174,7 @@ class ASR {
 
   void dispose() {
     _recordSub?.cancel();
-    _audioRecorder.dispose();
+    _audioRecorder?.dispose();
     _stream?.free();
     _recognizer?.free();
   }

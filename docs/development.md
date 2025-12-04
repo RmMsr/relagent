@@ -8,19 +8,20 @@ Implementation should prioritize:
 
 - Existing functionality over custom solutions or additional dependencies
 - Simple implementation over strong optimization, high customization or personal taste
+- More smaller classes with distinct purpose over complex state and logic in one class.
 - Readable and maintainable code over quick results
-
-Formatting and consistency are important. Use .editorconfig and linters.
 
 In order to value privacy, we have to care about security. Be explicit on tradeoffs and keep dependencies to a minimum.
 
 ### Coding style
 
-Respect the rules of linters and editor configuration (.editorconfig).
+Formatting and consistency are important. Use .editorconfig and linters.
+
+The goal is to have self-explanarory code most of the time.
 
 Use line comments only if they add significant to the understandability of the code. If renaming can do the same, use better names, order or structure.
 
-Use blocks of comments to briefly explain functionality and responsibility of classes. Skip them if the complexity is low. If functions are getting highly complex, try breaking the logic into smaller pieces.
+Classes and modules deserve an brief explanation what their functionality and responsibility is. If functions are getting highly complex, try breaking the logic into smaller pieces. Assume an reader that has a fundamental understanding of application programming. Explain the intention of complex logic, side effects or intentional specific implementation details. Leave out comments that just rephrase what the code already describes.
 
 ## Environment
 

@@ -1,5 +1,8 @@
 {
-    "speech_recognition": {
-        "streaming_asr_model": "sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06"
-    }
+  "speech_recognition": {
+    "streaming_asr_model": "sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06"
+  },
+  "tts": {
+    "model": "kokoro-en-v0_19"
+  }
 }

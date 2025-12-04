@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '/chat/widgets.dart';
 import '/providers/chat_provider.dart';
+import '/providers/recording_provider.dart';
 import '/providers/tts_provider.dart';
 import '/widgets/voice_mode_selector.dart';
 
@@ -16,6 +17,16 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> {
   final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Trigger auto-recording check once the page is ready
+    // This ensures we don't start recording during app initialization
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(recordingProvider.notifier).checkAutoStart();
+    });
+  }
 
   @override
   void dispose() {

@@ -47,16 +47,22 @@ class RecordingState {
   }
 }
 
-final recordingProvider =
-    StateNotifierProvider<RecordingNotifier, RecordingState>((ref) {
-      return RecordingNotifier(ref);
-    });
+final recordingProvider = NotifierProvider<RecordingNotifier, RecordingState>(
+  () {
+    return RecordingNotifier();
+  },
+);
 
-class RecordingNotifier extends StateNotifier<RecordingState> {
-  final Ref ref;
+class RecordingNotifier extends Notifier<RecordingState> {
   ASR? _asr;
 
-  RecordingNotifier(this.ref) : super(RecordingState.initial()) {
+  @override
+  RecordingState build() {
+    // Clean up on dispose
+    ref.onDispose(() {
+      _asr?.dispose();
+    });
+
     // Listen to voice mode changes
     ref.listen<Settings>(settingsProvider, (previous, next) {
       if (previous?.voiceMode != next.voiceMode) {
@@ -68,7 +74,7 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
     ref.listen<AudioCoordinatorState>(audioCoordinatorProvider, (
       previous,
       next,
-    ) {
+    ) async {
       // Handle forced stop (coordinator needs to play audio)
       if (state.isRecording &&
           previous?.mode == AudioMode.recording &&
@@ -76,7 +82,7 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
         debugPrint(
           'RecordingProvider: Coordinator forced stop, stopping recording',
         );
-        internalStop();
+        await internalStop();
       }
 
       // Handle auto-resume (coordinator finished playing, resuming continuous recording)
@@ -87,16 +93,28 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
         debugPrint(
           'RecordingProvider: Coordinator auto-resumed, restarting recording',
         );
-        internalStart();
+        await internalStart();
       }
     });
 
-    // Initialize based on current voice mode
-    // Defer to avoid modifying other providers during initialization
+    return RecordingState.initial();
+  }
+
+  /// Called by initialization code (e.g., startup sequence) to pre-initialize ASR
+  void initialize() {
+    debugPrint('RecordingProvider: initializing ASR...');
+    _initASR();
+    if (_asr != null) {
+      _asr!.init();
+    }
+  }
+
+  /// Called by UI when ready to handle recording (e.g. ChatPage mounted)
+  void checkAutoStart() {
     final currentMode = ref.read(settingsProvider).voiceMode;
     if (currentMode == VoiceMode.listening ||
         currentMode == VoiceMode.conversation) {
-      Future.microtask(() => _startContinuous());
+      _startContinuous();
     }
   }
 
@@ -130,6 +148,8 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
 
     try {
       _initASR();
+      // Ensure initialization is complete (defensive check)
+      if (_asr != null) _asr!.init();
       await _asr!.start();
       state = state.copyWith(
         isRecording: true,
@@ -151,17 +171,17 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
     debugPrint('RecordingProvider: Stopping continuous recording');
     try {
       await _asr?.stop();
+    } catch (e) {
+      debugPrint('RecordingProvider: Error during stop: $e');
+    } finally {
+      // Always update state and release lock, even if stop fails
       state = state.copyWith(
         isRecording: false,
         isContinuous: false,
         recognizedText: '',
       );
-      // Release coordinator lock
       await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
-      debugPrint('RecordingProvider: Continuous recording stopped');
-    } catch (e) {
-      debugPrint('RecordingProvider: Failed to stop continuous recording: $e');
-      state = state.copyWith(error: 'Failed to stop continuous recording: $e');
+      debugPrint('RecordingProvider: Continuous recording stopped (state reset)');
     }
   }
 
@@ -181,6 +201,8 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
 
     try {
       _initASR();
+      // Ensure initialization is complete (defensive check)
+      if (_asr != null) _asr!.init();
       await _asr!.start();
       state = state.copyWith(
         isRecording: true,
@@ -203,13 +225,13 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
     debugPrint('RecordingProvider: Stopping single recording');
     try {
       await _asr?.stop();
-      state = state.copyWith(isRecording: false);
-      // Release coordinator lock
-      await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
-      debugPrint('RecordingProvider: Single recording stopped');
     } catch (e) {
-      debugPrint('RecordingProvider: Failed to stop recording: $e');
-      state = state.copyWith(error: 'Failed to stop recording: $e');
+      debugPrint('RecordingProvider: Error during stop: $e');
+    } finally {
+      // Always update state and release lock, even if stop fails
+      state = state.copyWith(isRecording: false);
+      await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
+      debugPrint('RecordingProvider: Single recording stopped (state reset)');
     }
   }
 
@@ -226,13 +248,15 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
     debugPrint('RecordingProvider: internalStop() called by coordinator');
     try {
       await _asr?.stop();
+    } catch (e) {
+      debugPrint('RecordingProvider: Error during internal stop: $e');
+    } finally {
+      // Always update state, even if stop fails
       state = state.copyWith(
         isRecording: false,
         // Keep isContinuous flag so we know to resume later
       );
-      debugPrint('RecordingProvider: Internal stop completed');
-    } catch (e) {
-      debugPrint('RecordingProvider: Internal stop failed: $e');
+      debugPrint('RecordingProvider: Internal stop completed (state reset)');
     }
   }
 
@@ -240,6 +264,8 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
     debugPrint('RecordingProvider: internalStart() called for auto-resume');
     try {
       _initASR();
+      // Ensure initialization is complete (defensive check)
+      if (_asr != null) _asr!.init();
       await _asr!.start();
       state = state.copyWith(isRecording: true, error: null);
       debugPrint('RecordingProvider: Internal start completed');
@@ -275,12 +301,6 @@ class RecordingNotifier extends StateNotifier<RecordingState> {
         state = state.copyWith(recordState: recordState);
       },
     );
-    _asr!.init();
-  }
-
-  @override
-  void dispose() {
-    _asr?.dispose();
-    super.dispose();
+    // NOTE: Do NOT call init() here - it's called by initialize() or before start()
   }
 }
