@@ -23,6 +23,12 @@ Use line comments only if they add significant to the understandability of the c
 
 Classes and modules deserve an brief explanation what their functionality and responsibility is. If functions are getting highly complex, try breaking the logic into smaller pieces. Assume an reader that has a fundamental understanding of application programming. Explain the intention of complex logic, side effects or intentional specific implementation details. Leave out comments that just rephrase what the code already describes.
 
+### Commits
+
+Commits should be small and focus on one aspect.
+
+Commits messages should start with one short block summarizing the change. Major points can be added as list below.
+
 ## Environment
 
 Typical development environment is a Linux/Unix system with:
