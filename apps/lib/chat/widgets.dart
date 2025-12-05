@@ -160,9 +160,8 @@ class ChatMessageBubble extends StatelessWidget {
     final time = DateFormat.Hms().format(message.timestamp);
     final isError = message.role == ChatRole.error;
     final isUser = message.role == ChatRole.user;
-    final messageId = message.timestamp.millisecondsSinceEpoch.toString();
     final playbackStatus =
-        getPlaybackStatus?.call(messageId) ?? PlaybackStatus.idle;
+        getPlaybackStatus?.call(message.id) ?? PlaybackStatus.idle;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,7 +183,7 @@ class ChatMessageBubble extends StatelessWidget {
             children: [
               // TTS button for assistant messages (on the left)
               if (message.role == ChatRole.assistant && onSpeak != null)
-                _buildTtsButton(theme, playbackStatus, messageId),
+                _buildTtsButton(theme, playbackStatus, message.id),
               // Message content
               Expanded(child: _buildMessageContent(theme, isError)),
               // Retry button for user messages (on the right)

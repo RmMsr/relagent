@@ -383,7 +383,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
   }
 
   void _handlePlaybackStarted(String messageId) {
-    debugPrint('TtsProvider: Playback started for message: $messageId');
+    debugPrint('TtsProvider: Playback started [$messageId]');
 
     // Request playback lock when audio actually starts playing (for generated audio)
     // For cached audio, lock is already acquired before playback
@@ -404,7 +404,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
   }
 
   void _handlePlaybackFinished(String messageId) {
-    debugPrint('TtsProvider: Playback finished for message: $messageId');
+    debugPrint('TtsProvider: Playback finished [$messageId]');
     _updateMessageState(messageId, status: PlaybackStatus.completed);
 
     // Check if any other message is still playing

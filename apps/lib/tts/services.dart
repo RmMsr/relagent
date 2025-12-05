@@ -67,6 +67,7 @@ class TtsService {
           // This now happens in a background isolate - won't block the UI!
           final wavBytes = await _worker.generateAudio(
             text: text,
+            messageId: messageId,
             speakerId: speakerId,
             speed: speed,
           );

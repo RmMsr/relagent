@@ -28,11 +28,13 @@ class InitializeTtsMessage extends TtsWorkerMessage {
 
 class GenerateAudioMessage extends TtsWorkerMessage {
   final String text;
+  final String messageId;
   final int speakerId;
   final double speed;
   final SendPort responsePort;
   GenerateAudioMessage({
     required this.text,
+    required this.messageId,
     required this.speakerId,
     required this.speed,
     required this.responsePort,
@@ -114,7 +116,7 @@ void _ttsWorkerIsolate(_IsolateTask task) {
           }
 
           final totalStopwatch = Stopwatch()..start();
-          debugPrint('[TTS Worker] Generating audio for text (${message.text.length} chars)...');
+          debugPrint('[TTS Worker] Generating audio for [${message.messageId}] (${message.text.length} chars)...');
 
           final generateStopwatch = Stopwatch()..start();
           final audio = tts!.generate(
@@ -139,7 +141,7 @@ void _ttsWorkerIsolate(_IsolateTask task) {
           final audioDuration = audio.samples.length / audio.sampleRate;
           final rtf = (totalStopwatch.elapsedMilliseconds / 1000) / audioDuration;
 
-          debugPrint('[TTS Worker] ✓ Audio generated:');
+          debugPrint('[TTS Worker] ✓ Audio generated for [${message.messageId}]:');
           debugPrint('  - Generate: ${(generateStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s');
           debugPrint('  - Convert to WAV: ${convertStopwatch.elapsedMilliseconds}ms');
           debugPrint('  - Total: ${(totalStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s');
@@ -221,6 +223,7 @@ class TtsIsolateWorker {
   /// Generate audio in the background isolate
   Future<Uint8List> generateAudio({
     required String text,
+    required String messageId,
     required int speakerId,
     required double speed,
   }) async {
@@ -231,6 +234,7 @@ class TtsIsolateWorker {
     final responsePort = ReceivePort();
     _workerSendPort!.send(GenerateAudioMessage(
       text: text,
+      messageId: messageId,
       speakerId: speakerId,
       speed: speed,
       responsePort: responsePort.sendPort,

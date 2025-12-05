@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/chat/models.dart';
@@ -76,10 +77,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
         showAssistantPending: false,
       );
 
+      // Debug: Show message ID and preview
+      final preview = response.text.length > 50
+          ? '${response.text.substring(0, 50)}...'
+          : response.text;
+      debugPrint('ChatProvider: Received message [${response.id}]: $preview');
+
       // Auto-queue the assistant response for TTS playback if in auto-playback mode
       if (settings.isAutoPlayback) {
-        final messageId = response.timestamp.millisecondsSinceEpoch.toString();
-        ref.read(ttsProvider.notifier).enqueue(response.text, messageId);
+        ref.read(ttsProvider.notifier).enqueue(response.text, response.id);
       }
     } catch (e) {
       // Handle error - add error message to chat history
