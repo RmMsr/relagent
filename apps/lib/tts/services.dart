@@ -140,6 +140,21 @@ class TtsService {
     return _audioCache.containsKey(messageId);
   }
 
+  /// Query methods for polling player state instead of callbacks
+  bool isPlaying(String messageId) {
+    return _players[messageId]?.playing ?? false;
+  }
+
+  bool isPaused(String messageId) {
+    final player = _players[messageId];
+    if (player == null) return false;
+    return !player.playing && player.processingState == ProcessingState.ready;
+  }
+
+  ProcessingState? getProcessingState(String messageId) {
+    return _players[messageId]?.processingState;
+  }
+
   Future<void> _playFromCache(String messageId) async {
     final audioBytes = _audioCache[messageId];
     if (audioBytes == null) return;
@@ -150,6 +165,7 @@ class TtsService {
       _players[messageId] = player;
 
       bool hasNotifiedStart = false;
+      bool hasNotifiedFinish = false;
 
       player.playerStateStream.listen((state) {
         debugPrint('TtsService: Player state for $messageId: playing=${state.playing}, processingState=${state.processingState}');
@@ -166,10 +182,16 @@ class TtsService {
           hasNotifiedStart = false;
         }
 
-        // Notify when playback completes
-        if (state.processingState == ProcessingState.completed) {
+        // Notify when playback completes (only once)
+        if (state.processingState == ProcessingState.completed && !hasNotifiedFinish) {
+          hasNotifiedFinish = true;
           debugPrint('TtsService: Calling onPlaybackFinished for $messageId');
           onPlaybackFinished?.call(messageId);
+        }
+
+        // Reset finish flag when player is reset
+        if (state.processingState == ProcessingState.idle) {
+          hasNotifiedFinish = false;
         }
       });
     }

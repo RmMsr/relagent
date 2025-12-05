@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '/models/settings.dart';
 import '/providers/audio_coordinator_provider.dart';
@@ -109,6 +112,7 @@ class TtsNotifier extends StateNotifier<TtsState> {
   final Ref ref;
   TtsService? _service;
   bool _manualPlayInProgress = false;
+  bool _isProcessingQueue = false; // Lock to prevent concurrent queue processing
 
   TtsNotifier(this.ref) : super(TtsState.initial()) {
     // Listen to settings changes
@@ -304,11 +308,13 @@ class TtsNotifier extends StateNotifier<TtsState> {
 
   /// Add a message to the playback queue
   void enqueue(String text, String messageId) {
+    debugPrint('TtsProvider: enqueue() called for [$messageId]');
     final item = QueueItem(messageId: messageId, text: text);
     // Don't add duplicates
     if (!state.playbackQueue.contains(item)) {
       final newQueue = [...state.playbackQueue, item];
       state = state.copyWith(playbackQueue: newQueue);
+      debugPrint('TtsProvider: Added [$messageId] to queue (queue size: ${newQueue.length})');
 
       // Eagerly pre-generate audio in background (non-blocking)
       // This allows audio to be ready when it's time to play
@@ -316,8 +322,13 @@ class TtsNotifier extends StateNotifier<TtsState> {
 
       // Start processing if nothing is playing
       if (!state.isAnyPlaying) {
+        debugPrint('TtsProvider: Nothing playing, starting queue processing');
         _processQueue();
+      } else {
+        debugPrint('TtsProvider: Playback active, queue will process after current finishes');
       }
+    } else {
+      debugPrint('TtsProvider: Skipping duplicate [$messageId]');
     }
   }
 
@@ -336,6 +347,9 @@ class TtsNotifier extends StateNotifier<TtsState> {
     } else {
       _updateMessageState(messageId, status: PlaybackStatus.idle, error: 'Generation failed');
     }
+
+    // Trigger queue processing in case it was waiting for this message
+    _processQueue();
   }
 
   /// Remove a specific item from the queue
@@ -366,24 +380,108 @@ class TtsNotifier extends StateNotifier<TtsState> {
 
   /// Process the next item in the queue
   Future<void> _processQueue() async {
-    // Don't process if something is already playing or generating
-    if (state.isAnyPlaying ||
-        state.messageStates.values.any((s) => s.isGenerating)) {
+    // Acquire lock to prevent concurrent queue processing
+    if (_isProcessingQueue) {
+      debugPrint('TtsProvider: _processQueue already in progress, skipping');
       return;
     }
+    _isProcessingQueue = true;
 
-    // Get next item from queue
-    if (state.playbackQueue.isEmpty) {
-      return;
+    try {
+      debugPrint('TtsProvider: _processQueue() called (queue size: ${state.playbackQueue.length})');
+
+      // Don't process if something is already playing
+      if (state.isAnyPlaying) {
+        debugPrint('TtsProvider: Something already playing, skipping queue processing');
+        return;
+      }
+
+      // Get next item from queue
+      if (state.playbackQueue.isEmpty) {
+        debugPrint('TtsProvider: Queue is empty');
+        return;
+      }
+
+      final item = state.playbackQueue.first;
+      debugPrint('TtsProvider: Processing queue item [${item.messageId}]');
+
+      // Wait for this specific message to finish generating before playing
+      // (other messages can generate in background)
+      final messageState = state.getMessageState(item.messageId);
+      if (messageState.isGenerating) {
+        debugPrint('TtsProvider: Queue waiting for [${item.messageId}] to finish generating');
+        return;
+      }
+
+      // Remove from queue
+      final newQueue = state.playbackQueue.sublist(1);
+      state = state.copyWith(playbackQueue: newQueue);
+      debugPrint('TtsProvider: Starting playback for [${item.messageId}]');
+
+      // Play the item (from cache, as it was pre-generated)
+      final service = _getService();
+
+      // Request playback permission
+      debugPrint('TtsProvider: Requesting playback permission for queued item [${item.messageId}]');
+      final granted = await ref
+          .read(audioCoordinatorProvider.notifier)
+          .requestPlayback();
+
+      if (!granted) {
+        debugPrint('TtsProvider: Coordinator denied playback request');
+        return;
+      }
+
+      // Play from cache (audio was pre-generated)
+      await service.playFromCache(item.messageId);
+      _updateMessageState(item.messageId, status: PlaybackStatus.playing);
+
+      // Start polling player state to detect transitions
+      debugPrint('TtsProvider: Starting state polling for [${item.messageId}]');
+      _startPolling(item.messageId);
+    } finally {
+      // Release lock
+      _isProcessingQueue = false;
     }
 
-    final item = state.playbackQueue.first;
-    // Remove from queue
-    final newQueue = state.playbackQueue.sublist(1);
-    state = state.copyWith(playbackQueue: newQueue);
+    // After playback command completes and lock is released, check if we should continue
+    debugPrint('TtsProvider: Playback command completed, checking for next item');
+    if (state.playbackQueue.isNotEmpty && !state.isAnyPlaying) {
+      debugPrint('TtsProvider: Queue has more items, continuing processing');
+      // Recursively process next item (lock is now released)
+      await _processQueue();
+    }
+  }
 
-    // Play the item
-    await togglePlayPause(item.text, item.messageId);
+  /// Start periodic polling for a message's player state
+  void _startPolling(String messageId) {
+    // Poll every 100ms to detect state changes
+    Timer.periodic(Duration(milliseconds: 100), (timer) {
+      final service = _service;
+      if (service == null) {
+        timer.cancel();
+        return;
+      }
+
+      final processingState = service.getProcessingState(messageId);
+
+      // Stop polling when playback completes or player is disposed
+      if (processingState == null ||
+          processingState == ProcessingState.idle ||
+          processingState == ProcessingState.completed) {
+        debugPrint('TtsProvider: Stopping polling for [$messageId] (state: $processingState)');
+        timer.cancel();
+
+        // Do final poll to catch completion
+        if (processingState == ProcessingState.completed) {
+          _pollPlayerState(messageId);
+        }
+        return;
+      }
+
+      // Poll for state changes
+      _pollPlayerState(messageId);
+    });
   }
 
   void _updateMessageState(
@@ -402,6 +500,29 @@ class TtsNotifier extends StateNotifier<TtsState> {
     final newStates = Map<String, MessageTtsState>.from(state.messageStates);
     newStates[messageId] = newMessageState;
     state = state.copyWith(messageStates: newStates);
+  }
+
+  /// Poll player state to detect transitions (alternative to callbacks)
+  void _pollPlayerState(String messageId) {
+    final service = _service;
+    if (service == null) return;
+
+    final isPlaying = service.isPlaying(messageId);
+    final processingState = service.getProcessingState(messageId);
+    final currentStatus = state.getMessageState(messageId).status;
+
+    // Detect playback started transition
+    if (isPlaying && currentStatus != PlaybackStatus.playing) {
+      debugPrint('TtsProvider: Detected playback start via polling [$messageId]');
+      _handlePlaybackStarted(messageId);
+    }
+
+    // Detect playback finished transition
+    if (processingState == ProcessingState.completed &&
+        currentStatus == PlaybackStatus.playing) {
+      debugPrint('TtsProvider: Detected playback finish via polling [$messageId]');
+      _handlePlaybackFinished(messageId);
+    }
   }
 
   void _handlePlaybackStarted(String messageId) {
@@ -445,11 +566,17 @@ class TtsNotifier extends StateNotifier<TtsState> {
       final settings = ref.read(settingsProvider);
       if (settings.isAutoPlayback) {
         // Re-enable auto-queue: process any queued items
-        _processQueue();
+        if (!_isProcessingQueue) {
+          _processQueue();
+        }
       }
     } else {
-      // Normal queue processing
-      _processQueue();
+      // Normal queue processing (only if not already processing)
+      if (!_isProcessingQueue) {
+        _processQueue();
+      } else {
+        debugPrint('TtsProvider [$messageId]: Queue processing already active, will continue automatically');
+      }
     }
 
     // Reset completed message to idle after queue processing
