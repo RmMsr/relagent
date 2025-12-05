@@ -309,10 +309,32 @@ class TtsNotifier extends StateNotifier<TtsState> {
     if (!state.playbackQueue.contains(item)) {
       final newQueue = [...state.playbackQueue, item];
       state = state.copyWith(playbackQueue: newQueue);
+
+      // Eagerly pre-generate audio in background (non-blocking)
+      // This allows audio to be ready when it's time to play
+      _preGenerateAudio(text, messageId);
+
       // Start processing if nothing is playing
       if (!state.isAnyPlaying) {
         _processQueue();
       }
+    }
+  }
+
+  /// Pre-generate audio in background without blocking
+  Future<void> _preGenerateAudio(String text, String messageId) async {
+    final service = _getService();
+    _updateMessageState(messageId, status: PlaybackStatus.generating);
+
+    debugPrint('TtsProvider: Pre-generating audio [$messageId]');
+    final success = await service.preGenerate(text, messageId);
+
+    if (success) {
+      // Mark as idle (audio cached, ready to play)
+      _updateMessageState(messageId, status: PlaybackStatus.idle);
+      debugPrint('TtsProvider: Pre-generation complete [$messageId]');
+    } else {
+      _updateMessageState(messageId, status: PlaybackStatus.idle, error: 'Generation failed');
     }
   }
 

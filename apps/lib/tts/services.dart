@@ -49,6 +49,43 @@ class TtsService {
     await _init();
   }
 
+  /// Pre-generate audio without playing (for eager generation)
+  Future<bool> preGenerate(String text, String messageId) async {
+    await _init();
+
+    // Skip if already cached
+    if (_audioCache.containsKey(messageId)) {
+      debugPrint('TtsService [$messageId]: Already cached, skipping generation');
+      return true;
+    }
+
+    developer.Timeline.startSync('TTS_PreGeneration', arguments: {
+      'text_length': text.length,
+      'message_id': messageId,
+    });
+
+    try {
+      // Generate audio in background isolate
+      final wavBytes = await _worker.generateAudio(
+        text: text,
+        messageId: messageId,
+        speakerId: speakerId,
+        speed: speed,
+      );
+      developer.Timeline.finishSync();
+
+      // Add to cache with LRU eviction
+      _addToCache(messageId, wavBytes);
+      debugPrint('TtsService [$messageId]: Pre-generated and cached');
+      return true;
+    } catch (e) {
+      developer.Timeline.finishSync();
+      debugPrint('TtsService [$messageId]: Pre-generation failed: $e');
+      onError?.call(messageId, 'Failed to generate audio: $e');
+      return false;
+    }
+  }
+
   Future<bool> speak(String text, String messageId) async {
     await _init();
 
