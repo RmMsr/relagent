@@ -88,7 +88,7 @@ class ChatHistory extends StatelessWidget {
   final bool showAssistantPending;
   final void Function(String)? onRetry;
   final void Function(String, String)? onSpeak;
-  final PlaybackStatus Function(String)? getPlaybackStatus;
+  final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
 
   const ChatHistory({
     super.key,
@@ -96,7 +96,7 @@ class ChatHistory extends StatelessWidget {
     this.showAssistantPending = false,
     this.onRetry,
     this.onSpeak,
-    this.getPlaybackStatus,
+    this.getMessagePlaybackStatus,
   });
 
   @override
@@ -110,7 +110,7 @@ class ChatHistory extends StatelessWidget {
           message: message,
           onRetry: onRetry,
           onSpeak: onSpeak,
-          getPlaybackStatus: getPlaybackStatus,
+          getMessagePlaybackStatus: getMessagePlaybackStatus,
         ),
       );
     }
@@ -144,14 +144,14 @@ class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
   final void Function(String)? onRetry;
   final void Function(String, String)? onSpeak;
-  final PlaybackStatus Function(String)? getPlaybackStatus;
+  final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
 
   const ChatMessageBubble({
     super.key,
     required this.message,
     this.onRetry,
     this.onSpeak,
-    this.getPlaybackStatus,
+    this.getMessagePlaybackStatus,
   });
 
   @override
@@ -161,7 +161,7 @@ class ChatMessageBubble extends StatelessWidget {
     final isError = message.role == ChatRole.error;
     final isUser = message.role == ChatRole.user;
     final playbackStatus =
-        getPlaybackStatus?.call(message.id) ?? PlaybackStatus.idle;
+        getMessagePlaybackStatus?.call(message.id) ?? MessagePlaybackStatus.idle;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,7 +208,7 @@ class ChatMessageBubble extends StatelessWidget {
 
   Widget _buildTtsButton(
     ThemeData theme,
-    PlaybackStatus playbackStatus,
+    MessagePlaybackStatus playbackStatus,
     String messageId,
   ) {
     // Determine icon, tooltip, and color based on playback status
@@ -217,23 +217,23 @@ class ChatMessageBubble extends StatelessWidget {
     final Color? iconColor;
 
     switch (playbackStatus) {
-      case PlaybackStatus.playing:
+      case MessagePlaybackStatus.playing:
         ttsIcon = Icons.pause;
-        ttsTooltip = 'Pause';
+        ttsTooltip = 'Playing';
         iconColor = theme.colorScheme.primary;
         break;
-      case PlaybackStatus.paused:
-        ttsIcon = Icons.play_arrow;
-        ttsTooltip = 'Resume';
-        iconColor = theme.colorScheme.secondary;
-        break;
-      case PlaybackStatus.generating:
+      case MessagePlaybackStatus.generating:
         ttsIcon = Icons.hourglass_empty;
         ttsTooltip = 'Generating audio...';
         iconColor = null;
         break;
-      case PlaybackStatus.completed:
-      case PlaybackStatus.idle:
+      case MessagePlaybackStatus.error:
+        ttsIcon = Icons.error;
+        ttsTooltip = 'Error';
+        iconColor = theme.colorScheme.error;
+        break;
+      case MessagePlaybackStatus.completed:
+      case MessagePlaybackStatus.idle:
         ttsIcon = Icons.volume_up;
         ttsTooltip = 'Read aloud';
         iconColor = null;
@@ -242,7 +242,7 @@ class ChatMessageBubble extends StatelessWidget {
 
     return Container(
       margin: EdgeInsets.only(left: 10, top: 5),
-      child: playbackStatus == PlaybackStatus.generating
+      child: playbackStatus == MessagePlaybackStatus.generating
           ? _GeneratingIndicator(tooltip: ttsTooltip)
           : IconButton(
               icon: Icon(ttsIcon, size: 20, color: iconColor),

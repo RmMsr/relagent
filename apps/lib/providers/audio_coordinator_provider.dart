@@ -115,19 +115,21 @@ class AudioCoordinator extends StateNotifier<AudioCoordinatorState> {
     }
   }
 
-  Future<void> releasePlayback() async {
-    debugPrint('AudioCoordinator: releasePlayback() - mode: ${state.mode}');
+  Future<void> releasePlayback({bool autoResume = true}) async {
+    debugPrint('AudioCoordinator: releasePlayback(autoResume: $autoResume) - mode: ${state.mode}');
     if (state.mode != AudioMode.playing) return;
 
     state = const AudioCoordinatorState(mode: AudioMode.idle);
 
     // Check if we should auto-resume recording
-    final voiceMode = ref.read(settingsProvider).voiceMode;
-    if (voiceMode == VoiceMode.listening ||
-        voiceMode == VoiceMode.conversation) {
-      debugPrint('AudioCoordinator: Auto-resuming continuous recording');
-      // Auto-resume continuous recording
-      await requestRecording();
+    if (autoResume) {
+      final voiceMode = ref.read(settingsProvider).voiceMode;
+      if (voiceMode == VoiceMode.listening ||
+          voiceMode == VoiceMode.conversation) {
+        debugPrint('AudioCoordinator: Auto-resuming continuous recording');
+        // Auto-resume continuous recording
+        await requestRecording();
+      }
     }
   }
 }

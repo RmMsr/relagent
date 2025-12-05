@@ -26,7 +26,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(recordingProvider.notifier).checkAutoStart();
       // Pre-initialize TTS in background to minimize wait time on first use
-      ref.read(ttsProvider.notifier).preInitialize();
+      ref.read(ttsProvider.notifier).initialize();
     });
   }
 
@@ -99,9 +99,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     onSpeak: (text, messageId) {
                       ref
                           .read(ttsProvider.notifier)
-                          .togglePlayPause(text, messageId);
+                          .playNow(text, messageId);
                     },
-                    getPlaybackStatus: (messageId) =>
+                    getMessagePlaybackStatus: (messageId) =>
                         ttsState.getMessageState(messageId).status,
                   ),
                 ],
