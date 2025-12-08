@@ -1,4 +1,4 @@
-package com.example.relagent
+package org.venkado.relagent
 
 import io.flutter.embedding.android.FlutterActivity
 

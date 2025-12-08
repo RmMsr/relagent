@@ -1,5 +1,5 @@
 name: relagent
-description: "A new Flutter project."
+description: "Relatable Agentic Minion - Privacy focused and open AI agent"
 publish_to: "none"
 version: 0.1.0
 
@@ -37,7 +37,7 @@ flutter:
   assets:
     - assets/config.json
     - assets/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06/
-    - assets/kokoro-en-v0_19/ # - assets/kokoro-en-v0_19/espeak-ng-data/
+    - assets/kokoro-en-v0_19/
     - assets/kokoro-en-v0_19/espeak-ng-data/
     - assets/kokoro-en-v0_19/espeak-ng-data/lang/gmw/
 

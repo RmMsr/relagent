@@ -152,7 +152,7 @@ fvm flutter run --profile
 fvm flutter run --release
 
 # Memory usage monitoring
-adb shell dumpsys meminfo com.example.relagent
+adb shell dumpsys meminfo org.venkado.relagent
 
 # CPU usage monitoring
 adb shell top -m 10 -s cpu
@@ -644,7 +644,7 @@ class TtsService {
 ```bash
 fvm flutter run --profile
 # Open DevTools for timeline analysis
-adb shell dumpsys meminfo com.example.relagent
+adb shell dumpsys meminfo org.venkado.relagent
 ```
 
 #### Phase 1: Quick Wins (Week 2)
