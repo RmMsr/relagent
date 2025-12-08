@@ -27,7 +27,12 @@ Classes and modules deserve an brief explanation what their functionality and re
 
 Commits should be small and focus on one aspect.
 
-Commits messages should start with one short block summarizing the change. Major points can be added as list below.
+Commits messages should start with one short block summarizing the change. Major points can be added as list below. Main answers a commit message should give are:
+
+- What is new and different form an user perspective
+- Which bugs have been fixed
+- What are the major changes if any in architecture, patterns or dependencies
+- If this is part of a previous or future change, say brief what this build upon and what is next
 
 ## Environment
 

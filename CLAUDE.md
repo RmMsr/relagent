@@ -11,7 +11,7 @@ Relagent ("Relatable Agentic Minion") is a privacy-focused AI assistant project 
 
 The current development focus is on the Flutter app, which connects to any OpenAI-compatible API server.
 
-## Projec guide and rules
+## Project guide and rules
 
 For all planning and coding please respect the following documents:
 
@@ -30,7 +30,53 @@ This project prioritizes:
 - **Open source** - 100% open source with open-weight AI models
 - **Accessibility** - Runnable on consumer-grade hardware
 
-For detailed development principles, see [docs/development.md](docs/development.md).
+## Development Guidelines
+
+### Implementation Priorities
+
+When implementing features, prioritize:
+
+- **Existing functionality** over custom solutions or additional dependencies
+- **Simple implementation** over strong optimization, high customization or personal taste
+- **More smaller classes** with distinct purpose over complex state and logic in one class
+- **Readable and maintainable code** over quick results
+
+Privacy requires security. Be explicit about tradeoffs and keep dependencies to a minimum.
+
+### Commit Messages
+
+- **Small, focused commits** - Each commit should focus on one aspect
+- **Short summary line** - Start with imperative mood (Add, Update, Fix, Change)
+- **No period** at end of summary line
+- **Optional bullet list** - Major points can be added below the summary
+
+Examples: `Add prime message to initialize chat context`, `Update gitignore`, `Fix navigation issue`
+
+Also make sure not to leak any details about the dev environment like device names or ip addresses.
+
+### Code Comments
+
+- Use **line comments only if they add significant value** to understandability
+- **Prefer better names, order or structure** over explanatory comments
+- **Classes and modules** deserve a brief explanation of functionality and responsibility
+- For complex functions, **break logic into smaller pieces** rather than adding comments
+- **Explain intention** of complex logic, side effects, or intentional implementation details
+- **Avoid comments** that just rephrase what code already describes
+- Assume reader has fundamental understanding of application programming
+
+### Code Formatting
+
+- Use `.editorconfig` and linters for consistency
+- Goal is **self-explanatory code** most of the time
+
+### UI Design Principles
+
+- **Simple, intuitive interface** requiring minimal user attention
+- Support **hands-free usage** as a common use case
+- Interactions should work **without looking at screen** when possible
+- Touch areas should be **obvious, reasonably sized, with immediate effect**
+- Minimize user distraction
+- **Buttons show the state they will activate** on press
 
 ## Repository Structure
 
