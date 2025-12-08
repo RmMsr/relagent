@@ -11,6 +11,27 @@ Relagent ("Relatable Agentic Minion") is a privacy-focused AI assistant project 
 
 The current development focus is on the Flutter app, which connects to any OpenAI-compatible API server.
 
+## Projec guide and rules
+
+For all planning and coding please respect the following documents:
+
+- **[README.md](README.md)** - Introduction and general information
+- **[docs/development.md](docs/development.md)** - Development values, priorities, and environment setup
+- **[docs/vision.md](docs/vision.md)** - Project vision and future direction
+- **[docs/goals.md](docs/goals.md)** - Project motivation and guiding principles (privacy, open source, accessibility)
+- **[apps/CLAUDE.md](apps/CLAUDE.md)** App specific documentation
+
+## Key Principles
+
+This project prioritizes:
+
+- **Privacy and data sovereignty** - All processing happens locally or on user-controlled servers
+- **Simplicity** - Easy to understand, minimal dependencies, readable code
+- **Open source** - 100% open source with open-weight AI models
+- **Accessibility** - Runnable on consumer-grade hardware
+
+For detailed development principles, see [docs/development.md](docs/development.md).
+
 ## Repository Structure
 
 ```
@@ -46,25 +67,6 @@ relagent/
 
 - Python-based server (being phased out)
 - Any OpenAI-compatible server can be used instead (LM Studio, Ollama, vLLM, etc.)
-
-## Documentation Guide
-
-- **[apps/CLAUDE.md](apps/CLAUDE.md)** - Comprehensive Flutter app architecture, patterns, and development guide
-- **[README.md](README.md)** - Installation instructions, features, and quick start
-- **[docs/development.md](docs/development.md)** - Development values, priorities, and environment setup
-- **[docs/vision.md](docs/vision.md)** - Project vision and future direction
-- **[docs/goals.md](docs/goals.md)** - Project motivation and guiding principles (privacy, open source, accessibility)
-
-## Key Principles
-
-This project prioritizes:
-
-- **Privacy and data sovereignty** - All processing happens locally or on user-controlled servers
-- **Simplicity** - Easy to understand, minimal dependencies, readable code
-- **Open source** - 100% open source with open-weight AI models
-- **Accessibility** - Runnable on consumer-grade hardware
-
-For detailed development principles, see [docs/development.md](docs/development.md).
 
 ## Getting Started
 
