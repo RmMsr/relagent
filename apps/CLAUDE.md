@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with apps code.
 
 ## Project Overview
 
@@ -11,6 +11,7 @@ This is the Relagent ("Relatable Agentic Minion") frontend. A multi-platform Flu
 The Flutter app is located in the `apps/` directory of the repository and uses **Riverpod** for state management:
 
 ### Core Structure
+
 - **lib/main.dart**: App entry point, initializes SharedPreferences and ProviderScope
 - **lib/router/app_router.dart**: go_router navigation configuration
 - **lib/pages/chat_page.dart**: Main chat interface (default page)
@@ -24,24 +25,31 @@ The Flutter app is located in the `apps/` directory of the repository and uses *
 - **lib/config/app_config.dart**: Static configuration (ASR model only)
 
 ### State Management
+
 The app uses **Riverpod** for state management, providing:
+
 - Compile-time safe state access
 - Programmatic action triggering without BuildContext
 - Separation of business logic from UI
 - Easy testing and maintainability
 
 ### Navigation
+
 - **/** (root): Chat page (default)
 - **/settings**: Settings page (accessed via menu icon in chat)
 
 ## Configuration
 
 ### Static Configuration (ASR Model)
+
 Located in `apps/assets/config.json` - loaded at app startup:
+
 - **speech_recognition.streaming_asr_model**: Name of bundled Sherpa-ONNX ASR model directory (not user-editable)
 
 ### User Settings (API Configuration)
+
 Managed via settings page, persisted to SharedPreferences:
+
 - **Chat Base URL**: OpenAI-compatible API endpoint (e.g., http://localhost:1234/v1)
 - **Chat Model**: Model name to use with that endpoint (e.g., qwen2.5-coder:7b)
 
@@ -69,12 +77,16 @@ flutter build linux      # Linux desktop
 flutter test
 ```
 
+Logs after manual testing are found in flutter*logs*\*.txt
+
 ## Important Patterns
 
 ### State Management with Riverpod
+
 The app uses Riverpod StateNotifierProvider pattern:
 
 **Accessing State in Widgets:**
+
 ```dart
 class MyWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
@@ -90,6 +102,7 @@ class MyWidget extends ConsumerWidget {
 ```
 
 **Triggering Actions:**
+
 ```dart
 // From anywhere with WidgetRef:
 ref.read(chatProvider.notifier).sendMessage("Hello");
@@ -100,15 +113,20 @@ container.read(chatProvider.notifier).clearChat();
 ```
 
 ### Speech Recognition
+
 The app uses Sherpa-ONNX for on-device streaming ASR. Models are downloaded from [k2-fsa/sherpa-onnx releases](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) and bundled in `apps/assets/`. The model directory name must match the static config in `assets/config.json`.
 
 ### Configuration Management
+
 Two types of configuration:
+
 1. **Static Config** (`AppConfig`): Loaded from `assets/config.json` at startup, contains ASR model path (not user-editable)
 2. **User Settings** (`SettingsProvider`): Managed via Riverpod, persisted to SharedPreferences, editable in settings page
 
 ### Adding New Features
+
 When adding features that need state management:
+
 1. Create a model in `lib/models/` if needed
 2. Create a provider in `lib/providers/` using StateNotifierProvider
 3. Access state in widgets using `ref.watch()` (for reactive updates) or `ref.read()` (for one-time reads)

@@ -25,7 +25,9 @@ Classes and modules deserve an brief explanation what their functionality and re
 
 ### Commits
 
-Commits should be small and focus on one aspect.
+Commits to main should be isolated increments and focus on one aspect.
+
+Commits to feature branches should happen after every small increment. So we get anchor points to compare or go back to.
 
 Commits messages should start with one short block summarizing the change. Major points can be added as list below. Main answers a commit message should give are:
 

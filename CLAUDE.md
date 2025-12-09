@@ -45,6 +45,8 @@ Privacy requires security. Be explicit about tradeoffs and keep dependencies to 
 
 ### Commit Messages
 
+Use commits to create a history of changes when on a feature branch.
+
 - **Small, focused commits** - Each commit should focus on one aspect
 - **Short summary line** - Start with imperative mood (Add, Update, Fix, Change)
 - **No period** at end of summary line
