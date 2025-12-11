@@ -19,6 +19,8 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 # Relagent Project Guide
 
+**IMPORTANT: When working on Flutter app code, also read @apps/AGENTS.md for Flutter-specific patterns, MCP tools, and architectural guidelines.**
+
 This file provides high-level guidance for working with the Relagent codebase.
 
 ## Project Overview
@@ -32,38 +34,9 @@ The current development focus is on the Flutter app, which connects to any OpenA
 
 ## Project guide and rules
 
-For all planning and coding please respect the following documents:
-
-- **[README.md](README.md)** - Introduction and general information
-- **[docs/development.md](docs/development.md)** - Development values, priorities, and environment setup
-- **[docs/vision.md](docs/vision.md)** - Project vision and future direction
-- **[docs/goals.md](docs/goals.md)** - Project motivation and guiding principles (privacy, open source, accessibility)
-- **[apps/AGENTS.md](apps/AGENTS.md)** - Flutter app specific documentation
-
-## Key Principles
-
-This project prioritizes:
-
-- **Privacy and data sovereignty** - All processing happens locally or on user-controlled servers
-- **Simplicity** - Easy to understand, minimal dependencies, readable code
-- **Open source** - 100% open source with open-weight AI models
-- **Accessibility** - Runnable on consumer-grade hardware
-
-## Development Guidelines
-
-### Implementation Priorities
-
-When implementing features, prioritize:
-
-1. **Existing functionality** over custom solutions
-2. **Simple implementation** over optimization or customization  
-3. **Smaller, focused classes** over complex monolithic code
-4. **Readable and maintainable code** over quick results
-
-Privacy requires security - minimize dependencies and be explicit about tradeoffs.
+**CRITICAL RULES - Always follow these:**
 
 ### Branching Strategy
-
 **Use branches for complex changes** - Simple isolated changes can go directly to main:
 
 **Direct to main (single commit):**
@@ -83,19 +56,45 @@ Privacy requires security - minimize dependencies and be explicit about tradeoff
 
 **Branch workflow**:
 1. Create appropriate branch from main
-2. Make changes with small, focused commits
+2. Make changes with small, focused commits  
 3. Test changes thoroughly
-4. Create pull request for review
-5. Squash merge to main after approval
+4. Merge as one commit to main when ready
 
 ### Commit Messages
-
 - **Small, focused commits** - One aspect per commit
-- **Imperative mood** - Start with Add, Update, Fix, Change
-- **No period** at end of summary line
-- **Examples**: `Add prime message to initialize chat context`, `Update gitignore`, `Fix navigation issue`
+- **Main branch commits**: Isolated changes focusing on one aspect
+- **Feature branch commits**: After every small increment for anchor points
+- **Commit message format**: 
+  - Start with short summary block
+  - Answer: What's new for users, bugs fixed, major changes, relation to previous/future work
+  - Examples: `Add prime message to initialize chat context`, `Update gitignore`, `Fix navigation issue`
 
 **Security**: Never commit device names, IP addresses, or other dev environment details.
+
+### Implementation Priorities
+When implementing features, prioritize:
+1. **Existing functionality** over custom solutions
+2. **Simple implementation** over optimization or customization  
+3. **Smaller, focused classes** over complex monolithic code
+4. **Readable and maintainable code** over quick results
+
+**Additional documents for reference:**
+- **[README.md](README.md)** - Introduction and general information
+- **[docs/development.md](docs/development.md)** - Development values, priorities, and environment setup
+- **[docs/vision.md](docs/vision.md)** - Project vision and future direction
+- **[docs/goals.md](docs/goals.md)** - Project motivation and guiding principles (privacy, open source, accessibility)
+- **[apps/AGENTS.md](apps/AGENTS.md)** - Flutter app specific documentation
+
+## Key Principles
+
+This project prioritizes:
+
+- **Privacy and data sovereignty** - All processing happens locally or on user-controlled servers
+- **Simplicity** - Easy to understand, minimal dependencies, readable code
+- **Open source** - 100% open source with open-weight AI models
+- **Accessibility** - Runnable on consumer-grade hardware
+
+
 
 ### Code Comments
 

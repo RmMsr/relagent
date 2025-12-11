@@ -13,6 +13,8 @@ Implementation should prioritize:
 
 In order to value privacy, we have to care about security. Be explicit on tradeoffs and keep dependencies to a minimum.
 
+## Style and workflows
+
 ### Coding style
 
 Formatting and consistency are important. Use .editorconfig and linters.
@@ -25,7 +27,7 @@ Classes and modules deserve an brief explanation what their functionality and re
 
 ### Commits
 
-Commits to main should be isolated increments and focus on one aspect.
+Commits to main should be isolated changes and focus on one aspect.
 
 Commits to feature branches should happen after every small increment. So we get anchor points to compare or go back to.
 
@@ -35,6 +37,12 @@ Commits messages should start with one short block summarizing the change. Major
 - Which bugs have been fixed
 - What are the major changes if any in architecture, patterns or dependencies
 - If this is part of a previous or future change, say brief what this build upon and what is next
+
+### Branches
+
+Features and all changes most likely requiring more than one commit are developed in a branch. When the change is ready it can be merged as one commit to main.
+
+Smaller changes that very likely do not break anything can go directly to `main`. For example documentation or minor updates.
 
 ## Environment
 
