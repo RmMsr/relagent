@@ -4,11 +4,17 @@
 
 The user wants to be able to speak to the app and receive responses even if the app is in the background or the device is locked. This is already working on a basic level. Now we want the user to know and trust how long the app will be listening.
 
-1. **State desynchronization**: The app's internal state shows recording is active, but the audio input stream has died
-2. **Privacy transparency**: The user should know when and how long the microphone is recording
-3. **No user feedback**: Users have no indication that their speech is not being recognized
-4. **No automatic recovery**: The app doesn't detect or recover from the failure
-5. **Battery concerns**: Users may want to limit how long background listening runs to conserve battery
+Improvements from a user eprspective:
+
+- **Privacy transparency**: The user should know when and how long the microphone is recording
+- **Battery concerns**: Users may want to limit how long background listening runs to conserve battery
+- **Minimal notification noise**: The amount of appearing notification should be minimal. We need one to keep background activity (using the mic), but it should be re-used instead of being re-created every time the state changes
+
+The current implementation has the following issues:
+
+- **State desynchronization**: The app's internal state might shows recording is active, but the audio input stream has died
+- **No user feedback**: Users have no indication that their speech is not being recognized if recording is stopped outside the app
+- **No automatic recovery**: The app doesn't detect or recover from the failure
 
 Root causes for fail states:
 
