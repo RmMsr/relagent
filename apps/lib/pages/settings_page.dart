@@ -201,12 +201,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             const SizedBox(height: 16),
             Autocomplete<String>(
               optionsBuilder: (TextEditingValue textEditingValue) {
-                if (textEditingValue.text.isEmpty) {
-                  return urlSuggestions;
-                }
-                return urlSuggestions.where((String option) {
-                  return option.contains(textEditingValue.text.toLowerCase());
-                });
+                // Always show all URL suggestions, but prioritize matches
+                final matches = urlSuggestions.where((String option) {
+                  return option.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase(),
+                  );
+                }).toList();
+                final nonMatches = urlSuggestions.where((String option) {
+                  return !option.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase(),
+                  );
+                }).toList();
+
+                // Return matches first, then non-matches
+                return [...matches, ...nonMatches];
               },
               onSelected: (String selection) {
                 _baseUrlController.text = selection;
@@ -254,12 +262,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             const SizedBox(height: 16),
             Autocomplete<String>(
               optionsBuilder: (TextEditingValue textEditingValue) {
-                if (textEditingValue.text.isEmpty) {
-                  return modelSuggestions;
-                }
-                return modelSuggestions.where((String option) {
-                  return option.contains(textEditingValue.text.toLowerCase());
-                });
+                // Always show all model suggestions, but prioritize matches
+                final matches = modelSuggestions.where((String option) {
+                  return option.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase(),
+                  );
+                }).toList();
+                final nonMatches = modelSuggestions.where((String option) {
+                  return !option.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase(),
+                  );
+                }).toList();
+
+                // Return matches first, then non-matches
+                return [...matches, ...nonMatches];
               },
               onSelected: (String selection) {
                 _modelController.text = selection;

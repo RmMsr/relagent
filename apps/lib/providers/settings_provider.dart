@@ -29,26 +29,37 @@ class SettingsNotifier extends Notifier<Settings> {
   @override
   Settings build() {
     _prefs = ref.watch(sharedPreferencesProvider);
-    _loadSettings();
+
+    // Try to load settings, fall back to defaults if loading fails
+    Settings loadedSettings = _loadSettings();
     _loadHistory();
-    return Settings.defaults();
+
+    return loadedSettings;
   }
 
-  void _loadSettings() {
+  Settings _loadSettings() {
     try {
       final jsonString = _prefs.getString(_settingsKey);
       if (jsonString != null) {
         debugPrint('Loading settings from SharedPreferences...');
         final json = jsonDecode(jsonString) as Map<String, dynamic>;
-        state = Settings.fromJson(json);
+        final loadedSettings = Settings.fromJson(json);
+        state = loadedSettings;
         debugPrint('Settings loaded successfully: ${state.simpleChatBaseUrl}');
+        return loadedSettings;
       } else {
         debugPrint('No saved settings found, using defaults');
+        final defaultSettings = Settings.defaults();
+        state = defaultSettings;
+        return defaultSettings;
       }
     } catch (e, stackTrace) {
       // If loading fails, keep defaults
       debugPrint('Failed to load settings: $e');
       debugPrint('Stack trace: $stackTrace');
+      final defaultSettings = Settings.defaults();
+      state = defaultSettings;
+      return defaultSettings;
     }
   }
 
