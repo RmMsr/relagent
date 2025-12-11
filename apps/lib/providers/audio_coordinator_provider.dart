@@ -36,14 +36,15 @@ class AudioCoordinatorState {
 }
 
 final audioCoordinatorProvider =
-    StateNotifierProvider<AudioCoordinator, AudioCoordinatorState>((ref) {
-      return AudioCoordinator(ref);
+    NotifierProvider<AudioCoordinator, AudioCoordinatorState>(() {
+      return AudioCoordinator();
     });
 
-class AudioCoordinator extends StateNotifier<AudioCoordinatorState> {
-  final Ref ref;
-
-  AudioCoordinator(this.ref) : super(AudioCoordinatorState.initial());
+class AudioCoordinator extends Notifier<AudioCoordinatorState> {
+  @override
+  AudioCoordinatorState build() {
+    return AudioCoordinatorState.initial();
+  }
 
   /// Request to start recording - returns true if granted
   Future<bool> requestRecording() async {
@@ -116,7 +117,9 @@ class AudioCoordinator extends StateNotifier<AudioCoordinatorState> {
   }
 
   Future<void> releasePlayback({bool autoResume = true}) async {
-    debugPrint('AudioCoordinator: releasePlayback(autoResume: $autoResume) - mode: ${state.mode}');
+    debugPrint(
+      'AudioCoordinator: releasePlayback(autoResume: $autoResume) - mode: ${state.mode}',
+    );
     if (state.mode != AudioMode.playing) return;
 
     state = const AudioCoordinatorState(mode: AudioMode.idle);

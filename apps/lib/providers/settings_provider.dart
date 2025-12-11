@@ -14,18 +14,18 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 });
 
 /// Settings provider that persists to SharedPreferences
-final settingsProvider = StateNotifierProvider<SettingsNotifier, Settings>((
-  ref,
-) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return SettingsNotifier(prefs);
+final settingsProvider = NotifierProvider<SettingsNotifier, Settings>(() {
+  return SettingsNotifier();
 });
 
-class SettingsNotifier extends StateNotifier<Settings> {
-  final SharedPreferences _prefs;
+class SettingsNotifier extends Notifier<Settings> {
+  late final SharedPreferences _prefs;
 
-  SettingsNotifier(this._prefs) : super(Settings.defaults()) {
+  @override
+  Settings build() {
+    _prefs = ref.watch(sharedPreferencesProvider);
     _loadSettings();
+    return Settings.defaults();
   }
 
   void _loadSettings() {

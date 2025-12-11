@@ -38,14 +38,15 @@ class ChatState {
   }
 }
 
-final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
-  return ChatNotifier(ref);
+final chatProvider = NotifierProvider<ChatNotifier, ChatState>(() {
+  return ChatNotifier();
 });
 
-class ChatNotifier extends StateNotifier<ChatState> {
-  final Ref ref;
-
-  ChatNotifier(this.ref) : super(ChatState.initial());
+class ChatNotifier extends Notifier<ChatState> {
+  @override
+  ChatState build() {
+    return ChatState.initial();
+  }
 
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty) return;
