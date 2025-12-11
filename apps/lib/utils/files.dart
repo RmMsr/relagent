@@ -1,4 +1,4 @@
-// Containes code from sherpa-onnx. Copyright (c) 2024  Xiaomi Corporation
+// Contains code from sherpa-onnx. Copyright (c) 2024  Xiaomi Corporation
 import 'dart:convert';
 import 'dart:io';
 

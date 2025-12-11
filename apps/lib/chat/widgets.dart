@@ -42,8 +42,8 @@ class ChatInputState extends State<ChatInput> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 0, horizontal: 8),
-      decoration: BoxDecoration(border: Border(top: BorderSide())),
+      padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
+      decoration: const BoxDecoration(border: Border(top: BorderSide())),
       child: Row(
         children: [
           Expanded(
@@ -120,7 +120,7 @@ class ChatHistory extends StatelessWidget {
       chatWidgets.add(
         Container(
           alignment: Alignment.bottomCenter,
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
             ChatRole.assistant.name,
             style: theme.textTheme.labelSmall,
@@ -161,7 +161,8 @@ class ChatMessageBubble extends StatelessWidget {
     final isError = message.role == ChatRole.error;
     final isUser = message.role == ChatRole.user;
     final playbackStatus =
-        getMessagePlaybackStatus?.call(message.id) ?? MessagePlaybackStatus.idle;
+        getMessagePlaybackStatus?.call(message.id) ??
+        MessagePlaybackStatus.idle;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,7 +170,7 @@ class ChatMessageBubble extends StatelessWidget {
         // Message header
         Container(
           alignment: Alignment.bottomCenter,
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
             '${message.role.name} @ $time',
             style: theme.textTheme.labelSmall,
@@ -178,28 +179,31 @@ class ChatMessageBubble extends StatelessWidget {
         // Message bubble with action buttons
         SizedBox(
           width: double.infinity,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // TTS button for assistant messages (on the left)
-              if (message.role == ChatRole.assistant && onSpeak != null)
-                _buildTtsButton(theme, playbackStatus, message.id),
-              // Message content
-              Expanded(child: _buildMessageContent(theme, isError)),
-              // Retry button for user messages (on the right)
-              if (isUser && onRetry != null)
-                Container(
-                  margin: EdgeInsets.only(right: 10, top: 5),
-                  child: IconButton(
-                    icon: Icon(Icons.refresh, size: 20),
-                    iconSize: 20,
-                    padding: EdgeInsets.all(4),
-                    constraints: BoxConstraints(),
-                    tooltip: 'Retry',
-                    onPressed: () => onRetry!(message.text),
+          child: SizedBox(
+            width: double.infinity,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // TTS button for assistant messages (on the left)
+                if (message.role == ChatRole.assistant && onSpeak != null)
+                  _buildTtsButton(theme, playbackStatus, message.id),
+                // Message content
+                Expanded(child: _buildMessageContent(theme, isError)),
+                // Retry button for user messages (on the right)
+                if (isUser && onRetry != null)
+                  Container(
+                    margin: const EdgeInsets.only(right: 10, top: 5),
+                    child: IconButton(
+                      icon: const Icon(Icons.refresh, size: 20),
+                      iconSize: 20,
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Retry',
+                      onPressed: () => onRetry!(message.text),
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -241,14 +245,14 @@ class ChatMessageBubble extends StatelessWidget {
     }
 
     return Container(
-      margin: EdgeInsets.only(left: 10, top: 5),
+      margin: const EdgeInsets.only(left: 10, top: 5),
       child: playbackStatus == MessagePlaybackStatus.generating
           ? _GeneratingIndicator(tooltip: ttsTooltip)
           : IconButton(
               icon: Icon(ttsIcon, size: 20, color: iconColor),
               iconSize: 20,
-              padding: EdgeInsets.all(4),
-              constraints: BoxConstraints(),
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(),
               tooltip: ttsTooltip,
               onPressed: () => onSpeak!(message.text, messageId),
             ),
@@ -260,11 +264,11 @@ class ChatMessageBubble extends StatelessWidget {
       alignment: message.role == ChatRole.user
           ? Alignment.centerRight
           : Alignment.centerLeft,
-      padding: EdgeInsets.all(10),
-      margin: EdgeInsets.only(left: 10, right: 10, bottom: 20),
+      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(left: 10, right: 10, bottom: 20),
       decoration: BoxDecoration(
         shape: BoxShape.rectangle,
-        borderRadius: BorderRadius.all(Radius.circular(5)),
+        borderRadius: const BorderRadius.all(Radius.circular(5)),
         color: switch (message.role) {
           ChatRole.user => theme.colorScheme.onInverseSurface.withValues(
             alpha: 0.6,
@@ -338,8 +342,8 @@ class _GeneratingIndicatorState extends State<_GeneratingIndicator>
           return Opacity(
             opacity: _animation.value,
             child: Padding(
-              padding: EdgeInsets.all(4),
-              child: Icon(Icons.hourglass_empty, size: 20),
+              padding: const EdgeInsets.all(4),
+              child: const Icon(Icons.hourglass_empty, size: 20),
             ),
           );
         },
@@ -394,11 +398,11 @@ class _AssistantPendingPlaceholderState
           child: SizedBox(
             width: double.infinity,
             child: Container(
-              padding: EdgeInsets.all(10),
-              margin: EdgeInsets.only(left: 10, right: 10, bottom: 20),
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(left: 10, right: 10, bottom: 20),
               decoration: BoxDecoration(
                 shape: BoxShape.rectangle,
-                borderRadius: BorderRadius.all(Radius.circular(5)),
+                borderRadius: const BorderRadius.all(Radius.circular(5)),
                 color: theme.splashColor,
               ),
               child: Text('...', style: theme.textTheme.bodyMedium),
