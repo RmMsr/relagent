@@ -21,6 +21,8 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 **IMPORTANT: When working on Flutter app code, also read @apps/AGENTS.md for Flutter-specific patterns, MCP tools, and architectural guidelines.**
 
+**Note**: The Flutter app requires MCP configuration to work properly since it's located in the `apps/` directory. See apps/AGENTS.md for setup instructions.
+
 This file provides high-level guidance for working with the Relagent codebase.
 
 ## Project Overview

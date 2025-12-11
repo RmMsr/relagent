@@ -28,11 +28,34 @@ cp assets/config.template.json assets/config.json
 
 When available, use Flutter MCP (Model Context Protocol) tools for app management:
 
-- **Launch App**: Use `dart-flutter_launch_app` with `root: "apps/"` and appropriate device
+**IMPORTANT: MCP Configuration Required**
+Before using Flutter MCP tools, you must configure the project root. The Flutter app is located in the `apps/` directory, not the repository root, so MCP needs to know where to find the Flutter project:
+
+```bash
+# Configure MCP to use apps/ directory as Flutter project root
+dart-flutter_add_roots --roots '[{"uri": "file://$(pwd)/apps"}]'
+```
+
+Or using the MCP tool directly:
+```bash
+dart-flutter_add_roots --roots '[{"uri": "file:///absolute/path/to/project/apps"}]'
+```
+
+**Why this is needed**: MCP tools look for `pubspec.yaml` to identify Flutter projects. Since our Flutter project is in `apps/`, MCP must be pointed to the correct directory.
+
+- **Launch App**: Use `dart-flutter_launch_app` with appropriate device
 - **List Devices**: Use `dart-flutter_list_devices` to see available targets
-- **Stop App**: Use `dart-flutter_stop_app` with the process ID from launch
+- **Stop App**: Use `dart-flutter_stop_app` with process ID from launch
 - **Hot Reload**: Use `dart-flutter_hot_reload` for code changes
 - **Run Tests**: Use `dart-flutter_run_tests` for comprehensive testing
+- **Code Analysis**: Use `dart-flutter_analyze_files` to check for issues
+- **Symbol Resolution**: Use `dart-flutter_resolve_workspace_symbol` to find code locations
+
+**Verification**: Test the configuration by resolving a symbol:
+```bash
+dart-flutter_resolve_workspace_symbol --query "main"
+# Should return main() function from apps/lib/main.dart
+```
 
 These tools provide programmatic control and are preferred over bash commands when available.
 
