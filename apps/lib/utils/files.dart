@@ -1,10 +1,9 @@
 // Contains code from sherpa-onnx. Copyright (c) 2024  Xiaomi Corporation
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show rootBundle, AssetManifest;
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -56,11 +55,9 @@ Future<String> copyAssetDirectoryToCache(String assetDir) async {
   debugPrint('Copying asset directory $assetDir to $targetDir');
 
   // Load asset manifest to get all files in the directory
-  final manifestContent = await rootBundle.loadString('AssetManifest.json');
-  final Map<String, dynamic> manifestMap = json.decode(manifestContent);
-
-  // Get all asset paths that start with our directory
-  final assetPaths = manifestMap.keys
+  final assetManifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+  final assetPaths = assetManifest
+      .listAssets()
       .where((String key) => key.startsWith('assets/$assetDir/'))
       .toList();
 
