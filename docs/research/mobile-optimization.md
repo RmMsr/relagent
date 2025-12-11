@@ -3,6 +3,7 @@
 ## Problem Statement
 
 The Relagent Android app experiences Application Not Responding (ANR) errors and performance degradation, particularly around:
+
 - Speech recognition model initialization and usage
 - Text-to-speech (TTS) model initialization and audio generation
 - HTTP communication with the backend
@@ -17,6 +18,7 @@ ANRs occur when the main thread is blocked for more than 5 seconds, causing the 
 #### 1. Model Initialization on Main Thread (CRITICAL)
 
 **Speech Recognition (ASR)**
+
 - Location: `apps/lib/speech_recognition/services.dart:43-50`
 - Problem: `ASR.start()` performs heavy initialization synchronously on the main thread:
   - `sherpa_onnx.initBindings()` - Native library initialization
@@ -26,6 +28,7 @@ ANRs occur when the main thread is blocked for more than 5 seconds, causing the 
 - Trigger: Every time recording starts (first time or when resuming)
 
 **Text-to-Speech (TTS)**
+
 - Location: `apps/lib/tts/services.dart:26-37`
 - Problem: `TtsService._init()` performs heavy initialization synchronously:
   - `sherpa_onnx.initBindings()` - Native library initialization
@@ -36,6 +39,7 @@ ANRs occur when the main thread is blocked for more than 5 seconds, causing the 
 #### 2. Audio Generation on Main Thread (HIGH)
 
 **TTS Audio Generation**
+
 - Location: `apps/lib/tts/services.dart:48`
 - Problem: `_tts!.generate(text: text, sid: speakerId, speed: speed)` runs synchronously
 - Impact: Blocks main thread during speech synthesis (varies by text length)
@@ -44,6 +48,7 @@ ANRs occur when the main thread is blocked for more than 5 seconds, causing the 
 #### 3. Memory Management Issues (MEDIUM)
 
 **TTS Audio Cache**
+
 - Location: `apps/lib/tts/services.dart:14`
 - Problem: `Map<String, Uint8List> _audioCache` stores all generated audio in memory
 - Impact: Memory consumption grows unbounded with conversation length
@@ -54,6 +59,7 @@ ANRs occur when the main thread is blocked for more than 5 seconds, causing the 
 - No cleanup strategy for old/unused audio
 
 **Asset File Copying**
+
 - Location: `apps/lib/utils/files.dart:11-39`
 - Problem: Entire ONNX models (potentially 10-50+ MB each) loaded into memory during copying
 - Impact: High memory usage during initialization
@@ -61,18 +67,21 @@ ANRs occur when the main thread is blocked for more than 5 seconds, causing the 
 #### 4. HTTP Communication (LOW-MEDIUM)
 
 **Missing Timeout**
+
 - Location: `apps/lib/chat/services.dart:56`
 - Problem: `http.post()` has no timeout parameter
 - Impact: Can hang indefinitely if network is slow or server unresponsive
 - Default timeout varies by platform and can be very long
 
 **No Connection Pooling**
+
 - Problem: Each request creates new connection
 - Impact: Higher latency on subsequent requests
 
 #### 5. Audio Processing on Main Thread (LOW-MEDIUM)
 
 **Stream Processing**
+
 - Location: `apps/lib/speech_recognition/services.dart:83-105`
 - Problem: Audio stream listener processes on main thread:
   - Byte-to-float32 conversion
@@ -83,6 +92,7 @@ ANRs occur when the main thread is blocked for more than 5 seconds, causing the 
 ### Architecture Constraints
 
 The app is designed to run in the background waiting for events:
+
 - Continuous voice listening in certain modes
 - Must remain responsive during model operations
 - Limited device resources (especially on budget Android devices)
@@ -93,12 +103,14 @@ The app is designed to run in the background waiting for events:
 ### Flutter DevTools
 
 **Observatory Performance View**
+
 - Timeline view to identify janky frames
 - CPU profiler to find hot spots
 - Memory profiler to detect leaks
 - Usage: `flutter run --profile` then open DevTools
 
 **CPU Flame Charts**
+
 - Visualize method execution time
 - Identify synchronous blocking operations
 - Command: Available in DevTools Performance tab
@@ -106,33 +118,39 @@ The app is designed to run in the background waiting for events:
 ### Android-Specific Tools
 
 **Android Studio Profiler**
+
 - CPU profiling with method tracing
 - Memory allocation tracking
 - Network profiling
 - Usage: Attach to running Flutter app
 
 **ADB Logcat with Timeline**
+
 - Monitor for "Choreographer" frame skip warnings
 - ANR traces in system logs
 - Command: `adb logcat | grep -E "(Choreographer|ANR|skipped)"`
 
 **StrictMode**
+
 - Add to Android-specific code to detect main thread violations
 - Warns about disk reads, network access on main thread
 
 ### Flutter-Specific Profiling
 
 **Performance Overlay**
+
 - Shows frame rendering times
 - Red bars indicate janky frames (>16ms)
 - Enable with: `flutter run --profile` + overlay button in app
 
 **Dart Observatory**
+
 - Isolate view to monitor background work
 - GC events and pauses
 - Timeline events for async operations
 
 **Custom Performance Markers**
+
 ```dart
 // Add timeline events
 import 'dart:developer';
@@ -146,10 +164,10 @@ Timeline.finishSync();
 
 ```bash
 # Profile mode (optimized with profiling enabled)
-fvm flutter run --profile
+flutter run --profile
 
 # Release mode testing (production performance)
-fvm flutter run --release
+flutter run --release
 
 # Memory usage monitoring
 adb shell dumpsys meminfo org.venkado.relagent
@@ -168,22 +186,26 @@ flutter run --profile --trace-startup
 **Goal:** Move all model initialization off the main thread
 
 **Implementation:**
+
 - Use Dart isolates to load ONNX models in background
 - Initialize models once at app startup in dedicated isolate
 - Keep models loaded for app lifetime (or until memory pressure)
 - Communicate with model isolate via SendPort/ReceivePort
 
 **Benefits:**
+
 - Eliminates ANRs from model loading
 - App remains responsive during initialization
 - Can show progress indicator to user
 
 **Challenges:**
+
 - Sherpa-ONNX FFI bindings may not be isolate-safe (need to verify)
 - SendPort can only transfer primitive types and some collections
 - May need to use Platform Channels for model initialization
 
 **Alternative: Platform Channels**
+
 - Initialize models in native Android code (Kotlin/Java)
 - Use MethodChannel to call from Dart
 - Native code runs on background thread automatically
@@ -194,12 +216,14 @@ flutter run --profile --trace-startup
 **Goal:** Prevent blocking UI with clear user feedback
 
 **Implementation:**
+
 - Show loading overlay during model initialization
 - Load models on first use, not at startup
 - Cache initialized models for session lifetime
 - Implement warmup period during app splash screen
 
 **User Experience:**
+
 - First TTS: "Initializing voice system..."
 - First ASR: "Loading speech recognition..."
 - Subsequent uses: Instant
@@ -209,6 +233,7 @@ flutter run --profile --trace-startup
 **Goal:** Move TTS generation off main thread
 
 **Implementation:**
+
 ```dart
 Future<Uint8List> _generateAudioInBackground(String text) async {
   return await compute(_generateAudioIsolate, GenerateParams(
@@ -227,6 +252,7 @@ static Uint8List _generateAudioIsolate(GenerateParams params) {
 ```
 
 **Benefits:**
+
 - Main thread stays responsive during generation
 - Can generate multiple audio clips concurrently
 - User can continue interacting with app
@@ -234,6 +260,7 @@ static Uint8List _generateAudioIsolate(GenerateParams params) {
 ### 4. Memory Management & Caching Strategy
 
 **TTS Audio Cache Improvements:**
+
 ```dart
 class TtsAudioCache {
   final int maxCacheSizeBytes;
@@ -252,12 +279,14 @@ class TtsAudioCache {
 ```
 
 **Strategies:**
+
 - Limit cache to last N messages (e.g., 20)
 - Limit total cache size (e.g., 50MB)
 - Clear cache on memory pressure (use WidgetsBindingObserver)
 - Consider disk caching for long-term storage
 
 **Asset Loading:**
+
 - Stream file copying instead of loading entire file into memory
 - Use `RandomAccessFile` for chunked operations
 - Check available memory before copying large files
@@ -265,6 +294,7 @@ class TtsAudioCache {
 ### 5. HTTP Timeout & Connection Management
 
 **Add Timeouts:**
+
 ```dart
 final client = http.Client();
 try {
@@ -287,6 +317,7 @@ try {
 ```
 
 **Connection Pooling:**
+
 - Create singleton HTTP client for reuse
 - Configure keep-alive settings
 - Set reasonable connection limits
@@ -294,6 +325,7 @@ try {
 ### 6. Audio Processing Optimization
 
 **Options:**
+
 - Verify if Sherpa-ONNX processes audio in native thread
 - If not, consider processing in background isolate
 - Batch audio chunks if possible
@@ -302,11 +334,13 @@ try {
 ### 7. Background Processing Architecture
 
 **Android WorkManager Integration:**
+
 - Use WorkManager for deferrable background tasks
 - Schedule model preloading during device charging/WiFi
 - Handle model updates in background
 
 **Foreground Service for Always-On Listening:**
+
 ```dart
 // Platform channel to Android Service
 class VoiceListeningService {
@@ -317,6 +351,7 @@ class VoiceListeningService {
 ```
 
 **Considerations:**
+
 - Foreground services require persistent notification
 - Battery impact must be minimal
 - Respect Android Doze mode
@@ -327,11 +362,13 @@ class VoiceListeningService {
 For very resource-constrained scenarios, consider splitting:
 
 **App 1: Lightweight Frontend**
+
 - UI only
 - Minimal dependencies
 - Quick startup
 
 **App 2: Model Service**
+
 - Runs as Android Service
 - Loads and manages ONNX models
 - Accessed via AIDL or Messenger
@@ -339,12 +376,14 @@ For very resource-constrained scenarios, consider splitting:
 - Started once, used by all
 
 **Benefits:**
+
 - Frontend stays responsive
 - Models stay loaded across sessions
 - Can update models independently
 - Better resource isolation
 
 **Drawbacks:**
+
 - Increased complexity
 - Inter-process communication overhead
 - More difficult to debug
@@ -353,6 +392,7 @@ For very resource-constrained scenarios, consider splitting:
 ## Implementation Priorities
 
 ### Phase 1: Quick Wins (1-2 weeks)
+
 1. **Add HTTP timeouts** - 1 hour
 2. **Add performance profiling markers** - 2 hours
 3. **Implement TTS audio cache limits** - 4 hours
@@ -360,18 +400,21 @@ For very resource-constrained scenarios, consider splitting:
 5. **Profile app with DevTools to confirm bottlenecks** - 4 hours
 
 ### Phase 2: Core Optimizations (2-4 weeks)
+
 1. **Move model loading to background (isolates or platform channels)** - 1-2 weeks
 2. **Implement TTS generation in background** - 3-5 days
 3. **Optimize asset file copying** - 2 days
 4. **Implement proper cache eviction** - 3 days
 
 ### Phase 3: Advanced Optimizations (1-2 months)
+
 1. **Implement foreground service for background listening** - 1 week
 2. **Add memory pressure handling** - 3 days
 3. **Optimize audio processing pipeline** - 1 week
 4. **Consider model quantization/compression** - 2 weeks
 
 ### Phase 4: Architecture (Future)
+
 1. **Evaluate multi-app architecture** - Research phase
 2. **Prototype model service** - 2-3 weeks
 3. **Performance comparison** - 1 week
@@ -379,6 +422,7 @@ For very resource-constrained scenarios, consider splitting:
 ## Monitoring & Validation
 
 ### Success Metrics
+
 - Zero ANR errors in production
 - Frame rate consistently above 55 FPS (out of 60)
 - Model initialization < 200ms perceived delay
@@ -386,13 +430,16 @@ For very resource-constrained scenarios, consider splitting:
 - TTS generation doesn't block UI
 
 ### Testing Strategy
+
 1. **Device Matrix Testing**
+
    - Test on low-end devices (1-2GB RAM, older SoCs)
    - Test on mid-range devices
    - Test on high-end devices
    - Focus on worst-case scenarios
 
 2. **Load Testing**
+
    - Long conversation sessions (100+ messages)
    - Rapid TTS requests
    - Continuous recording for extended periods
@@ -404,6 +451,7 @@ For very resource-constrained scenarios, consider splitting:
    - Automated performance regression tests
 
 ### Key Performance Indicators
+
 ```dart
 // Add telemetry
 class PerformanceMetrics {
@@ -427,6 +475,7 @@ class PerformanceMetrics {
 ### Device Resource Constraints
 
 **Memory Limits:**
+
 - Budget Android devices: 1-2GB total RAM
 - App may get 200-500MB max before OOM
 - ONNX models: 50-100MB combined
@@ -434,11 +483,13 @@ class PerformanceMetrics {
 - System reserves significant portion for UI
 
 **CPU Considerations:**
+
 - Low-end SoCs struggle with ONNX inference
 - May need model quantization (INT8 vs FP32)
 - Consider model size vs accuracy tradeoffs
 
 **Storage:**
+
 - Models stored in app cache directory
 - Can be cleared by system under pressure
 - Need strategy to re-download if cleared
@@ -446,11 +497,13 @@ class PerformanceMetrics {
 ### Battery Impact
 
 **Continuous Listening:**
+
 - Audio recording drains battery
 - ONNX inference is CPU-intensive
 - Need to balance responsiveness vs battery life
 
 **Optimization Strategies:**
+
 - Use lower sample rates when possible
 - Implement VAD (Voice Activity Detection) to reduce processing
 - Pause listening when screen off (configurable)
@@ -459,16 +512,19 @@ class PerformanceMetrics {
 ### Android Background Restrictions
 
 **Doze Mode:**
+
 - System limits background processing
 - Foreground service exempt from most restrictions
 - Need persistent notification
 
 **App Standby:**
+
 - System restricts network and jobs
 - Foreground service keeps app active
 - Must handle standby bucket changes
 
 **Battery Optimization:**
+
 - Users can enable aggressive optimization
 - May kill background services
 - Need to request exemption for critical use cases
@@ -476,22 +532,26 @@ class PerformanceMetrics {
 ## References & Resources
 
 ### Flutter Performance
+
 - [Flutter Performance Best Practices](https://docs.flutter.dev/perf/best-practices)
 - [Flutter Performance Profiling](https://docs.flutter.dev/perf/ui-performance)
 - [Using Isolates](https://dart.dev/guides/language/concurrency)
 
 ### Android Development
+
 - [Android Background Execution Limits](https://developer.android.com/about/versions/oreo/background)
 - [Foreground Services](https://developer.android.com/guide/components/foreground-services)
 - [WorkManager](https://developer.android.com/topic/libraries/architecture/workmanager)
 - [ANR Detection](https://developer.android.com/topic/performance/vitals/anr)
 
 ### ONNX & ML Performance
+
 - [Sherpa-ONNX Documentation](https://k2-fsa.github.io/sherpa/onnx/)
 - [ONNX Runtime Mobile](https://onnxruntime.ai/docs/tutorials/mobile/)
 - [Model Quantization](https://onnxruntime.ai/docs/performance/quantization.html)
 
 ### Tools
+
 - [Flutter DevTools](https://docs.flutter.dev/development/tools/devtools/overview)
 - [Android Profiler](https://developer.android.com/studio/profile/android-profiler)
 - [Memory Profiler](https://developer.android.com/studio/profile/memory-profiler)
@@ -520,6 +580,7 @@ The project architect has reviewed the performance analysis and provided strateg
 **Decision:** Start with Dart isolates and `compute()` for background processing. Only use platform channels if FFI proves incompatible.
 
 **Rationale:**
+
 - Maintains cross-platform code (Android, iOS, Linux)
 - Aligns with project simplicity principle
 - Easier to maintain and debug
@@ -530,6 +591,7 @@ The project architect has reviewed the performance analysis and provided strateg
 **Decision:** Load all models during app splash screen, not on-demand.
 
 **Implementation:**
+
 ```dart
 // In main.dart
 void main() async {
@@ -549,6 +611,7 @@ void main() async {
 ```
 
 **Rationale:**
+
 - Models are core functionality, not optional features
 - One-time startup cost (1-2 seconds) for instant functionality
 - Eliminates first-use delays entirely
@@ -561,6 +624,7 @@ void main() async {
 **Decision:** Fixed-size cache with 20 messages, simple eviction.
 
 **Implementation:**
+
 ```dart
 class TtsService {
   final int _maxCacheItems = 20; // ~10-20MB total
@@ -579,6 +643,7 @@ class TtsService {
 ```
 
 **Rationale:**
+
 - Simple implementation (no byte-level tracking needed)
 - 20 messages × ~500KB = ~10MB total (acceptable)
 - Cleanup already exists, just needs eviction logic
@@ -588,6 +653,7 @@ class TtsService {
 **Decision:** Do not pursue separate model service app.
 
 **Rationale:**
+
 - Violates simplicity principle
 - Introduces IPC complexity, dual APKs, difficult debugging
 - Premature optimization - simpler solutions can address issues
@@ -599,6 +665,7 @@ class TtsService {
 **Decision:** Implement only as optional "background listening mode" with user consent.
 
 **Requirements:**
+
 - Must be optional, not default behavior
 - Requires persistent notification: "Relagent is listening for commands"
 - User explicitly enables in settings
@@ -606,6 +673,7 @@ class TtsService {
 - Document battery impact honestly
 
 **Rationale:**
+
 - Necessary for ambient assistant use case
 - Notification ensures transparency (privacy-first)
 - Optional preserves simplicity for users who don't need it
@@ -614,9 +682,11 @@ class TtsService {
 ### Revised Implementation Plan
 
 #### Phase 0: Profiling & Validation (Week 1)
+
 **CRITICAL: Must complete before implementing optimizations**
 
 1. Add performance markers to critical paths:
+
    ```dart
    import 'dart:developer' as developer;
 
@@ -641,22 +711,27 @@ class TtsService {
 4. Establish baseline metrics
 
 **Tools:**
+
 ```bash
-fvm flutter run --profile
+flutter run --profile
 # Open DevTools for timeline analysis
 adb shell dumpsys meminfo org.venkado.relagent
 ```
 
 #### Phase 1: Quick Wins (Week 2)
+
 1. **HTTP timeouts** (2 hours)
+
    - Add 30-second timeout to all requests
    - Create singleton HTTP client for connection pooling
 
 2. **Loading indicators** (4 hours)
+
    - Show progress during model initialization
    - "Initializing voice system..." overlay
 
 3. **Simple LRU cache** (4 hours)
+
    - Fixed 20-message limit
    - Simple eviction on overflow
 
@@ -664,12 +739,15 @@ adb shell dumpsys meminfo org.venkado.relagent
    - Only if profiling shows this is a bottleneck
 
 #### Phase 2: Background Processing (Weeks 3-4)
+
 1. **Model preloading** (3 days)
+
    - Create `modelLoaderProvider` in Riverpod
    - Load during splash screen with progress
    - Services receive pre-initialized models
 
 2. **TTS generation via compute()** (3 days)
+
    - If isolates work with Sherpa-ONNX FFI
    - Background audio generation
 
@@ -678,12 +756,15 @@ adb shell dumpsys meminfo org.venkado.relagent
    - Ensure graceful degradation
 
 #### Phase 3: Advanced Features (Month 2+, if needed)
+
 1. **Optional foreground service** (1 week)
+
    - Background listening mode
    - User opt-in required
    - Persistent notification
 
 2. **Memory pressure handling** (3 days)
+
    - WidgetsBindingObserver for system warnings
    - Unload models under pressure
 
@@ -692,11 +773,13 @@ adb shell dumpsys meminfo org.venkado.relagent
    - Smaller model variants
 
 #### Phase 4: Deprecated
+
 - Multi-app architecture - not pursuing
 
 ### Riverpod Integration Pattern
 
 **New Provider: Model Loader**
+
 ```dart
 // lib/providers/model_loader_provider.dart
 enum ModelLoadState { unloaded, loading, loaded, error }
@@ -739,6 +822,7 @@ final modelLoaderProvider =
 ```
 
 **Service Integration:**
+
 ```dart
 // Services receive already-initialized models
 class ASR {
@@ -758,6 +842,7 @@ final asrServiceProvider = Provider<ASR>((ref) {
 ```
 
 **UI Integration:**
+
 ```dart
 class SplashScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
@@ -790,11 +875,13 @@ class SplashScreen extends ConsumerWidget {
 ### Memory Budget Guidelines
 
 **Target Devices:**
+
 - Modern devices (4GB+ RAM): No special considerations needed
 - Mid-range (2-3GB RAM): Should work fine with current plan
 - Low-end (<2GB RAM): Add optional lazy loading setting
 
 **Memory Allocation:**
+
 - ONNX models loaded: 50-100MB
 - TTS audio cache: ~10-20MB (20 messages)
 - App overhead: ~50MB
@@ -803,6 +890,7 @@ class SplashScreen extends ConsumerWidget {
 ### Performance Targets
 
 **Success Metrics:**
+
 - Zero ANR errors in production
 - Frame rate consistently above 55 FPS
 - Model initialization perceived delay < 2 seconds (splash screen)
@@ -812,16 +900,19 @@ class SplashScreen extends ConsumerWidget {
 ### Future Considerations
 
 **Scaling Concerns:**
+
 - Adding vision, RAG, or other ML models will increase startup time
 - Consider progressive loading: ASR first, then TTS, then optional models
 - May need dedicated model manager service for multiple ML features
 
 **Battery Optimization:**
+
 - Implement VAD (Voice Activity Detection) to reduce processing during silence
 - Configurable sample rates (8kHz for low-power, 16kHz for quality)
 - Show battery usage metrics to user
 
 **Platform-Specific ML Acceleration:**
+
 - iOS: CoreML
 - Android: NNAPI
 - Only pursue after exhausting cross-platform solutions
@@ -839,6 +930,6 @@ The architect confirms these optimizations align with project values:
 
 ---
 
-*Document created: 2025-11-28*
-*Last updated: 2025-11-28*
-*Status: Architect review complete - ready for Phase 0 profiling*
+_Document created: 2025-11-28_
+_Last updated: 2025-11-28_
+_Status: Architect review complete - ready for Phase 0 profiling_
