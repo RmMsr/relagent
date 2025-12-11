@@ -180,6 +180,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final history = ref.watch(settingsProvider.notifier).history;
+    final urlSuggestions = history.map((entry) => entry.url).toSet().toList();
+    final modelSuggestions = history
+        .map((entry) => entry.model)
+        .toSet()
+        .toList();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: Form(
@@ -192,51 +199,105 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _baseUrlController,
-              decoration: const InputDecoration(
-                labelText: 'API Base URL',
-                hintText: 'http://localhost:1234/v1',
-                border: OutlineInputBorder(),
-                helperText: 'OpenAI-compatible API endpoint',
-              ),
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () {
-                // Move to next field
-                FocusScope.of(context).nextFocus();
-              },
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter an API base URL';
+            Autocomplete<String>(
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text.isEmpty) {
+                  return urlSuggestions;
                 }
-                if (!value.startsWith('http://') &&
-                    !value.startsWith('https://')) {
-                  return 'URL must start with http:// or https://';
-                }
-                return null;
+                return urlSuggestions.where((String option) {
+                  return option.contains(textEditingValue.text.toLowerCase());
+                });
               },
+              onSelected: (String selection) {
+                _baseUrlController.text = selection;
+              },
+              fieldViewBuilder:
+                  (
+                    BuildContext context,
+                    TextEditingController fieldTextEditingController,
+                    FocusNode fieldFocusNode,
+                    VoidCallback onFieldSubmitted,
+                  ) {
+                    // Sync with our controller
+                    fieldTextEditingController.text = _baseUrlController.text;
+                    fieldTextEditingController.addListener(() {
+                      _baseUrlController.text = fieldTextEditingController.text;
+                    });
+                    return TextFormField(
+                      controller: fieldTextEditingController,
+                      focusNode: fieldFocusNode,
+                      decoration: const InputDecoration(
+                        labelText: 'API Base URL',
+                        hintText: 'http://localhost:1234/v1',
+                        border: OutlineInputBorder(),
+                        helperText: 'OpenAI-compatible API endpoint',
+                      ),
+                      keyboardType: TextInputType.url,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () {
+                        // Move to next field
+                        FocusScope.of(context).nextFocus();
+                      },
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter an API base URL';
+                        }
+                        if (!value.startsWith('http://') &&
+                            !value.startsWith('https://')) {
+                          return 'URL must start with http:// or https://';
+                        }
+                        return null;
+                      },
+                    );
+                  },
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _modelController,
-              decoration: const InputDecoration(
-                labelText: 'Model Name',
-                hintText: 'qwen2.5-coder:7b',
-                border: OutlineInputBorder(),
-                helperText: 'Model to use for chat completions',
-              ),
-              textInputAction: TextInputAction.done,
-              onEditingComplete: () {
-                // Save settings when pressing Enter on last field
-                _saveSettings();
-              },
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a model name';
+            Autocomplete<String>(
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text.isEmpty) {
+                  return modelSuggestions;
                 }
-                return null;
+                return modelSuggestions.where((String option) {
+                  return option.contains(textEditingValue.text.toLowerCase());
+                });
               },
+              onSelected: (String selection) {
+                _modelController.text = selection;
+              },
+              fieldViewBuilder:
+                  (
+                    BuildContext context,
+                    TextEditingController fieldTextEditingController,
+                    FocusNode fieldFocusNode,
+                    VoidCallback onFieldSubmitted,
+                  ) {
+                    // Sync with our controller
+                    fieldTextEditingController.text = _modelController.text;
+                    fieldTextEditingController.addListener(() {
+                      _modelController.text = fieldTextEditingController.text;
+                    });
+                    return TextFormField(
+                      controller: fieldTextEditingController,
+                      focusNode: fieldFocusNode,
+                      decoration: const InputDecoration(
+                        labelText: 'Model Name',
+                        hintText: 'qwen2.5-coder:7b',
+                        border: OutlineInputBorder(),
+                        helperText: 'Model to use for chat completions',
+                      ),
+                      textInputAction: TextInputAction.done,
+                      onEditingComplete: () {
+                        // Save settings when pressing Enter on last field
+                        _saveSettings();
+                      },
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter a model name';
+                        }
+                        return null;
+                      },
+                    );
+                  },
             ),
             const SizedBox(height: 16),
             TextFormField(

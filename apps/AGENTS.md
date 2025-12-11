@@ -24,6 +24,18 @@ cp assets/config.template.json assets/config.json
 # Standard Flutter commands: flutter pub get, flutter run, flutter build, flutter test, flutter analyze
 ```
 
+### Flutter MCP Tools (Preferred)
+
+When available, use Flutter MCP (Model Context Protocol) tools for app management:
+
+- **Launch App**: Use `dart-flutter_launch_app` with `root: "apps/"` and appropriate device
+- **List Devices**: Use `dart-flutter_list_devices` to see available targets
+- **Stop App**: Use `dart-flutter_stop_app` with the process ID from launch
+- **Hot Reload**: Use `dart-flutter_hot_reload` for code changes
+- **Run Tests**: Use `dart-flutter_run_tests` for comprehensive testing
+
+These tools provide programmatic control and are preferred over bash commands when available.
+
 Logs after manual testing are found in flutter*logs*\*.txt
 
 ## Architecture

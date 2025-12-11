@@ -5,6 +5,38 @@ enum VoiceMode {
   reading, // One-shot recording + auto-playback
 }
 
+class SettingsHistoryEntry {
+  final String url;
+  final String model;
+
+  const SettingsHistoryEntry({required this.url, required this.model});
+
+  Map<String, dynamic> toJson() {
+    return {'url': url, 'model': model};
+  }
+
+  factory SettingsHistoryEntry.fromJson(Map<String, dynamic> json) {
+    return SettingsHistoryEntry(
+      url: json['url'] as String,
+      model: json['model'] as String,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is SettingsHistoryEntry &&
+        other.url == url &&
+        other.model == model;
+  }
+
+  @override
+  int get hashCode => Object.hash(url, model);
+
+  @override
+  String toString() => '$url ($model)';
+}
+
 class Settings {
   // URL to an legacy OpenAI compatible API endpoint
   final String simpleChatBaseUrl;
