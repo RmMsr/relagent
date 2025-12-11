@@ -62,6 +62,32 @@ When implementing features, prioritize:
 
 Privacy requires security - minimize dependencies and be explicit about tradeoffs.
 
+### Branching Strategy
+
+**Use branches for complex changes** - Simple isolated changes can go directly to main:
+
+**Direct to main (single commit):**
+- Documentation updates (`docs/`, `README.md`, `AGENTS.md`)
+- Simple code style/formatting changes
+- Typos and minor fixes
+- Single-file changes with no dependencies
+
+**Use branches for complex changes:**
+- **New features**: `experiment/feature-name`
+- **Bug fixes**: `fix/issue-description`
+- **Refactoring**: `refactor/component-name`
+- **Performance**: `perf/optimization-area`
+- **Dependencies**: `deps/package-name`
+- **OpenSpec changes**: `openspec/change-description`
+- Any change requiring multiple commits or affecting multiple files
+
+**Branch workflow**:
+1. Create appropriate branch from main
+2. Make changes with small, focused commits
+3. Test changes thoroughly
+4. Create pull request for review
+5. Squash merge to main after approval
+
 ### Commit Messages
 
 - **Small, focused commits** - One aspect per commit
