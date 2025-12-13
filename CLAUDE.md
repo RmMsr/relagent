@@ -1,1 +1,1 @@
-/home/roman/projects/relagent/AGENTS.md
+AGENTS.md

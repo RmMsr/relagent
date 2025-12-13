@@ -21,7 +21,7 @@ This is the Relagent ("Relatable Agentic Minion") frontend. A multi-platform Flu
 cp assets/config.template.json assets/config.json
 # Edit config.json to configure chat API endpoint and ASR model
 
-# Standard Flutter commands: flutter pub get, flutter run, flutter build, flutter test, flutter analyze
+# Standard Flutter commands (via fvm): fvm flutter pub get, fvm flutter run, fvm flutter build, fvm flutter test, fvm flutter analyze
 ```
 
 ### Flutter MCP Tools (Preferred)
@@ -110,33 +110,6 @@ Managed via settings page, persisted to SharedPreferences:
 
 Default settings are used on first launch and can be reset via the settings page.
 
-## Development Commands
-
-```bash
-# Setup - create config from template
-cp assets/config.template.json assets/config.json
-# Edit config.json to configure chat API endpoint and ASR model
-
-# Get dependencies
-flutter pub get
-
-# Run on connected device/emulator
-flutter run
-
-# Build for specific platform
-flutter build apk        # Android
-flutter build ios        # iOS
-flutter build linux      # Linux desktop
-
-# Run tests
-flutter test
-
-# Lint code
-flutter analyze
-```
-
-Logs after manual testing are found in flutter*logs*\*.txt
-
 ## Repository Structure (Flutter App)
 
 ```
@@ -171,23 +144,23 @@ apps/
 - Relative imports with `/` prefix (e.g., `import '/providers/chat_provider.dart'`)
 - PascalCase for classes, camelCase for variables/methods
 - Use `const` constructors and `copyWith()` pattern for immutable state
-- Riverpod StateNotifierProvider pattern for state management
+- Riverpod 3.x NotifierProvider pattern for state management
 - Try-catch blocks for error handling with specific error messages
 
 **Riverpod Patterns:**
-- Use `StateNotifierProvider<Notifier, State>` for state management
+- Use `NotifierProvider<Notifier, State>` for state management (Riverpod 3.x)
 - Use `Provider<T>` for dependency injection (e.g., SharedPreferences)
 - Override providers in `ProviderScope` in main.dart for testing/initialization
 - Use `ref.read()` for one-time reads, `ref.watch()` for reactive reads
 - Create immutable state classes with `copyWith()` method
-- Handle async operations in StateNotifier methods with proper error states
+- Handle async operations in Notifier methods with proper error states
 - Use `unawaited()` for fire-and-forget async operations (like TTS pre-caching)
 
 ## Important Patterns
 
 ### State Management with Riverpod
 
-The app uses Riverpod StateNotifierProvider pattern:
+The app uses Riverpod 3.x NotifierProvider pattern:
 
 **Accessing State in Widgets:**
 
@@ -232,6 +205,6 @@ Two types of configuration:
 When adding features that need state management:
 
 1. Create a model in `lib/models/` if needed
-2. Create a provider in `lib/providers/` using StateNotifierProvider
+2. Create a provider in `lib/providers/` using NotifierProvider (Riverpod 3.x)
 3. Access state in widgets using `ref.watch()` (for reactive updates) or `ref.read()` (for one-time reads)
 4. Trigger actions using `ref.read(provider.notifier).method()`

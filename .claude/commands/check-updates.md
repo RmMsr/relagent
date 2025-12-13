@@ -1,1 +1,1 @@
-check-updates.md
+../../.opencode/command/check-updates.md

@@ -1,1 +1,1 @@
-/home/roman/projects/relagent/.opencode/command/check-sherpa-models.md
+../../.opencode/command/check-sherpa-models.md

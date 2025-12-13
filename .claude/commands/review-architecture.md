@@ -1,1 +1,1 @@
-/home/roman/projects/relagent/.opencode/command/review-architecture.md
+../../.opencode/command/review-architecture.md
