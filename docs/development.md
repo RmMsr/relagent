@@ -63,8 +63,16 @@ Buttons should show the state that they will activate on press.
 
 ## Debugging
 
-In order to capture the flutter logs run the app and capture the logs:
+**Preferred Method**: Use Flutter MCP tools for debugging:
+- `dart-flutter_get_runtime_errors` - Get Flutter-specific runtime errors
+- `dart-flutter_hot_reload` - Apply code changes and test immediately
+- `dart-flutter_analyze_files` - Check for code issues
 
+**Alternative Method**: Capture full logs with shell commands:
+
+```
+cd apps
+flutter run 2>&1 | tee flutter_log.txt
 ```
 cd apps
 flutter run 2>&1 | tee flutter_log.txt

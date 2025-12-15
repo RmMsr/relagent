@@ -23,6 +23,8 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 **Note**: The Flutter app requires MCP configuration to work properly since it's located in the `apps/` directory. See apps/AGENTS.md for setup instructions.
 
+**Flutter MCP Tool Preference**: ALWAYS prefer Flutter MCP tools (dart-flutter_*) over shell commands when available. See apps/AGENTS.md for complete reference table and usage guidelines.
+
 This file provides high-level guidance for working with the Relagent codebase.
 
 ## Project Overview
@@ -165,6 +167,30 @@ relagent/
 - Prefer self-explanatory code over comments
 - Break complex logic into smaller functions
 - Follow existing patterns in neighboring files
+
+## Tool Usage Priority
+
+**Always prioritize specialized tools over generic searches:**
+
+1. **First Priority - Specialized Tools:**
+   - Use language/framework-specific documentation tools for API lookups
+   - Use package manager tools for dependency/package discovery
+   - Use project-specific tools for building, testing, linting
+
+2. **Second Priority - Generic Tools:**
+   - Use web search only when specialized tools don't cover the need
+   - Use web fetch for specific URLs provided by the user
+
+**Discouraged Alternatives:**
+- Generic shell commands when specialized tools exist (e.g., `adb devices` instead of device management tools)
+- Manual web browsing when documentation tools are available
+
+**Conflict Resolution:**
+- When results differ between tools, present both options
+- For ambiguous choices (multiple packages/approaches), ask for user preference
+- If specialized tools fail, fall back to web search and inform the user
+
+This ensures accurate, up-to-date information while maintaining tool awareness regardless of the specific AI system or MCP servers being used.
 
 **Python Conventions:**
 - Standard Python naming (snake_case for functions/variables)

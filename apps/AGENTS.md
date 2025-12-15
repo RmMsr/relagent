@@ -22,6 +22,7 @@ cp assets/config.template.json assets/config.json
 # Edit config.json to configure chat API endpoint and ASR model
 
 # Standard Flutter commands (via fvm): fvm flutter pub get, fvm flutter run, fvm flutter build, fvm flutter test, fvm flutter analyze
+# ⚠️  PREFER MCP TOOLS: Use dart-flutter_* MCP tools instead of shell commands when available
 ```
 
 ### Flutter MCP Tools (Preferred)
@@ -47,9 +48,12 @@ dart-flutter_add_roots --roots '[{"uri": "file:///absolute/path/to/project/apps"
 - **List Devices**: Use `dart-flutter_list_devices` to see available targets
 - **Stop App**: Use `dart-flutter_stop_app` with process ID from launch
 - **Hot Reload**: Use `dart-flutter_hot_reload` for code changes
-- **Run Tests**: Use `dart-flutter_run_tests` for comprehensive testing
-- **Code Analysis**: Use `dart-flutter_analyze_files` to check for issues
+- **Run Tests**: Use `dart-flutter_run_tests` for comprehensive testing (instead of `fvm flutter test`)
+- **Code Analysis**: Use `dart-flutter_analyze_files` to check for issues (instead of `fvm flutter analyze`)
 - **Symbol Resolution**: Use `dart-flutter_resolve_workspace_symbol` to find code locations
+- **Code Formatting**: Use `dart-flutter_dart_format` for code formatting (instead of `fvm flutter format .`)
+- **Apply Fixes**: Use `dart-flutter_dart_fix` to apply automated fixes (instead of `fvm dart fix --apply`)
+- **Dependency Management**: Use `dart-flutter_pub` for package operations (instead of `fvm flutter pub get/add/remove`)
 
 **Verification**: Test the configuration by resolving a symbol:
 ```bash
@@ -57,9 +61,38 @@ dart-flutter_resolve_workspace_symbol --query "main"
 # Should return main() function from apps/lib/main.dart
 ```
 
-These tools provide programmatic control and are preferred over bash commands when available.
+These tools provide programmatic control and are **ALWAYS preferred** over bash commands when available:
+- ✅ **USE MCP**: `dart-flutter_run_tests` - Provides structured test output and better error handling
+- ❌ **AVOID**: `fvm flutter test` - Shell command with less integration
+- ✅ **USE MCP**: `dart-flutter_analyze_files` - Direct integration with codebase analysis
+- ❌ **AVOID**: `fvm flutter analyze` - Shell command requiring manual path handling
+- ✅ **USE MCP**: `dart-flutter_hot_reload` - Works with connected app instances
+- ❌ **AVOID**: Manual hot reload via shell - Less reliable
 
 Logs after manual testing are found in flutter*logs*\*.txt
+
+## MCP vs Shell Command Reference
+
+### Common Replacements
+
+| Shell Command | MCP Tool | Why MCP is Better |
+|---------------|-----------|-------------------|
+| `fvm flutter test` | `dart-flutter_run_tests` | Structured output, better error handling |
+| `fvm flutter analyze` | `dart-flutter_analyze_files` | Direct codebase integration |
+| `fvm flutter format .` | `dart-flutter_dart_format` | Targeted formatting, better control |
+| `fvm dart fix --apply` | `dart-flutter_dart_fix` | Safer automated fixes |
+| `fvm flutter pub get` | `dart-flutter_pub --command get` | Better dependency resolution |
+| `fvm flutter pub add package` | `dart-flutter_pub --command add --packageName package` | Safer package management |
+| `adb logcat` | `dart-flutter_get_runtime_errors` | Flutter-specific error filtering |
+| Manual hot reload | `dart-flutter_hot_reload` | Works with connected instances |
+
+### When Shell Commands Are Still Needed
+
+- **File operations**: `cp`, `mv`, `rm` for file management
+- **Git operations**: `git status`, `git commit`, etc.
+- **System operations**: `ls`, `find`, `grep` for exploration
+- **Build deployment**: `fvm flutter build apk` (if MCP equivalent not available)
+- **Device management**: `adb devices` when MCP device listing fails
 
 ## Architecture
 
@@ -73,10 +106,15 @@ The Flutter app is located in the `apps/` directory of the repository and uses *
 - **lib/pages/settings_page.dart**: Settings page for API configuration
 - **lib/providers/**: Riverpod state providers
   - **chat_provider.dart**: Chat state (messages, loading, errors)
-  - **settings_provider.dart**: User settings (API endpoint, model)
-- **lib/models/settings.dart**: Settings data class
+  - **settings_provider.dart**: User settings (API endpoint, model, voice mode, background duration)
+  - **recording_provider.dart**: Audio recording state with health monitoring and auto-recovery
+  - **background_service_provider.dart**: Native foreground service coordination
+  - **audio_coordinator_provider.dart**: Audio session management and focus handling
+  - **playback_provider.dart**: TTS audio playback coordination
+  - **tts_provider.dart**: Text-to-speech state management
+- **lib/models/settings.dart**: Settings data class with background listening duration options
 - **lib/chat/**: Chat models, widgets, and services for OpenAI-compatible API communication
-- **lib/speech_recognition/**: Sherpa-ONNX integration for on-device streaming ASR
+- **lib/speech_recognition/**: Sherpa-ONNX integration for on-device streaming ASR with error handling
 - **lib/config/app_config.dart**: Static configuration (ASR model only)
 
 ### State Management
@@ -101,12 +139,20 @@ Located in `apps/assets/config.json` - loaded at app startup:
 
 - **speech_recognition.streaming_asr_model**: Name of bundled Sherpa-ONNX ASR model directory (not user-editable)
 
-### User Settings (API Configuration)
+### User Settings (API Configuration & Voice Settings)
 
 Managed via settings page, persisted to SharedPreferences:
 
+**API Configuration:**
 - **Chat Base URL**: OpenAI-compatible API endpoint (e.g., http://localhost:1234/v1)
 - **Chat Model**: Model name to use with that endpoint (e.g., qwen2.5-coder:7b)
+
+**Voice Settings:**
+- **Background Listening Duration**: Maximum time for background recording sessions
+  - Options: 5min, 15min, 30min, 1hr (default), 2hr, 3hr, 6hr, 12hr, 24hr, Unlimited
+  - Automatically transitions to Silent mode when duration expires
+  - Notification shows end time for limited durations
+  - Unlimited setting uses 24-hour wake lock with renewal
 
 Default settings are used on first launch and can be reset via the settings page.
 
@@ -120,7 +166,7 @@ apps/
 │   ├── pages/             # UI screens
 │   ├── chat/              # Chat functionality
 │   ├── speech_recognition/ # Sherpa-ONNX ASR integration
-│   ├── tts/               # Text-to-speech functionality
+│   ├── tts/               # Text-to-speech functionality with isolate-based processing
 │   ├── models/            # Data models
 │   ├── widgets/           # Reusable UI components
 │   ├── config/            # App configuration
@@ -208,3 +254,127 @@ When adding features that need state management:
 2. Create a provider in `lib/providers/` using NotifierProvider (Riverpod 3.x)
 3. Access state in widgets using `ref.watch()` (for reactive updates) or `ref.read()` (for one-time reads)
 4. Trigger actions using `ref.read(provider.notifier).method()`
+
+## Health Monitoring Architecture
+
+The app includes a robust health monitoring system for background audio recording to ensure reliability and user trust:
+
+### Components
+
+**RecordingHealthMonitor** (`lib/providers/recording_provider.dart`):
+- Periodic health checks every 30 seconds when recording is active
+- Tracks `lastAudioDataTime` to detect silent stream failures
+- Implements exponential backoff recovery strategy (0s, 2s, 5s delays)
+- Graceful degradation to Silent mode after 3 failed recovery attempts
+
+**Audio Stream Error Handling** (`lib/speech_recognition/services.dart`):
+- `onError` and `onDone` handlers on audio stream listeners
+- Immediate detection of stream failures
+- Callback mechanism for audio data flow tracking
+
+**Background Service Integration** (`lib/providers/background_service_provider.dart`):
+- Dynamic wake lock timeout based on user's background listening duration setting
+- Wake lock timeout = user setting + 5 minute buffer
+- 24-hour timeout for unlimited setting with renewal mechanism
+
+### User Settings
+
+**BackgroundListeningDuration** enum in `lib/models/settings.dart`:
+- Options: 5min, 15min, 30min, 1hr (default), 2hr, 3hr, 6hr, 12hr, 24hr, unlimited
+- Automatic transition to Silent mode when duration expires
+- Notification shows end time for limited durations
+
+### Recovery Flow
+
+1. **Health Check** (every 30s): Verifies `RecordState.record` and recent audio data
+2. **Failure Detection**: Triggers when no audio data for 2+ minutes or stream error
+3. **Recovery Attempts**: Up to 3 tries with exponential backoff delays
+4. **Graceful Degradation**: Switches to Silent mode and shows user notification
+5. **User Notification**: "Listening stopped - could not recover audio recording" with "Open Settings" action
+
+### Battery Optimization
+
+- Health monitoring timer runs infrequently (30s intervals) for minimal battery impact
+- Wake lock timeouts align with user preferences to avoid unnecessary battery drain
+- Automatic shutoff prevents indefinite background recording
+
+### Debugging
+
+Health monitoring logs recovery attempts and failures for troubleshooting:
+
+**Recovery Logging**:
+- Recovery attempt count and timing (Attempt 1: immediate, Attempt 2: +2s, Attempt 3: +5s)
+- Audio data flow timestamps (`lastAudioDataTime` updates)
+- Stream error details from `onError` and `onDone` handlers
+- Graceful degradation triggers and reasons
+
+**Log Messages to Look For**:
+```
+Health check: Recording active, audio data flowing normally
+Health check: No audio data for 2+ minutes, attempting recovery
+Recovery attempt 1/3: Restarting audio stream
+Recovery attempt 2/3: Waiting 2s before restart
+Recovery attempt 3/3: Waiting 5s before restart
+Graceful degradation: 3 recovery attempts failed, switching to Silent
+Audio stream error: [error details]
+Audio stream closed unexpectedly: [reason]
+```
+
+**Debugging Tools**:
+- **Flutter logs**: `dart-flutter_get_runtime_errors` for Flutter-specific errors, or `adb logcat` for full system logs
+- **Notification timing**: Check if "Listening stopped" appears after ~7 seconds of failure
+- **Settings verification**: Confirm background duration matches expected timeout behavior
+- **Battery stats**: Monitor if wake lock is held for expected duration
+
+**Common Debugging Scenarios**:
+- **Frequent recoveries**: Check for audio focus conflicts or hardware issues
+- **Immediate failures**: Usually permission or microphone hardware problems
+- **Timeout after exact duration**: Normal behavior for time-limited sessions
+- **No recovery attempts**: Health monitoring may not be running (check provider initialization)
+
+## Troubleshooting Guide
+
+### "Listening Stopped" Notification
+
+When you see "Listening stopped - could not recover audio recording" notification:
+
+**What this means**: The app detected a failure in audio recording and could not automatically recover after 3 attempts.
+
+**Common causes**:
+- **Audio focus loss**: Phone calls, other apps playing audio, system sounds
+- **Hardware disruption**: Airplane mode toggle, headphone connection changes
+- **System resource constraints**: Low memory or CPU affecting audio processing
+- **Permission issues**: Microphone permission revoked or restricted
+
+**Immediate solutions**:
+1. **Open Settings** (notification action): Re-enable listening mode
+2. **Restart the app**: Clear any transient system issues
+3. **Check audio focus**: Stop any other audio-playing apps
+4. **Verify permissions**: Ensure microphone permission is granted
+
+**Prevention**:
+- Use appropriate **Background Listening Duration** settings to balance battery and reliability
+- Avoid frequent airplane mode toggles during active listening sessions
+- Close unnecessary apps when using extended background listening
+
+**If the problem persists**:
+- Check device storage space (low storage can affect audio processing)
+- Restart the device to clear system-level audio issues
+- Report the issue with device model and Android version for further investigation
+
+### Background Listening Not Working
+
+**Symptoms**: App stops listening when backgrounded or screen locked
+
+**Solutions**:
+1. **Check Background Listening Duration**: Set to desired time limit (not "Unlimited" for testing)
+2. **Verify Notification**: Look for "Listening..." notification when backgrounded
+3. **Disable Battery Optimization**: In Android settings, allow app to run in background
+4. **Check Do Not Disturb**: Ensure it doesn't silence notifications from the app
+
+### Battery Drain Concerns
+
+**If background listening drains battery quickly**:
+1. **Reduce Background Listening Duration**: Choose shorter limits (30min-2hr)
+2. **Monitor Health**: Check if recovery attempts are frequent (indicates underlying issues)
+3. **Close Other Apps**: Reduce background processing load on device
