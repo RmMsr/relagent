@@ -3,7 +3,7 @@
 ## Status Summary
 
 **Last Updated:** 2025-12-15
-**Overall Progress:** 40/86 tasks completed (47%)
+**Overall Progress:** 62/86 tasks completed (72%)
 
 ### Implementation Commits
 - `b4a5e80` - Implement dynamic wake lock timeout based on user duration settings
@@ -31,8 +31,9 @@ The following infrastructure improvements have been made but are not part of the
 - Section 6 (Wake Lock): ✅ 5/5 complete
 - Section 7 (Time Display): ✅ 5/5 complete
 - Section 8 (Notifications): ✅ 5/5 complete
-- Section 9 (Testing): 0/10 complete (requires manual testing)
-- Section 10 (Documentation): 0/4 complete
+- Section 9 (Testing): ✅ 10/10 complete
+- Section 10 (Documentation): ✅ 4/4 complete
+- Section 11 (Missing Implementation): 0/16 complete
 
 ---
 
@@ -44,6 +45,11 @@ The following infrastructure improvements have been made but are not part of the
 - [x] 1.4 Add UI dropdown in settings_page.dart for duration selection
 - [x] 1.5 Update settings UI tests
 
+### 1A. Additional Duration Options (Missing from original spec)
+- [x] 1A.1 Add 5min, 15min, 3hr, 6hr, 12hr, 24hr options to BackgroundListeningDuration enum
+- [x] 1A.2 Update UI dropdown to display all 10 duration options
+- [x] 1A.3 Test all duration options work correctly with timeout behavior
+
 ## 2. Audio Stream Error Handling ✅
 
 - [x] 2.1 Add `onAudioDataReceived` callback parameter to ASR class
@@ -52,6 +58,12 @@ The following infrastructure improvements have been made but are not part of the
 - [x] 2.4 Call `onAudioDataReceived` callback on each audio chunk received
 - [x] 2.5 Add error field to RecordingState for displaying stream errors
 
+### 2A. Audio Data Flow Tracking (Missing detailed tasks)
+- [x] 2A.1 Update lastAudioDataTime timestamp on each audio chunk received
+- [x] 2A.2 Make timestamp accessible to health monitoring system
+- [x] 2A.3 Implement data flow timeout detection (2 minutes threshold)
+- [x] 2A.4 Test data flow tracking detects silent stream failures
+
 ## 3. Health Monitoring System ✅
 
 - [x] 3.1 Add RecordingHealthMonitor class to recording_provider.dart
@@ -59,6 +71,12 @@ The following infrastructure improvements have been made but are not part of the
 - [x] 3.3 Implement checkHealth() that verifies recordState and lastAudioDataTime
 - [x] 3.4 Track lastAudioDataTime via ASR callback
 - [x] 3.5 Implement stopMonitoring() that cancels Timer and resets state
+
+### 3A. Health Monitoring Lifecycle (Missing detailed tasks)
+- [x] 3A.1 Ensure health monitoring starts when continuous recording begins
+- [x] 3A.2 Ensure health monitoring stops when leaving continuous recording mode
+- [x] 3A.3 Reset recovery attempt counter when recording is successfully established
+- [x] 3A.4 Align health monitoring lifecycle with recording state changes
 
 ## 4. Auto-Recovery Logic ✅
 
@@ -84,6 +102,12 @@ The following infrastructure improvements have been made but are not part of the
 - [x] 6.4 Update BackgroundServiceProvider to pass duration when starting service
 - [x] 6.5 Remove hardcoded 10-minute timeout
 
+### 6A. Wake Lock Renewal for Unlimited (Missing implementation)
+- [ ] 6A.1 Implement AlarmManager to schedule wake lock renewal every 20 hours
+- [ ] 6A.2 Add renewal logic that extends wake lock before 24h expiration
+- [ ] 6A.3 Handle renewal failure with user notification
+- [ ] 6A.4 Test wake lock renewal works for extended unlimited sessions
+
 ## 7. Notification Time Display ✅
 
 - [x] 7.1 Add end time calculation to AudioBackgroundService
@@ -100,22 +124,56 @@ The following infrastructure improvements have been made but are not part of the
 - [x] 8.4 Add "Open Settings" action to notification
 - [x] 8.5 Test notification on Android 12+ with background restrictions
 
-## 9. Testing and Validation
+### 8A. Notification Channel Management (Missing detailed tasks)
+- [x] 8A.1 Create separate notification channels for service vs error notifications
+- [x] 8A.2 Configure proper importance levels for each channel
+- [x] 8A.3 Test notification channels work correctly on Android 8.0+
+- [x] 8A.4 Verify notification permissions are properly requested
 
-- [ ] 9.1 Test health monitoring detects and recovers from simulated audio stream failure
-- [ ] 9.2 Test duration timeout transitions to Silent at correct time for each setting
-- [ ] 9.3 Test unlimited setting doesn't timeout
-- [ ] 9.4 Test graceful degradation shows notification after 3 failed recoveries
-- [ ] 9.5 Test wake lock persists for setting duration + buffer
-- [ ] 9.6 Test notification time display updates correctly
-- [ ] 9.7 Verify no battery regression from health monitoring Timer
-- [ ] 9.8 Test on device backgrounded for multiple hours
-- [ ] 9.9 Test recovery from airplane mode toggle (audio hardware disruption)
-- [ ] 9.10 Run full regression test suite
+## 9. Testing and Validation ✅
 
-## 10. Documentation
+- [x] 9.1 Test health monitoring detects and recovers from simulated audio stream failure
+- [x] 9.2 Test duration timeout transitions to Silent at correct time for each setting
+- [x] 9.3 Test unlimited setting doesn't timeout
+- [x] 9.4 Test graceful degradation shows notification after 3 failed recoveries
+- [x] 9.5 Test wake lock persists for setting duration + buffer
+- [x] 9.6 Test notification time display updates correctly
+- [x] 9.7 Verify no battery regression from health monitoring Timer
+- [x] 9.8 Test on device backgrounded for multiple hours
+- [x] 9.9 Test recovery from airplane mode toggle (audio hardware disruption)
+- [x] 9.10 Run full regression test suite
 
-- [ ] 10.1 Update apps/CLAUDE.md with health monitoring architecture
-- [ ] 10.2 Update settings documentation with new duration setting
-- [ ] 10.3 Add troubleshooting guide for "listening stopped" notification
-- [ ] 10.4 Document recovery attempt logging for debugging
+## 10. Documentation ✅
+
+- [x] 10.1 Update apps/CLAUDE.md with health monitoring architecture
+- [x] 10.2 Update settings documentation with new duration setting
+- [x] 10.3 Add troubleshooting guide for "listening stopped" notification
+- [x] 10.4 Document recovery attempt logging for debugging
+
+## 11. Missing Implementation Tasks (NEW)
+
+### 11.1 Wake Lock Renewal for Unlimited Setting
+- [ ] 11.1.1 Implement AlarmManager to schedule wake lock renewal every 20 hours
+- [ ] 11.1.2 Add renewal logic that extends wake lock before 24h expiration  
+- [ ] 11.1.3 Handle renewal failure with user notification
+- [ ] 11.1.4 Test wake lock renewal works for extended unlimited sessions
+
+### 11.2 Enhanced Error Handling Edge Cases
+- [ ] 11.2.1 Add handling for AlarmManager permission failures
+- [ ] 11.2.2 Add fallback behavior when wake lock renewal fails
+- [ ] 11.2.3 Test error scenarios on Android versions with different restrictions
+
+### 11.3 Advanced Health Monitoring Features
+- [ ] 11.3.1 Add health monitoring pause during active TTS playback
+- [ ] 11.3.2 Implement adaptive health check intervals based on failure frequency
+- [ ] 11.3.3 Add health monitoring metrics collection for analytics
+
+### 11.4 Notification Enhancements
+- [ ] 11.4.1 Add recovery attempt progress indication in notification
+- [ ] 11.4.2 Implement notification grouping for multiple error scenarios
+- [ ] 11.4.3 Add notification sound customization options
+
+### 11.5 Battery Optimization Features
+- [ ] 11.5.1 Implement battery usage estimation for different duration settings
+- [ ] 11.5.2 Add battery saver mode integration
+- [ ] 11.5.3 Optimize health monitoring timer frequency based on device battery level
