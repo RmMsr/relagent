@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '/chat/widgets.dart';
+import '/providers/audio_coordinator_provider.dart';
 import '/providers/chat_provider.dart';
 import '/providers/recording_provider.dart';
 import '/providers/tts_provider.dart';
@@ -61,6 +62,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       if (previous?.messages.length != next.messages.length ||
           previous?.showAssistantPending != next.showAssistantPending) {
         _scrollToBottom();
+      }
+    });
+
+    // Show SnackBar when permanent audio focus loss occurs
+    ref.listen<AudioCoordinatorState>(audioCoordinatorProvider,
+        (previous, next) {
+      if (previous?.audioFocusState.status != AudioFocusStatus.permanentLoss &&
+          next.audioFocusState.status == AudioFocusStatus.permanentLoss) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Voice mode changed because another app needs audio'),
+            duration: Duration(seconds: 4),
+          ),
+        );
       }
     });
 

@@ -145,13 +145,13 @@ The system SHALL manage Android wake lock duration based on user-configured time
 - **WHEN** the service stops
 - **THEN** the wake lock SHALL be released immediately
 
-### Requirement: Remaining Time Display
-The system SHALL display remaining time in the foreground notification when background listening has a time limit.
+### Requirement: End Time Display
+The system SHALL display end time in the foreground notification when background listening has a time limit.
 
-#### Scenario: Notification shows remaining time
+#### Scenario: Notification shows end time
 - **GIVEN** continuous listening is active with 1 hour duration limit
 - **WHEN** 20 minutes have passed
-- **THEN** the notification content SHALL display "Listening... (40m remaining)"
+- **THEN** the notification content SHALL display "Listening... (ends at 3:45 PM)"
 - **AND** the time SHALL update every 60 seconds
 
 #### Scenario: Notification omits time for unlimited

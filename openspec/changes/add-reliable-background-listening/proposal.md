@@ -39,7 +39,7 @@ Root causes for fail states:
   - 24 hours
   - Unlimited (with caution due to battery drain)
 - After time limit expires, app automatically switches to Silent voice mode
-- Notification displays remaining time in continuous listening modes (optional enhancement)
+- Notification displays time when listening will switch off (listening until)
 - If recording fails and cannot be recovered, app switches to Silent with user notification
 - Whenever the app switches to Silent mode on itself (without user's request) the user get's a notification about the state change
 

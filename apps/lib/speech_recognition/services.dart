@@ -25,6 +25,9 @@ class ASR {
   final ValueChanged<String> textRecognized;
   final VoidCallback textFinished;
   final ValueChanged<RecordState>? onRecordStateChanged;
+  final VoidCallback? onAudioDataReceived;
+  final ValueChanged<Object>? onStreamError;
+  final VoidCallback? onStreamDone;
 
   RecordState get recordState => _recordState;
 
@@ -32,6 +35,9 @@ class ASR {
     required this.textRecognized,
     required this.textFinished,
     this.onRecordStateChanged,
+    this.onAudioDataReceived,
+    this.onStreamError,
+    this.onStreamDone,
   });
 
   void init() {
@@ -95,6 +101,9 @@ class ASR {
           encoder: encoder,
           sampleRate: 16000,
           numChannels: 1,
+          // Auto pause/resume on interruptions (phone calls, etc.)
+          // This makes the recorder handle interruptions automatically
+          audioInterruption: AudioInterruptionMode.pauseResume,
         );
 
         final stream = await _audioRecorder!.startStream(config);
@@ -103,6 +112,9 @@ class ASR {
         stream.listen(
           (data) {
             developer.Timeline.startSync('ASR_ProcessAudioChunk');
+
+            // Notify that audio data was received
+            onAudioDataReceived?.call();
 
             final samplesFloat32 = convertBytesToFloat32(
               Uint8List.fromList(data),
@@ -129,8 +141,13 @@ class ASR {
 
             developer.Timeline.finishSync();
           },
+          onError: (error) {
+            debugPrint('Audio stream error: $error');
+            onStreamError?.call(error);
+          },
           onDone: () {
-            debugPrint('stream stopped.');
+            debugPrint('Audio stream done (unexpected closure)');
+            onStreamDone?.call();
           },
         );
       }

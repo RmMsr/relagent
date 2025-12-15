@@ -5,6 +5,47 @@ enum VoiceMode {
   reading, // One-shot recording + auto-playback
 }
 
+enum BackgroundListeningDuration {
+  fiveMinutes(Duration(minutes: 5)),
+  fifteenMinutes(Duration(minutes: 15)),
+  thirtyMinutes(Duration(minutes: 30)),
+  oneHour(Duration(hours: 1)),
+  twoHours(Duration(hours: 2)),
+  threeHours(Duration(hours: 3)),
+  sixHours(Duration(hours: 6)),
+  twelveHours(Duration(hours: 12)),
+  twentyFourHours(Duration(hours: 24)),
+  unlimited(null);
+
+  final Duration? duration;
+  const BackgroundListeningDuration(this.duration);
+
+  String get displayName {
+    switch (this) {
+      case BackgroundListeningDuration.fiveMinutes:
+        return '5 minutes';
+      case BackgroundListeningDuration.fifteenMinutes:
+        return '15 minutes';
+      case BackgroundListeningDuration.thirtyMinutes:
+        return '30 minutes';
+      case BackgroundListeningDuration.oneHour:
+        return '1 hour';
+      case BackgroundListeningDuration.twoHours:
+        return '2 hours';
+      case BackgroundListeningDuration.threeHours:
+        return '3 hours';
+      case BackgroundListeningDuration.sixHours:
+        return '6 hours';
+      case BackgroundListeningDuration.twelveHours:
+        return '12 hours';
+      case BackgroundListeningDuration.twentyFourHours:
+        return '24 hours';
+      case BackgroundListeningDuration.unlimited:
+        return 'Unlimited';
+    }
+  }
+}
+
 class SettingsHistoryEntry {
   final String url;
   final String model;
@@ -54,6 +95,9 @@ class Settings {
   // Voice mode (replaces ttsAutoQueue)
   final VoiceMode voiceMode;
 
+  // Background listening duration limit
+  final BackgroundListeningDuration backgroundListeningDuration;
+
   const Settings({
     required this.simpleChatBaseUrl,
     required this.simpleChatModel,
@@ -61,6 +105,7 @@ class Settings {
     required this.ttsSpeakerId,
     required this.ttsSpeed,
     required this.voiceMode,
+    required this.backgroundListeningDuration,
   });
 
   factory Settings.defaults() {
@@ -71,6 +116,7 @@ class Settings {
       ttsSpeakerId: 0,
       ttsSpeed: 1.0,
       voiceMode: VoiceMode.conversation, // Conversation mode by default
+      backgroundListeningDuration: BackgroundListeningDuration.oneHour,
     );
   }
 
@@ -81,6 +127,7 @@ class Settings {
     int? ttsSpeakerId,
     double? ttsSpeed,
     VoiceMode? voiceMode,
+    BackgroundListeningDuration? backgroundListeningDuration,
   }) {
     return Settings(
       simpleChatBaseUrl: simpleChatBaseUrl ?? this.simpleChatBaseUrl,
@@ -89,6 +136,8 @@ class Settings {
       ttsSpeakerId: ttsSpeakerId ?? this.ttsSpeakerId,
       ttsSpeed: ttsSpeed ?? this.ttsSpeed,
       voiceMode: voiceMode ?? this.voiceMode,
+      backgroundListeningDuration:
+          backgroundListeningDuration ?? this.backgroundListeningDuration,
     );
   }
 
@@ -107,6 +156,7 @@ class Settings {
       'ttsSpeakerId': ttsSpeakerId,
       'ttsSpeed': ttsSpeed,
       'voiceMode': voiceMode.name,
+      'backgroundListeningDuration': backgroundListeningDuration.name,
     };
   }
 
@@ -127,6 +177,18 @@ class Settings {
       mode = VoiceMode.conversation;
     }
 
+    // Parse backgroundListeningDuration
+    BackgroundListeningDuration duration;
+    if (json.containsKey('backgroundListeningDuration')) {
+      final durationStr = json['backgroundListeningDuration'] as String;
+      duration = BackgroundListeningDuration.values.firstWhere(
+        (e) => e.name == durationStr,
+        orElse: () => BackgroundListeningDuration.oneHour,
+      );
+    } else {
+      duration = BackgroundListeningDuration.oneHour;
+    }
+
     return Settings(
       simpleChatBaseUrl: json['simpleChatBaseUrl'] as String,
       simpleChatModel: json['simpleChatModel'] as String,
@@ -134,6 +196,7 @@ class Settings {
       ttsSpeakerId: (json['ttsSpeakerId'] as int?) ?? 0,
       ttsSpeed: (json['ttsSpeed'] as num?)?.toDouble() ?? 1.0,
       voiceMode: mode,
+      backgroundListeningDuration: duration,
     );
   }
 
@@ -146,18 +209,20 @@ class Settings {
         other.primeMessage == primeMessage &&
         other.ttsSpeakerId == ttsSpeakerId &&
         other.ttsSpeed == ttsSpeed &&
-        other.voiceMode == voiceMode;
+        other.voiceMode == voiceMode &&
+        other.backgroundListeningDuration == backgroundListeningDuration;
   }
 
   @override
   int get hashCode => Object.hash(
-    simpleChatBaseUrl,
-    simpleChatModel,
-    primeMessage,
-    ttsSpeakerId,
-    ttsSpeed,
-    voiceMode,
-  );
+        simpleChatBaseUrl,
+        simpleChatModel,
+        primeMessage,
+        ttsSpeakerId,
+        ttsSpeed,
+        voiceMode,
+        backgroundListeningDuration,
+      );
 }
 
 const _defaultPrimeMessage = '''

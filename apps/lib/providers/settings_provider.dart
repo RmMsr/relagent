@@ -117,6 +117,13 @@ class SettingsNotifier extends Notifier<Settings> {
     return await _saveSettings();
   }
 
+  Future<bool> updateBackgroundListeningDuration(
+    BackgroundListeningDuration duration,
+  ) async {
+    state = state.copyWith(backgroundListeningDuration: duration);
+    return await _saveSettings();
+  }
+
   Future<bool> updateSettings({
     String? simpleChatBaseUrl,
     String? simpleChatModel,
@@ -124,6 +131,7 @@ class SettingsNotifier extends Notifier<Settings> {
     int? ttsSpeakerId,
     double? ttsSpeed,
     VoiceMode? voiceMode,
+    BackgroundListeningDuration? backgroundListeningDuration,
   }) async {
     state = state.copyWith(
       simpleChatBaseUrl: simpleChatBaseUrl,
@@ -132,6 +140,7 @@ class SettingsNotifier extends Notifier<Settings> {
       ttsSpeakerId: ttsSpeakerId,
       ttsSpeed: ttsSpeed,
       voiceMode: voiceMode,
+      backgroundListeningDuration: backgroundListeningDuration,
     );
 
     // Add to history if URL or model changed

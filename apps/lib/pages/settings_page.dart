@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '/models/settings.dart';
 import '/providers/settings_provider.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -17,6 +18,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   late TextEditingController _primeMessageController;
   late TextEditingController _ttsSpeakerIdController;
   late double _ttsSpeed;
+  late BackgroundListeningDuration _backgroundListeningDuration;
   final _formKey = GlobalKey<FormState>();
 
   @override
@@ -34,6 +36,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       text: settings.ttsSpeakerId.toString(),
     );
     _ttsSpeed = settings.ttsSpeed;
+    _backgroundListeningDuration = settings.backgroundListeningDuration;
   }
 
   @override
@@ -56,6 +59,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           primeMessage: _primeMessageController.text.trim(),
           ttsSpeakerId: int.parse(_ttsSpeakerIdController.text.trim()),
           ttsSpeed: _ttsSpeed,
+          backgroundListeningDuration: _backgroundListeningDuration,
         );
 
     if (mounted) {
@@ -122,6 +126,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _ttsSpeakerIdController.text = settings.ttsSpeakerId.toString();
     setState(() {
       _ttsSpeed = settings.ttsSpeed;
+      _backgroundListeningDuration = settings.backgroundListeningDuration;
     });
 
     if (mounted) {
@@ -385,6 +390,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'Background Listening',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<BackgroundListeningDuration>(
+              value: _backgroundListeningDuration,
+              decoration: const InputDecoration(
+                labelText: 'Background Listening Duration',
+                border: OutlineInputBorder(),
+                helperText:
+                    'Maximum time for continuous background listening',
+              ),
+              items: BackgroundListeningDuration.values.map((duration) {
+                return DropdownMenuItem(
+                  value: duration,
+                  child: Text(duration.displayName),
+                );
+              }).toList(),
+              onChanged: (BackgroundListeningDuration? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _backgroundListeningDuration = newValue;
+                  });
+                }
+              },
             ),
             const SizedBox(height: 24),
             Row(

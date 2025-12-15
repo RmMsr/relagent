@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:record/record.dart';
 
@@ -54,13 +57,27 @@ final recordingProvider = NotifierProvider<RecordingNotifier, RecordingState>(
 );
 
 class RecordingNotifier extends Notifier<RecordingState> {
+  static const _platform = MethodChannel('com.relagent.background_service');
+
   ASR? _asr;
+
+  // Health monitoring fields
+  Timer? _healthCheckTimer;
+  DateTime? _lastAudioDataTime;
+
+  // Auto-recovery fields
+  int _recoveryAttempts = 0;
+
+  // Duration-based shutoff field
+  Timer? _durationTimer;
 
   @override
   RecordingState build() {
     // Clean up on dispose
     ref.onDispose(() {
       _asr?.dispose();
+      _stopHealthMonitoring();
+      _stopDurationTimer();
     });
 
     // Listen to voice mode changes
@@ -119,16 +136,22 @@ class RecordingNotifier extends Notifier<RecordingState> {
   }
 
   void _handleVoiceModeChanged(VoiceMode? oldMode, VoiceMode newMode) {
+    debugPrint(
+      'RecordingProvider: Voice mode changed from $oldMode to $newMode',
+    );
+
     final wasContinuous =
         oldMode == VoiceMode.listening || oldMode == VoiceMode.conversation;
     final isContinuous =
         newMode == VoiceMode.listening || newMode == VoiceMode.conversation;
 
     if (!wasContinuous && isContinuous) {
-      // Switching to continuous mode
+      debugPrint('RecordingProvider: Switching to continuous mode');
       _startContinuous();
     } else if (wasContinuous && !isContinuous) {
-      // Switching from continuous mode
+      debugPrint(
+        'RecordingProvider: Switching from continuous mode (stopping)',
+      );
       _stopContinuous();
     }
   }
@@ -156,6 +179,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
         isContinuous: true,
         error: null,
       );
+      _recoveryAttempts = 0; // Reset recovery counter on successful start
+      _startHealthMonitoring();
+      _startDurationTimer();
       debugPrint('RecordingProvider: Continuous recording started');
     } catch (e) {
       debugPrint('RecordingProvider: Failed to start continuous recording: $e');
@@ -169,6 +195,8 @@ class RecordingNotifier extends Notifier<RecordingState> {
     if (!state.isContinuous) return;
 
     debugPrint('RecordingProvider: Stopping continuous recording');
+    _stopHealthMonitoring();
+    _stopDurationTimer();
     try {
       await _asr?.stop();
     } catch (e) {
@@ -246,6 +274,8 @@ class RecordingNotifier extends Notifier<RecordingState> {
   // Internal methods called by AudioCoordinator for forced stop/resume
   Future<void> internalStop() async {
     debugPrint('RecordingProvider: internalStop() called by coordinator');
+    _stopHealthMonitoring();
+    _stopDurationTimer();
     try {
       await _asr?.stop();
     } catch (e) {
@@ -268,6 +298,11 @@ class RecordingNotifier extends Notifier<RecordingState> {
       if (_asr != null) _asr!.init();
       await _asr!.start();
       state = state.copyWith(isRecording: true, error: null);
+      // Restart health monitoring and duration timer if this is continuous mode
+      if (state.isContinuous) {
+        _startHealthMonitoring();
+        _startDurationTimer();
+      }
       debugPrint('RecordingProvider: Internal start completed');
     } catch (e) {
       debugPrint('RecordingProvider: Internal start failed: $e');
@@ -300,7 +335,193 @@ class RecordingNotifier extends Notifier<RecordingState> {
       onRecordStateChanged: (recordState) {
         state = state.copyWith(recordState: recordState);
       },
+      onAudioDataReceived: () {
+        // Track last audio data time for health monitoring
+        _lastAudioDataTime = DateTime.now();
+      },
+      onStreamError: (error) {
+        debugPrint('RecordingProvider: Audio stream error: $error');
+        state = state.copyWith(
+          error: 'Audio stream error: $error',
+        );
+      },
+      onStreamDone: () {
+        debugPrint('RecordingProvider: Audio stream closed unexpectedly');
+        if (state.isRecording) {
+          state = state.copyWith(
+            error: 'Audio stream closed unexpectedly',
+          );
+        }
+      },
     );
     // NOTE: Do NOT call init() here - it's called by initialize() or before start()
+  }
+
+  // Health Monitoring Methods
+
+  void _startHealthMonitoring() {
+    if (_healthCheckTimer != null) return;
+
+    debugPrint('RecordingProvider: Starting health monitoring (check every 30s)');
+    _healthCheckTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _checkHealth(),
+    );
+  }
+
+  void _stopHealthMonitoring() {
+    if (_healthCheckTimer == null) return;
+
+    debugPrint('RecordingProvider: Stopping health monitoring');
+    _healthCheckTimer?.cancel();
+    _healthCheckTimer = null;
+    _lastAudioDataTime = null;
+  }
+
+  void _checkHealth() {
+    debugPrint('RecordingProvider: Running health check...');
+
+    // Verify recording state matches expected state
+    final isRecordingExpected = state.isRecording && state.isContinuous;
+    final isActuallyRecording = state.recordState == RecordState.record;
+
+    if (isRecordingExpected && !isActuallyRecording) {
+      debugPrint(
+        'RecordingProvider: Health check FAILED - expected recording but recordState is ${state.recordState}',
+      );
+      _attemptRecovery('Record state mismatch');
+      return;
+    }
+
+    // Verify audio data is flowing (within last 2 minutes)
+    if (_lastAudioDataTime != null) {
+      final timeSinceLastData = DateTime.now().difference(_lastAudioDataTime!);
+      if (timeSinceLastData > const Duration(minutes: 2)) {
+        debugPrint(
+          'RecordingProvider: Health check FAILED - no audio data for ${timeSinceLastData.inSeconds}s',
+        );
+        _attemptRecovery('No audio data for ${timeSinceLastData.inSeconds}s');
+        return;
+      }
+    }
+
+    debugPrint('RecordingProvider: Health check passed');
+  }
+
+  // Auto-Recovery Methods
+
+  Future<void> _attemptRecovery(String reason) async {
+    _recoveryAttempts++;
+    debugPrint(
+      'RecordingProvider: Attempting recovery (attempt $_recoveryAttempts/3) - reason: $reason',
+    );
+
+    if (_recoveryAttempts > 3) {
+      debugPrint('RecordingProvider: Recovery attempts exhausted, degrading gracefully');
+      await _gracefulDegradation(reason);
+      return;
+    }
+
+    // Exponential backoff delays: 0s, 2s, 5s
+    final delays = [
+      Duration.zero,
+      const Duration(seconds: 2),
+      const Duration(seconds: 5),
+    ];
+    final delay = delays[_recoveryAttempts - 1];
+
+    if (delay > Duration.zero) {
+      debugPrint('RecordingProvider: Waiting ${delay.inSeconds}s before recovery...');
+      await Future.delayed(delay);
+    }
+
+    try {
+      debugPrint('RecordingProvider: Stopping ASR for recovery...');
+      await internalStop();
+
+      debugPrint('RecordingProvider: Restarting ASR...');
+      await internalStart();
+
+      debugPrint('RecordingProvider: Recovery attempt $_recoveryAttempts succeeded');
+      // On successful recovery, reset counter will happen on next successful start
+    } catch (e) {
+      debugPrint('RecordingProvider: Recovery attempt $_recoveryAttempts failed: $e');
+      // Will retry on next health check if attempts < 3
+    }
+  }
+
+  Future<void> _gracefulDegradation(String reason) async {
+    debugPrint('RecordingProvider: Graceful degradation triggered - $reason');
+
+    // Stop health monitoring
+    _stopHealthMonitoring();
+
+    // Stop recording and release resources
+    try {
+      await _asr?.stop();
+    } catch (e) {
+      debugPrint('RecordingProvider: Error during graceful stop: $e');
+    }
+
+    // Update state to indicate failure
+    state = state.copyWith(
+      isRecording: false,
+      error: 'Listening stopped - could not recover: $reason',
+    );
+
+    // Release audio coordinator lock
+    await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
+
+    // Switch to Silent mode
+    debugPrint('RecordingProvider: Switching to Silent mode due to recovery failure');
+    await ref.read(settingsProvider.notifier).updateVoiceMode(VoiceMode.silent);
+
+    // Show error notification to user
+    try {
+      await _platform.invokeMethod('showErrorNotification', {
+        'title': 'Listening Stopped',
+        'message': 'Could not recover audio recording: $reason',
+      });
+      debugPrint('RecordingProvider: Error notification sent');
+    } catch (e) {
+      debugPrint('RecordingProvider: Failed to show error notification: $e');
+    }
+
+    debugPrint('RecordingProvider: Graceful degradation complete');
+  }
+
+  // Duration-Based Auto-Shutoff Methods
+
+  void _startDurationTimer() {
+    if (_durationTimer != null) return;
+
+    final settings = ref.read(settingsProvider);
+    final duration = settings.backgroundListeningDuration.duration;
+
+    // Skip timer for unlimited setting
+    if (duration == null) {
+      debugPrint('RecordingProvider: Duration is unlimited, no auto-shutoff timer');
+      return;
+    }
+
+    debugPrint(
+      'RecordingProvider: Starting duration timer (${duration.inMinutes} minutes)',
+    );
+
+    _durationTimer = Timer(duration, () async {
+      debugPrint(
+        'RecordingProvider: Duration timeout reached, switching to Silent mode',
+      );
+      // Switch to Silent mode, which will trigger _stopContinuous()
+      await ref.read(settingsProvider.notifier).updateVoiceMode(VoiceMode.silent);
+    });
+  }
+
+  void _stopDurationTimer() {
+    if (_durationTimer == null) return;
+
+    debugPrint('RecordingProvider: Stopping duration timer');
+    _durationTimer?.cancel();
+    _durationTimer = null;
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
+import '/providers/audio_coordinator_provider.dart';
 import '/providers/settings_provider.dart';
 
 class VoiceModeSelector extends ConsumerWidget {
@@ -25,11 +26,11 @@ class VoiceModeSelector extends ConsumerWidget {
           onToggle: () {
             final newMode = settings.isAutoPlayback
                 ? (settings.isContinuousRecording
-                      ? VoiceMode.listening
-                      : VoiceMode.silent)
+                    ? VoiceMode.listening
+                    : VoiceMode.silent)
                 : (settings.isContinuousRecording
-                      ? VoiceMode.conversation
-                      : VoiceMode.reading);
+                    ? VoiceMode.conversation
+                    : VoiceMode.reading);
             ref.read(settingsProvider.notifier).updateVoiceMode(newMode);
           },
         ),
@@ -45,11 +46,11 @@ class VoiceModeSelector extends ConsumerWidget {
           onToggle: () {
             final newMode = settings.isContinuousRecording
                 ? (settings.isAutoPlayback
-                      ? VoiceMode.reading
-                      : VoiceMode.silent)
+                    ? VoiceMode.reading
+                    : VoiceMode.silent)
                 : (settings.isAutoPlayback
-                      ? VoiceMode.conversation
-                      : VoiceMode.listening);
+                    ? VoiceMode.conversation
+                    : VoiceMode.listening);
             ref.read(settingsProvider.notifier).updateVoiceMode(newMode);
           },
         ),
@@ -84,7 +85,7 @@ class _ToggleControl extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: const BorderRadius.all(Radius.circular(8)),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: theme.colorScheme.outline.withValues(alpha: 0.2),
           width: 1,

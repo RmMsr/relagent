@@ -218,6 +218,20 @@ class TtsNotifier extends Notifier<TtsState> {
         _updateMessageState(messageId, status: MessagePlaybackStatus.playing);
       }
     }
+
+    // Handle queue clearing - reset all items that were in queue but are gone
+    if (prev != null && prev.queue.isNotEmpty && next.queue.isEmpty) {
+      debugPrint(
+        'TtsProvider: Playback queue cleared, resetting ${prev.queue.length} pending items',
+      );
+      for (final item in prev.queue) {
+        final messageState = state.getMessageState(item.id);
+        // Reset to idle if it was generating (waiting in queue)
+        if (messageState.isGenerating) {
+          _updateMessageState(item.id, status: MessagePlaybackStatus.idle);
+        }
+      }
+    }
   }
 
   void _updateMessageState(

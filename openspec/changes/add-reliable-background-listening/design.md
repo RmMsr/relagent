@@ -134,24 +134,24 @@ Failure 3: Switch to Silent, show notification
 - No notifications ever: User may not realize listening stopped
 - In-app only notification: User may not see if app is backgrounded
 
-### 6. Remaining Time Display (Optional)
+### 6. End Time Display (Optional)
 
-**Decision**: Show remaining time in notification content when non-unlimited
+**Decision**: Show end time in notification content when non-unlimited
 
 **Rationale**:
-- Helps users know when timeout will occur
-- Simple to implement - format duration and update every minute
+- Helps users know when listening will end
+- Simple to implement - format end time and update every 60 seconds
 - Only shown for limited durations (not "unlimited")
 
 **Implementation**:
 - In AudioBackgroundService, when mode=recording and duration!=unlimited:
-  - Calculate remaining = (startTime + duration) - now
-  - Format as "Listening... (1h 23m remaining)"
+  - Calculate endTime = startTime + duration
+  - Format as "Listening... (ends at 3:45 PM)"
   - Update notification every 60 seconds
 
 **Alternatives considered**:
 - Always show even for unlimited: Redundant ("unlimited" is clear)
-- Don't show at all: Less user awareness of when timeout occurs
+- Don't show at all: Less user awareness of when listening will end
 - Show in seconds: Too granular, distracting
 
 ## Data Model Changes

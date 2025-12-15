@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '/models/settings.dart';
+import '/providers/settings_provider.dart';
 import '../tts/audio_source.dart';
 import 'audio_coordinator_provider.dart';
 
@@ -64,12 +66,35 @@ class PlaybackService extends Notifier<PlaybackState> {
       }
     });
 
+    // Listen to settings changes - stop playback when switching to silent mode
+    ref.listen<Settings>(settingsProvider, (previous, next) {
+      if (previous?.voiceMode != next.voiceMode) {
+        _handleVoiceModeChanged(previous?.voiceMode, next.voiceMode);
+      }
+    });
+
     ref.onDispose(() {
       _playerStateSub?.cancel();
       _player.dispose();
     });
 
     return const PlaybackState();
+  }
+
+  void _handleVoiceModeChanged(VoiceMode? oldMode, VoiceMode newMode) {
+    debugPrint(
+      'PlaybackService: Voice mode changed from $oldMode to $newMode',
+    );
+
+    // Stop all playback and clear queue when switching to silent mode
+    if (newMode == VoiceMode.silent) {
+      if (state.isPlaying || state.queue.isNotEmpty) {
+        debugPrint(
+          'PlaybackService: Stopping playback and clearing queue due to silent mode',
+        );
+        stop();
+      }
+    }
   }
 
   Future<void> enqueue(PlaybackItem item) async {
@@ -111,11 +136,22 @@ class PlaybackService extends Notifier<PlaybackState> {
 
     await ref
         .read(audioCoordinatorProvider.notifier)
-        .releasePlayback(autoResume: true);
+        .releasePlayback();
 
+    // Complete current item and all queued items
     _completeCurrentItem();
+    _completeQueuedItems();
 
     state = const PlaybackState();
+  }
+
+  void _completeQueuedItems() {
+    // Complete all items in queue so TTS provider can reset their status
+    for (final item in state.queue) {
+      if (!item.onFinished.isCompleted) {
+        item.onFinished.complete();
+      }
+    }
   }
 
   Future<void> _processNext() async {
@@ -125,7 +161,7 @@ class PlaybackService extends Notifier<PlaybackState> {
       // currentItem already cleared in _finishAndNext, no state update needed
       await ref
           .read(audioCoordinatorProvider.notifier)
-          .releasePlayback(autoResume: true);
+          .releasePlayback();
       return;
     }
 
@@ -213,7 +249,7 @@ class PlaybackService extends Notifier<PlaybackState> {
     if (currentQueue.isNotEmpty) {
       await ref
           .read(audioCoordinatorProvider.notifier)
-          .releasePlayback(autoResume: false);
+          .releasePlayback();
     }
 
     _processNext();

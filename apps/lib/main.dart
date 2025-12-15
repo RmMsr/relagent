@@ -6,6 +6,7 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '/config/app_config.dart';
+import '/providers/background_service_provider.dart';
 import '/providers/settings_provider.dart';
 import '/router/app_router.dart';
 import '/tts/sherpa_tts.dart';
@@ -38,11 +39,15 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Initialize background service provider to start listening to AudioCoordinator
+    // This ensures the service syncs with audio state changes
+    ref.read<BackgroundServiceState>(backgroundServiceProvider);
+
     return MaterialApp.router(
       title: 'Relagent',
       theme: ThemeData(
