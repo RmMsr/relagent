@@ -14,10 +14,9 @@ enum BackgroundListeningDuration {
   threeHours(Duration(hours: 3)),
   sixHours(Duration(hours: 6)),
   twelveHours(Duration(hours: 12)),
-  twentyFourHours(Duration(hours: 24)),
-  unlimited(null);
+  twentyFourHours(Duration(hours: 24));
 
-  final Duration? duration;
+  final Duration duration;
   const BackgroundListeningDuration(this.duration);
 
   String get displayName {
@@ -40,8 +39,6 @@ enum BackgroundListeningDuration {
         return '12 hours';
       case BackgroundListeningDuration.twentyFourHours:
         return '24 hours';
-      case BackgroundListeningDuration.unlimited:
-        return 'Unlimited';
     }
   }
 }
@@ -215,14 +212,14 @@ class Settings {
 
   @override
   int get hashCode => Object.hash(
-        simpleChatBaseUrl,
-        simpleChatModel,
-        primeMessage,
-        ttsSpeakerId,
-        ttsSpeed,
-        voiceMode,
-        backgroundListeningDuration,
-      );
+    simpleChatBaseUrl,
+    simpleChatModel,
+    primeMessage,
+    ttsSpeakerId,
+    ttsSpeed,
+    voiceMode,
+    backgroundListeningDuration,
+  );
 }
 
 const _defaultPrimeMessage = '''

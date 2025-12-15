@@ -508,14 +508,6 @@ class RecordingNotifier extends Notifier<RecordingState> {
     final settings = ref.read(settingsProvider);
     final duration = settings.backgroundListeningDuration.duration;
 
-    // Skip timer for unlimited setting
-    if (duration == null) {
-      debugPrint(
-        'RecordingProvider: Duration is unlimited, no auto-shutoff timer',
-      );
-      return;
-    }
-
     debugPrint(
       'RecordingProvider: Starting duration timer (${duration.inMinutes} minutes)',
     );

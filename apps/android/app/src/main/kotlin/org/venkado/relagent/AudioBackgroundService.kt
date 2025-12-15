@@ -1,8 +1,8 @@
 package org.venkado.relagent
 
-import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
+import org.venkado.relagent.R
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -20,8 +20,8 @@ import androidx.core.app.NotificationCompat
 import java.util.Date
 
 /**
- * Minimal foreground service for Phase 1 POC testing.
- * Keeps app alive during background audio operations.
+ * Simplified foreground service for background audio operations.
+ * Keeps app alive during background recording/playback with max 24-hour duration.
  *
  * Note: Audio focus is managed by audio_session package (used by just_audio and record).
  * This service only handles wake lock and foreground notification.
@@ -31,14 +31,9 @@ class AudioBackgroundService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var currentMode: String = MODE_IDLE
     
-    // Wake lock renewal fields
-    private var alarmManager: AlarmManager? = null
-    private var wakeLockRenewalPendingIntent: PendingIntent? = null
-    private var isWakeLockRenewalScheduled = false
-
     // Time display fields
     private var recordingStartTime: Long = 0
-    private var recordingDurationMinutes: Long = -1
+    private var recordingDurationMinutes: Long = 0
     private var lastNotificationText: String = ""
     private val notificationUpdateHandler = Handler(Looper.getMainLooper())
     private val notificationUpdateRunnable = object : Runnable {
@@ -61,7 +56,6 @@ class AudioBackgroundService : Service() {
 
         const val ACTION_STOP = "org.venkado.relagent.STOP"
         private const val ACTION_NOTIFICATION_DISMISSED = "org.venkado.relagent.NOTIFICATION_DISMISSED"
-        private const val ACTION_WAKE_LOCK_RENEWAL = "org.venkado.relagent.WAKE_LOCK_RENEWAL"
     }
 
     private val dismissalReceiver = object : BroadcastReceiver() {
@@ -74,10 +68,6 @@ class AudioBackgroundService : Service() {
                         recreateNotification()
                     }
                 }
-                ACTION_WAKE_LOCK_RENEWAL -> {
-                    Log.d(TAG, "Wake lock renewal alarm triggered")
-                    handleWakeLockRenewal()
-                }
             }
         }
     }
@@ -88,20 +78,21 @@ class AudioBackgroundService : Service() {
         createNotificationChannel()
         createErrorNotificationChannel()
 
-        // Initialize AlarmManager
-        alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        // Start foreground immediately to avoid ForegroundServiceDidNotStartInTimeException
+        val initialNotification = createNotification("Initializing...")
+        startForeground(NOTIFICATION_ID, initialNotification)
+        Log.d(TAG, "Foreground service started immediately in onCreate")
 
-        // Register receiver for notification dismissal and wake lock renewal
+        // Register receiver for notification dismissal
         val filter = IntentFilter().apply {
             addAction(ACTION_NOTIFICATION_DISMISSED)
-            addAction(ACTION_WAKE_LOCK_RENEWAL)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(dismissalReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(dismissalReceiver, filter)
         }
-        Log.d(TAG, "Broadcast receivers registered (dismissal and wake lock renewal)")
+        Log.d(TAG, "Broadcast receivers registered (dismissal)")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -118,7 +109,7 @@ class AudioBackgroundService : Service() {
 
         val mode = intent?.getStringExtra("mode") ?: MODE_IDLE
         val message = intent?.getStringExtra("message")
-        val durationMinutes = intent?.getLongExtra("durationMinutes", -1L) ?: -1L
+        val durationMinutes = intent?.getLongExtra("durationMinutes", 0L) ?: 0L
 
         if (message != null) {
             // Update notification message without changing mode
@@ -133,14 +124,13 @@ class AudioBackgroundService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? {
-        // Not a bound service for Phase 1
+        // Not a bound service
         return null
     }
 
     override fun onDestroy() {
         Log.d(TAG, "Service destroyed")
         releaseWakeLock()
-        cancelWakeLockRenewal()
         stopNotificationUpdates()
         try {
             unregisterReceiver(dismissalReceiver)
@@ -151,21 +141,19 @@ class AudioBackgroundService : Service() {
         super.onDestroy()
     }
 
-    private fun updateServiceMode(mode: String, durationMinutes: Long = -1L) {
+    private fun updateServiceMode(mode: String, durationMinutes: Long = 0L) {
         currentMode = mode
         Log.d(TAG, "Mode changed to: $mode (duration: $durationMinutes min)")
 
         try {
             when (mode) {
                 MODE_IDLE -> {
-                    // IMPORTANT: Don't stop service during IDLE - it's just a transition state
-                    // Keep service running to avoid Android killing it when restarting from background
                     Log.d(TAG, "Mode idle - keeping service alive during transition")
                     releaseWakeLock()
-                    cancelWakeLockRenewal()
                     stopNotificationUpdates()
-                    // Remove foreground notification when switching to idle
-                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    // Update notification for idle mode instead of removing
+                    val idleNotification = createNotification("Ready")
+                    startForeground(NOTIFICATION_ID, idleNotification)
                 }
                 MODE_RECORDING -> {
                     Log.d(TAG, "Starting foreground service for recording")
@@ -173,19 +161,14 @@ class AudioBackgroundService : Service() {
 
                     // Track start time and duration for time display
                     recordingStartTime = System.currentTimeMillis()
-                    recordingDurationMinutes = durationMinutes
-
-                    // Schedule wake lock renewal for unlimited sessions
-                    if (durationMinutes < 0) {
-                        scheduleWakeLockRenewal()
-                    }
+                    this.recordingDurationMinutes = durationMinutes
 
                     // Create notification and track its text
                     val endTime = if (durationMinutes > 0) getEndTimeText() else ""
                     lastNotificationText = if (durationMinutes > 0) {
                         "Listening... (ends at $endTime)"
                     } else {
-                        "Listening... (unlimited)"
+                        "Listening... (24 hours max)"
                     }
 
                     val notification = createNotificationWithTime()
@@ -201,7 +184,6 @@ class AudioBackgroundService : Service() {
                 MODE_PLAYING -> {
                     Log.d(TAG, "Starting foreground service for playback")
                     releaseWakeLock() // No wake lock needed for playback
-                    cancelWakeLockRenewal()
                     stopNotificationUpdates()
                     val notification = createNotification("Speaking...")
                     startForeground(NOTIFICATION_ID, notification)
@@ -265,7 +247,7 @@ class AudioBackgroundService : Service() {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Relagent conversation active")
             .setContentText(contentText)
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // Standard system icon that exists on all devices
+            .setSmallIcon(R.mipmap.ic_launcher) // Use app's launcher icon
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true) // Cannot be dismissed
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -327,7 +309,7 @@ class AudioBackgroundService : Service() {
         }
     }
 
-    private fun acquireWakeLock(durationMinutes: Long = -1L) {
+    private fun acquireWakeLock(durationMinutes: Long = 0L) {
         if (wakeLock == null) {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(
@@ -339,20 +321,10 @@ class AudioBackgroundService : Service() {
         }
 
         if (wakeLock?.isHeld == false) {
-            // Calculate wake lock timeout based on user setting
-            val timeoutMs = when {
-                durationMinutes < 0 -> {
-                    // Unlimited: use 24 hour timeout
-                    Log.d(TAG, "Unlimited duration - using 24h wake lock")
-                    24 * 60 * 60 * 1000L
-                }
-                else -> {
-                    // Limited: user duration + 5 minute buffer
-                    val totalMinutes = durationMinutes + 5
-                    Log.d(TAG, "Limited duration - using ${totalMinutes}min wake lock (${durationMinutes}min + 5min buffer)")
-                    totalMinutes * 60 * 1000L
-                }
-            }
+            // User duration + 5 minute buffer (max 24h)
+            val totalMinutes = minOf(durationMinutes + 5, 24 * 60)
+            Log.d(TAG, "Using ${totalMinutes}min wake lock (${durationMinutes}min + 5min buffer)")
+            val timeoutMs = totalMinutes * 60 * 1000L
 
             wakeLock?.acquire(timeoutMs)
             Log.d(TAG, "Wake lock acquired for ${timeoutMs / 1000 / 60}min")
@@ -371,12 +343,8 @@ class AudioBackgroundService : Service() {
     // Time Display Methods
 
     private fun createNotificationWithTime(): Notification {
-        val text = if (recordingDurationMinutes > 0) {
-            val endTime = getEndTimeText()
-            "Listening... (ends at $endTime)"
-        } else {
-            "Listening... (unlimited)"
-        }
+        val endTime = getEndTimeText()
+        val text = "Listening... (ends at $endTime)"
         Log.d(TAG, "Creating recording notification with text: $text")
         return createNotification(text)
     }
@@ -387,11 +355,26 @@ class AudioBackgroundService : Service() {
         val endTimeMs = recordingStartTime + (recordingDurationMinutes * 60 * 1000)
         val endDate = Date(endTimeMs)
         val timeFormat = android.text.format.DateFormat.getTimeFormat(this)
-        return timeFormat.format(endDate)
+        val timeText = timeFormat.format(endDate)
+        
+        // Check if end time is on a different day (after midnight)
+        val calendar = java.util.Calendar.getInstance()
+        val endCalendar = java.util.Calendar.getInstance()
+        endCalendar.time = endDate
+        
+        val currentDay = calendar.get(java.util.Calendar.DAY_OF_YEAR)
+        val endDay = endCalendar.get(java.util.Calendar.DAY_OF_YEAR)
+        
+        // If end day is different, prefix with "tomorrow"
+        return if (currentDay != endDay) {
+            "tomorrow $timeText"
+        } else {
+            timeText
+        }
     }
 
     private fun updateNotificationWithEndTime() {
-        if (currentMode == MODE_RECORDING && recordingDurationMinutes > 0) {
+        if (currentMode == MODE_RECORDING) {
             // Calculate what the new notification text would be
             val endTime = getEndTimeText()
             val newText = "Listening... (ends at $endTime)"
@@ -458,109 +441,4 @@ class AudioBackgroundService : Service() {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(ERROR_NOTIFICATION_ID, notification)
     }
-
-    // Wake Lock Renewal Methods
-
-    private fun scheduleWakeLockRenewal() {
-        Log.d(TAG, "Scheduling wake lock renewal for unlimited session")
-        
-        try {
-            // Cancel any existing renewal
-            cancelWakeLockRenewal()
-
-            // Create pending intent for renewal alarm
-            val renewalIntent = Intent(ACTION_WAKE_LOCK_RENEWAL).apply {
-                setPackage(packageName)
-            }
-            
-            wakeLockRenewalPendingIntent = PendingIntent.getBroadcast(
-                this,
-                0,
-                renewalIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-
-            // Schedule alarm for 20 hours from now (before 24h wake lock timeout)
-            val renewalTime = System.currentTimeMillis() + (20 * 60 * 60 * 1000L)
-            
-            wakeLockRenewalPendingIntent?.let { pendingIntent ->
-                alarmManager?.let { alarmMgr ->
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        alarmMgr.setExactAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            renewalTime,
-                            pendingIntent
-                        )
-                    } else {
-                        alarmMgr.setExact(
-                            AlarmManager.RTC_WAKEUP,
-                            renewalTime,
-                            pendingIntent
-                        )
-                    }
-                    isWakeLockRenewalScheduled = true
-                    Log.d(TAG, "Wake lock renewal scheduled for ${Date(renewalTime)}")
-                } ?: run {
-                    Log.e(TAG, "AlarmManager is null - cannot schedule wake lock renewal")
-                }
-            } ?: run {
-                Log.e(TAG, "Wake lock renewal pending intent is null - cannot schedule")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to schedule wake lock renewal: ${e.message}", e)
-            showErrorNotification(
-                "Wake Lock Error",
-                "Failed to schedule automatic wake lock renewal. Background listening may stop after 24 hours."
-            )
-        }
-    }
-
-    private fun cancelWakeLockRenewal() {
-        if (isWakeLockRenewalScheduled) {
-            wakeLockRenewalPendingIntent?.let { pendingIntent ->
-                try {
-                    alarmManager?.cancel(pendingIntent)
-                    isWakeLockRenewalScheduled = false
-                    Log.d(TAG, "Wake lock renewal cancelled")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to cancel wake lock renewal: ${e.message}")
-                }
-            } ?: run {
-                Log.w(TAG, "Wake lock renewal pending intent is null")
-                isWakeLockRenewalScheduled = false
-            }
-        }
-    }
-
-    private fun handleWakeLockRenewal() {
-        Log.d(TAG, "Handling wake lock renewal")
-        
-        try {
-            // Check if we're still in recording mode with unlimited duration
-            if (currentMode == MODE_RECORDING && recordingDurationMinutes < 0) {
-                // Extend wake lock for another 24 hours
-                val newTimeoutMs = 24 * 60 * 60 * 1000L
-                wakeLock?.acquire(newTimeoutMs)
-                Log.d(TAG, "Wake lock renewed for another 24 hours")
-                
-                // Schedule next renewal
-                scheduleWakeLockRenewal()
-                
-                // Show success notification (optional, can be removed for less noise)
-                // updateNotificationText("Listening... (unlimited - renewed)")
-            } else {
-                Log.d(TAG, "Wake lock renewal triggered but not in unlimited recording mode - ignoring")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to renew wake lock: ${e.message}", e)
-            showErrorNotification(
-                "Wake Lock Renewal Failed",
-                "Could not extend background listening time. The app may stop responding after 24 hours."
-            )
-            
-            // Don't reschedule if renewal failed
-            isWakeLockRenewalScheduled = false
-        }
-    }
-
 }

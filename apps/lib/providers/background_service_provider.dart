@@ -229,40 +229,9 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
     }
   }
 
-  /// Check if notification permissions are granted
-  Future<bool> _checkNotificationPermissions() async {
-    try {
-      final bool hasPermission = await _platform.invokeMethod(
-        'checkNotificationPermissions',
-      );
-      debugPrint(
-        'BackgroundServiceProvider: Notification permission status: $hasPermission',
-      );
-      return hasPermission;
-    } on PlatformException catch (e) {
-      debugPrint(
-        'BackgroundServiceProvider: Failed to check notification permissions: ${e.message}',
-      );
-      return false;
-    }
-  }
-
   /// Sync the native service with the current AudioMode
   Future<void> _syncServiceWithAudioMode(AudioMode mode) async {
     debugPrint('BackgroundServiceProvider: Syncing service with mode: $mode');
-
-    // Check notification permissions when starting service
-    if (mode != AudioMode.idle) {
-      final hasNotificationPermission = await _checkNotificationPermissions();
-      if (!hasNotificationPermission) {
-        state = state.copyWith(
-          error: () =>
-              'Notifications are disabled. Please enable notifications in Settings to use background listening.',
-        );
-        // Don't start service without notifications
-        return;
-      }
-    }
 
     try {
       switch (mode) {
@@ -274,7 +243,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
           // Pass background listening duration for wake lock timeout
           final settings = ref.read(settingsProvider);
           final durationMinutes =
-              settings.backgroundListeningDuration.duration?.inMinutes ?? -1;
+              settings.backgroundListeningDuration.duration.inMinutes;
           await _startService('recording', durationMinutes: durationMinutes);
         case AudioMode.playing:
           await _startService('playing');
@@ -291,7 +260,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
       if (mode == 'recording') {
         arguments['durationMinutes'] = durationMinutes;
         debugPrint(
-          'BackgroundServiceProvider: Starting service with duration: ${durationMinutes}min (${durationMinutes < 0 ? "unlimited" : "limited"})',
+          'BackgroundServiceProvider: Starting service with duration: ${durationMinutes}min',
         );
       }
       await _platform.invokeMethod('startService', arguments);
