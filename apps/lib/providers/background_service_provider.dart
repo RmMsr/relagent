@@ -12,19 +12,13 @@ class BackgroundServiceState {
   final bool isActive;
   final String? error;
 
-  const BackgroundServiceState({
-    required this.isActive,
-    this.error,
-  });
+  const BackgroundServiceState({required this.isActive, this.error});
 
   factory BackgroundServiceState.initial() {
     return const BackgroundServiceState(isActive: false);
   }
 
-  BackgroundServiceState copyWith({
-    bool? isActive,
-    String? Function()? error,
-  }) {
+  BackgroundServiceState copyWith({bool? isActive, String? Function()? error}) {
     return BackgroundServiceState(
       isActive: isActive ?? this.isActive,
       error: error != null ? error() : this.error,
@@ -35,8 +29,8 @@ class BackgroundServiceState {
 /// Provider for managing the native background service
 final backgroundServiceProvider =
     NotifierProvider<BackgroundServiceNotifier, BackgroundServiceState>(
-  () => BackgroundServiceNotifier(),
-);
+      () => BackgroundServiceNotifier(),
+    );
 
 /// Manages the native Android foreground service for background audio operations.
 ///
@@ -44,8 +38,9 @@ final backgroundServiceProvider =
 /// The service never makes state decisions - it only reflects AudioCoordinator state.
 class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
   static const _platform = MethodChannel('com.relagent.background_service');
-  static const _notificationActions =
-      MethodChannel('com.relagent.notification_actions');
+  static const _notificationActions = MethodChannel(
+    'com.relagent.notification_actions',
+  );
 
   @override
   BackgroundServiceState build() {
@@ -64,30 +59,30 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
     }
 
     // Listen to AudioCoordinator state changes and sync service
-    ref.listen<AudioCoordinatorState>(
-      audioCoordinatorProvider,
-      (previous, next) {
-        // Update service mode when audio mode changes
-        if (previous?.mode != next.mode) {
-          _syncServiceWithAudioMode(next.mode);
+    ref.listen<AudioCoordinatorState>(audioCoordinatorProvider, (
+      previous,
+      next,
+    ) {
+      // Update service mode when audio mode changes
+      if (previous?.mode != next.mode) {
+        _syncServiceWithAudioMode(next.mode);
 
-          // Also update notification when mode changes during waiting state
-          // This catches interruptions that don't fire audio session events
-          if (next.audioFocusState.status == AudioFocusStatus.temporaryLoss) {
-            debugPrint(
-              'BackgroundServiceProvider: Mode changed during temporary loss, updating notification',
-            );
-            _updateNotificationForAudioFocus(next);
-          }
-        }
-
-        // Update notification when audio focus state or waiting state changes
-        if (previous?.audioFocusState.status != next.audioFocusState.status ||
-            previous?.isWaiting != next.isWaiting) {
+        // Also update notification when mode changes during waiting state
+        // This catches interruptions that don't fire audio session events
+        if (next.audioFocusState.status == AudioFocusStatus.temporaryLoss) {
+          debugPrint(
+            'BackgroundServiceProvider: Mode changed during temporary loss, updating notification',
+          );
           _updateNotificationForAudioFocus(next);
         }
-      },
-    );
+      }
+
+      // Update notification when audio focus state or waiting state changes
+      if (previous?.audioFocusState.status != next.audioFocusState.status ||
+          previous?.isWaiting != next.isWaiting) {
+        _updateNotificationForAudioFocus(next);
+      }
+    });
 
     // Listen to settings changes
     ref.listen<Settings>(settingsProvider, (previous, next) {
@@ -98,7 +93,8 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
       }
 
       // Restart service with new duration if it changed while recording
-      if (previous?.backgroundListeningDuration != next.backgroundListeningDuration) {
+      if (previous?.backgroundListeningDuration !=
+          next.backgroundListeningDuration) {
         final currentMode = ref.read(audioCoordinatorProvider).mode;
         if (currentMode == AudioMode.recording) {
           debugPrint(
@@ -129,9 +125,9 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
         debugPrint(
           'BackgroundServiceProvider: User requested silence via notification',
         );
-        await ref.read(settingsProvider.notifier).updateVoiceMode(
-              VoiceMode.silent,
-            );
+        await ref
+            .read(settingsProvider.notifier)
+            .updateVoiceMode(VoiceMode.silent);
       }
     });
   }
@@ -184,7 +180,9 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
 
       debugPrint('BackgroundServiceProvider: Audio session initialized');
     } catch (e) {
-      debugPrint('BackgroundServiceProvider: Failed to initialize audio session: $e');
+      debugPrint(
+        'BackgroundServiceProvider: Failed to initialize audio session: $e',
+      );
     }
   }
 
@@ -198,7 +196,9 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
 
     // Don't update notification if we're truly idle (not waiting)
     if (state.mode == AudioMode.idle && !state.isWaiting) {
-      debugPrint('BackgroundServiceProvider: Skipping notification update for idle state');
+      debugPrint(
+        'BackgroundServiceProvider: Skipping notification update for idle state',
+      );
       return;
     }
 
@@ -229,9 +229,40 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
     }
   }
 
+  /// Check if notification permissions are granted
+  Future<bool> _checkNotificationPermissions() async {
+    try {
+      final bool hasPermission = await _platform.invokeMethod(
+        'checkNotificationPermissions',
+      );
+      debugPrint(
+        'BackgroundServiceProvider: Notification permission status: $hasPermission',
+      );
+      return hasPermission;
+    } on PlatformException catch (e) {
+      debugPrint(
+        'BackgroundServiceProvider: Failed to check notification permissions: ${e.message}',
+      );
+      return false;
+    }
+  }
+
   /// Sync the native service with the current AudioMode
   Future<void> _syncServiceWithAudioMode(AudioMode mode) async {
     debugPrint('BackgroundServiceProvider: Syncing service with mode: $mode');
+
+    // Check notification permissions when starting service
+    if (mode != AudioMode.idle) {
+      final hasNotificationPermission = await _checkNotificationPermissions();
+      if (!hasNotificationPermission) {
+        state = state.copyWith(
+          error: () =>
+              'Notifications are disabled. Please enable notifications in Settings to use background listening.',
+        );
+        // Don't start service without notifications
+        return;
+      }
+    }
 
     try {
       switch (mode) {
@@ -242,7 +273,8 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
         case AudioMode.recording:
           // Pass background listening duration for wake lock timeout
           final settings = ref.read(settingsProvider);
-          final durationMinutes = settings.backgroundListeningDuration.duration?.inMinutes ?? -1;
+          final durationMinutes =
+              settings.backgroundListeningDuration.duration?.inMinutes ?? -1;
           await _startService('recording', durationMinutes: durationMinutes);
         case AudioMode.playing:
           await _startService('playing');
@@ -268,16 +300,25 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
     } on PlatformException catch (e) {
       // Android 12+ restriction: Cannot start foreground service from background
       // This is expected when app is backgrounded - service will resume when app returns to foreground
-      final isForegroundRestriction = e.message?.contains('startForegroundService() not allowed') ?? false;
-      final isForegroundException = e.message?.contains('ForegroundServiceStartNotAllowedException') ?? false;
+      final isForegroundRestriction =
+          e.message?.contains('startForegroundService() not allowed') ?? false;
+      final isForegroundException =
+          e.message?.contains('ForegroundServiceStartNotAllowedException') ??
+          false;
 
       if (isForegroundRestriction || isForegroundException) {
-        debugPrint('BackgroundServiceProvider: Cannot start service from background (Android 12+ restriction)');
-        debugPrint('BackgroundServiceProvider: Service will start when app returns to foreground');
+        debugPrint(
+          'BackgroundServiceProvider: Cannot start service from background (Android 12+ restriction)',
+        );
+        debugPrint(
+          'BackgroundServiceProvider: Service will start when app returns to foreground',
+        );
         state = state.copyWith(isActive: false, error: () => null);
         // Don't rethrow - this is expected behavior when backgrounded
       } else {
-        debugPrint('BackgroundServiceProvider: Failed to start service: ${e.message}');
+        debugPrint(
+          'BackgroundServiceProvider: Failed to start service: ${e.message}',
+        );
         state = state.copyWith(error: () => e.message);
         rethrow;
       }

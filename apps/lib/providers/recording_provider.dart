@@ -209,7 +209,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
         recognizedText: '',
       );
       await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
-      debugPrint('RecordingProvider: Continuous recording stopped (state reset)');
+      debugPrint(
+        'RecordingProvider: Continuous recording stopped (state reset)',
+      );
     }
   }
 
@@ -341,16 +343,12 @@ class RecordingNotifier extends Notifier<RecordingState> {
       },
       onStreamError: (error) {
         debugPrint('RecordingProvider: Audio stream error: $error');
-        state = state.copyWith(
-          error: 'Audio stream error: $error',
-        );
+        state = state.copyWith(error: 'Audio stream error: $error');
       },
       onStreamDone: () {
         debugPrint('RecordingProvider: Audio stream closed unexpectedly');
         if (state.isRecording) {
-          state = state.copyWith(
-            error: 'Audio stream closed unexpectedly',
-          );
+          state = state.copyWith(error: 'Audio stream closed unexpectedly');
         }
       },
     );
@@ -362,7 +360,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
   void _startHealthMonitoring() {
     if (_healthCheckTimer != null) return;
 
-    debugPrint('RecordingProvider: Starting health monitoring (check every 30s)');
+    debugPrint(
+      'RecordingProvider: Starting health monitoring (check every 30s)',
+    );
     _healthCheckTimer = Timer.periodic(
       const Duration(seconds: 30),
       (_) => _checkHealth(),
@@ -417,7 +417,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
     );
 
     if (_recoveryAttempts > 3) {
-      debugPrint('RecordingProvider: Recovery attempts exhausted, degrading gracefully');
+      debugPrint(
+        'RecordingProvider: Recovery attempts exhausted, degrading gracefully',
+      );
       await _gracefulDegradation(reason);
       return;
     }
@@ -431,8 +433,10 @@ class RecordingNotifier extends Notifier<RecordingState> {
     final delay = delays[_recoveryAttempts - 1];
 
     if (delay > Duration.zero) {
-      debugPrint('RecordingProvider: Waiting ${delay.inSeconds}s before recovery...');
-      await Future.delayed(delay);
+      debugPrint(
+        'RecordingProvider: Waiting ${delay.inSeconds}s before recovery...',
+      );
+      await Future<void>.delayed(delay);
     }
 
     try {
@@ -442,10 +446,14 @@ class RecordingNotifier extends Notifier<RecordingState> {
       debugPrint('RecordingProvider: Restarting ASR...');
       await internalStart();
 
-      debugPrint('RecordingProvider: Recovery attempt $_recoveryAttempts succeeded');
+      debugPrint(
+        'RecordingProvider: Recovery attempt $_recoveryAttempts succeeded',
+      );
       // On successful recovery, reset counter will happen on next successful start
     } catch (e) {
-      debugPrint('RecordingProvider: Recovery attempt $_recoveryAttempts failed: $e');
+      debugPrint(
+        'RecordingProvider: Recovery attempt $_recoveryAttempts failed: $e',
+      );
       // Will retry on next health check if attempts < 3
     }
   }
@@ -473,7 +481,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
     await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
 
     // Switch to Silent mode
-    debugPrint('RecordingProvider: Switching to Silent mode due to recovery failure');
+    debugPrint(
+      'RecordingProvider: Switching to Silent mode due to recovery failure',
+    );
     await ref.read(settingsProvider.notifier).updateVoiceMode(VoiceMode.silent);
 
     // Show error notification to user
@@ -500,7 +510,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
     // Skip timer for unlimited setting
     if (duration == null) {
-      debugPrint('RecordingProvider: Duration is unlimited, no auto-shutoff timer');
+      debugPrint(
+        'RecordingProvider: Duration is unlimited, no auto-shutoff timer',
+      );
       return;
     }
 
@@ -513,7 +525,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
         'RecordingProvider: Duration timeout reached, switching to Silent mode',
       );
       // Switch to Silent mode, which will trigger _stopContinuous()
-      await ref.read(settingsProvider.notifier).updateVoiceMode(VoiceMode.silent);
+      await ref
+          .read(settingsProvider.notifier)
+          .updateVoiceMode(VoiceMode.silent);
     });
   }
 

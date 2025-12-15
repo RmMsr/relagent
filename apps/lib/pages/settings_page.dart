@@ -398,12 +398,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<BackgroundListeningDuration>(
-              value: _backgroundListeningDuration,
+              initialValue: _backgroundListeningDuration,
               decoration: const InputDecoration(
                 labelText: 'Background Listening Duration',
                 border: OutlineInputBorder(),
-                helperText:
-                    'Maximum time for continuous background listening',
+                helperText: 'Maximum time for continuous background listening',
               ),
               items: BackgroundListeningDuration.values.map((duration) {
                 return DropdownMenuItem(

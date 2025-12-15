@@ -44,6 +44,8 @@ dart-flutter_add_roots --roots '[{"uri": "file:///absolute/path/to/project/apps"
 
 **Why this is needed**: MCP tools look for `pubspec.yaml` to identify Flutter projects. Since our Flutter project is in `apps/`, MCP must be pointed to the correct directory.
 
+**IMPORTANT**: Always address warnings, deprecations, and analysis issues as part of any iteration. Run `dart-flutter_analyze_files` and fix all issues before completing changes.
+
 - **Launch App**: Use `dart-flutter_launch_app` with appropriate device
 - **List Devices**: Use `dart-flutter_list_devices` to see available targets
 - **Stop App**: Use `dart-flutter_stop_app` with process ID from launch
@@ -69,7 +71,10 @@ These tools provide programmatic control and are **ALWAYS preferred** over bash 
 - ✅ **USE MCP**: `dart-flutter_hot_reload` - Works with connected app instances
 - ❌ **AVOID**: Manual hot reload via shell - Less reliable
 
-Logs after manual testing are found in flutter*logs*\*.txt
+Logs after manual testing are found in flutter_logs_$platform.txt (e.g., flutter_logs_android.txt).
+
+**Common Debugging Issues**:
+- **Notification not dismissed when switching off continuous listening**: Fixed by calling `stopForeground(STOP_FOREGROUND_REMOVE)` when switching to IDLE mode in AudioBackgroundService
 
 ## MCP vs Shell Command Reference
 

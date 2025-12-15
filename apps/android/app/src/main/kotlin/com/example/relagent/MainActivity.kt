@@ -2,6 +2,8 @@ package org.venkado.relagent
 
 import android.content.Intent
 import android.os.Build
+import android.provider.Settings
+import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -50,6 +52,66 @@ class MainActivity : FlutterActivity() {
                     android.util.Log.d("MainActivity", "Showing error notification: $title")
                     showErrorNotification(title, message)
                     result.success(null)
+                }
+                "getNotificationPermissionStatus" -> {
+                    val status = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        NotificationManagerCompat.from(this).areNotificationsEnabled()
+                    } else {
+                        true // Older versions don't need runtime permission
+                    }
+                    result.success(if (status) "granted" else "denied")
+                }
+                "requestNotificationPermissionDialog" -> {
+                    // Show in-app permission request dialog first
+                    // Note: This is a simplified implementation - in production you'd want
+                    // a proper dialog with explanation, but for now this opens system settings
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        }
+                        startActivity(intent)
+                        result.success("requested")
+                    } else {
+                        result.success("granted") // Older versions grant by default
+                    }
+                }
+                "openNotificationSettings" -> {
+                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    }
+                    startActivity(intent)
+                    result.success("opened")
+                }
+                "requestNotificationPermissionDialog" -> {
+                    // Simplified approach - open system settings for now
+                    // In a full implementation, this would show an in-app dialog
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        }
+                        startActivity(intent)
+                        result.success("opened")
+                    } else {
+                        result.success("granted") // Older versions grant by default
+                    }
+                }
+                "openNotificationSettings" -> {
+                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    }
+                    startActivity(intent)
+                    result.success("opened")
+                }
+                "requestNotificationPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        }
+                        startActivity(intent)
+                        result.success("requested")
+                    } else {
+                        result.success("granted") // Older versions grant by default
+                    }
                 }
                 else -> result.notImplemented()
             }

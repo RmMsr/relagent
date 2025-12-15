@@ -156,6 +156,8 @@ relagent/
 
 **Flutter (apps/):**
 - See [apps/AGENTS.md](apps/AGENTS.md) for Flutter-specific commands
+- **IMPORTANT**: Always address warnings, deprecations, and analysis issues as part of any iteration
+- Run `flutter analyze` and fix all issues before completing changes
 
 **Python (experiments/):**
 - `uv sync` - Install dependencies

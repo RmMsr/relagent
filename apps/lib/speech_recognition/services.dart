@@ -141,7 +141,7 @@ class ASR {
 
             developer.Timeline.finishSync();
           },
-          onError: (error) {
+          onError: (Object error) {
             debugPrint('Audio stream error: $error');
             onStreamError?.call(error);
           },
