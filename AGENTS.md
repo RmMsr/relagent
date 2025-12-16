@@ -172,27 +172,38 @@ relagent/
 
 ## Tool Usage Priority
 
-**Always prioritize specialized tools over generic searches:**
+**AI TOOLS (MCP SERVERS) ALWAYS TAKE PRECEDENCE OVER SHELL COMMANDS**
 
-1. **First Priority - Specialized Tools:**
+**Priority Order:**
+
+1. **First Priority - AI Tools (MCP Servers):**
+   - Always use available AI tools first (e.g., Flutter MCP tools, Dart Tooling Daemon, etc.)
+   - These provide structured, safe, and context-aware operations
+   - Examples: dart-flutter_*, perfetto_*, websearch_*, codesearch_*, etc.
+
+2. **Second Priority - Specialized Tools:**
    - Use language/framework-specific documentation tools for API lookups
    - Use package manager tools for dependency/package discovery
    - Use project-specific tools for building, testing, linting
 
-2. **Second Priority - Generic Tools:**
+3. **Third Priority - Generic Tools:**
    - Use web search only when specialized tools don't cover the need
    - Use web fetch for specific URLs provided by the user
 
-**Discouraged Alternatives:**
-- Generic shell commands when specialized tools exist (e.g., `adb devices` instead of device management tools)
-- Manual web browsing when documentation tools are available
+4. **Last Resort - Shell Commands:**
+   - Only use when NO AI/MCP tools are available for the specific task
+   - Avoid shell commands for operations that have dedicated AI tool equivalents
+   - Example: Use `dart-flutter_hot_reload` instead of `flutter hot reload`
 
-**Conflict Resolution:**
-- When results differ between tools, present both options
-- For ambiguous choices (multiple packages/approaches), ask for user preference
-- If specialized tools fail, fall back to web search and inform the user
+**Critical Rules:**
+- **If a fitting AI tool exists, it MUST be used** - no exceptions
+- **If the AI tool doesn't work, FIX IT FIRST** before looking for alternatives
+- **NEVER use shell commands when AI tools exist** for the same functionality
+- **Executing identical shell commands is a LAST RESORT** - only when no AI tool exists or can be fixed
+- **ALWAYS check for available MCP servers** before falling back to generic tools
+- **MCP tools provide superior safety, context awareness, and integration**
 
-This ensures accurate, up-to-date information while maintaining tool awareness regardless of the specific AI system or MCP servers being used.
+This ensures optimal use of AI capabilities while maintaining accuracy and development efficiency.
 
 **Python Conventions:**
 - Standard Python naming (snake_case for functions/variables)
