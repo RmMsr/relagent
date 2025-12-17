@@ -1,5 +1,18 @@
 # Differentiate Build Types Proposal
 
+## Why
+
+The user wants to differentiate between stable releases (from main branch) and development builds (from other branches) to clearly distinguish between production and development versions. This helps avoid confusion about which version is being tested and provides transparency about build provenance.
+
+## What Changes
+
+Differentiate app naming and display based on build type:
+- **Release builds (main branch)**: Named "Relagent" with version number + shortened commit hash
+- **Debug builds**: Named "Relagent develop" with debug banner enabled  
+- **Other branch builds**: Show branch name instead of version, latest commit hash
+- **Visibility**: Name and version visible on start screen (logo) and new info page
+- **Additional info**: Build timestamp on info page
+
 ## Summary
 
 Add build type differentiation to distinguish between stable releases (from main) and development builds (from other branches). The app should display different names, version information, and visual indicators based on the build type.
