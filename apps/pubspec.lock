@@ -45,10 +45,10 @@ packages:
     dependency: "direct main"
     description:
       name: audio_session
-      sha256: "2b7fff16a552486d078bfc09a8cde19f426dc6d6329262b684182597bec5b1ac"
+      sha256: "8f96a7fecbb718cb093070f868b4cdcb8a9b1053dce342ff8ab2fde10eb9afb7"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.25"
+    version: "0.2.2"
   boolean_selector:
     dependency: transitive
     description:
@@ -284,10 +284,10 @@ packages:
     dependency: transitive
     description:
       name: image
-      sha256: "51555e36056541237b15b57afc31a0f53d4f9aefd9bd00873a6dc0090e54e332"
+      sha256: "48c11d0943b93b6fb29103d956ff89aafeae48f6058a3939649be2093dcff0bf"
       url: "https://pub.dev"
     source: hosted
-    version: "4.6.0"
+    version: "4.7.1"
   intl:
     dependency: "direct main"
     description:
@@ -412,10 +412,10 @@ packages:
     dependency: transitive
     description:
       name: media_kit
-      sha256: bed6d1572b61c875a6927db24874e68f8cf27b4f898d985018fc15078ebf38ac
+      sha256: ae9e79597500c7ad6083a3c7b7b7544ddabfceacce7ae5c9709b0ec16a5d6643
       url: "https://pub.dev"
     source: hosted
-    version: "1.2.5"
+    version: "1.2.6"
   media_kit_libs_linux:
     dependency: "direct main"
     description:
@@ -764,50 +764,50 @@ packages:
     dependency: "direct main"
     description:
       name: sherpa_onnx
-      sha256: "8340608099f35f4da5faf4a59fe648c9c47245c543bae7c212ac797e6d7a00fd"
+      sha256: e4650ea6e0dac80b1b5f9484c4349f3634c77c29c37bf55b0a2e1704574adf57
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.19"
+    version: "1.12.20"
   sherpa_onnx_android:
     dependency: transitive
     description:
       name: sherpa_onnx_android
-      sha256: e2037a3d4ab5883ec371afda9b9b801bc392a84f02d0a1d325b7d2cd3c8cf75d
+      sha256: a15a33a6d7f17af083e098c2321509fc7ec79a6b780bdce41024a31cea75d460
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.19"
+    version: "1.12.20"
   sherpa_onnx_ios:
     dependency: transitive
     description:
       name: sherpa_onnx_ios
-      sha256: "0359d0dad445731bd8bb63dc631285cfc15fa40c03f24e789dc1e272dd44af25"
+      sha256: "7afe2179a34ce543eae532a32abbe6a71cafcb12580d5530bca816fd87853cc5"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.19"
+    version: "1.12.20"
   sherpa_onnx_linux:
     dependency: transitive
     description:
       name: sherpa_onnx_linux
-      sha256: "830659520cc08d5b6435932fef19e1e35db71941da6b546f674be568984924a3"
+      sha256: bd40aebdaec335b3f01ea67ddf4f604486a075fd21d7fddf19c36a9aeb7835e4
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.19"
+    version: "1.12.20"
   sherpa_onnx_macos:
     dependency: transitive
     description:
       name: sherpa_onnx_macos
-      sha256: "14c68fc291860542519e784d38262f5ff1c02251d30f48b0273debe588d8f4cd"
+      sha256: e0e29acd57bb701f539aece224948bfcf8d7d6f3195674c26a6353ecd93addd7
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.19"
+    version: "1.12.20"
   sherpa_onnx_windows:
     dependency: transitive
     description:
       name: sherpa_onnx_windows
-      sha256: bfa4fd0796300a2b457cd9ac06d6c4b5cf68780079abba1e367aece2a320d4cb
+      sha256: "1512243509d02713895067f960b9532c61bb43e125dcdf5e2780a5f967c5fe35"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.19"
+    version: "1.12.20"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -937,10 +937,10 @@ packages:
     dependency: transitive
     description:
       name: uri_parser
-      sha256: ff4d2c720aca3f4f7d5445e23b11b2d15ef8af5ddce5164643f38ff962dcb270
+      sha256: "051c62e5f693de98ca9f130ee707f8916e2266945565926be3ff20659f7853ce"
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.0"
+    version: "3.0.2"
   uuid:
     dependency: transitive
     description:

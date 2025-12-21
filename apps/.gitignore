@@ -49,6 +49,3 @@ app.*.map.json
 /assets/config.json
 /assets/sherpa*
 /assets/kokoro*
-
-# FVM Version Cache
-.fvm/

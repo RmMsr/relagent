@@ -16,3 +16,6 @@ wheels/
 # Development tools
 .aider*
 .vscode
+
+# FVM Version Cache
+.fvm/
