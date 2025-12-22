@@ -4,7 +4,7 @@
 
 - [ ] Review `audio_session` 0.2.3 changelog and assess upgrade safety
 - [ ] Verify iOS Info.plist contains required audio background mode
-- [ ] Review current Bluetooth-related logs from existing manual testing (flutter_logs_android.txt)
+- [ ] Review current Bluetooth-related logs from existing manual testing (apps/flutter*.log)
 - [ ] Document current audio routing behavior (which device is used now)
 
 ## Phase 1: Critical Fixes (Immediate Bluetooth Support)

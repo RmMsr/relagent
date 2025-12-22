@@ -71,7 +71,7 @@ These tools provide programmatic control and are **ALWAYS preferred** over bash 
 - ✅ **USE MCP**: `dart-flutter_hot_reload` - Works with connected app instances
 - ❌ **AVOID**: Manual hot reload via shell - Less reliable
 
-Logs after manual testing are found in flutter_logs_$platform.txt (e.g., flutter_logs_android.txt).
+Logs after manual testing are found in flutter_$platform.log (e.g., flutter_android.log).
 
 **Common Debugging Issues**:
 - **Notification not dismissed when switching off continuous listening**: Fixed by calling `stopForeground(STOP_FOREGROUND_REMOVE)` when switching to IDLE mode in AudioBackgroundService

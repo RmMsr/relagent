@@ -72,8 +72,8 @@ Buttons should show the state that they will activate on press.
 
 ```
 cd apps
-flutter run 2>&1 | tee flutter_log.txt
+flutter run 2>&1 | tee flutter.log
 ```
 cd apps
-flutter run 2>&1 | tee flutter_log.txt
+flutter run 2>&1 | tee flutter.log
 ```

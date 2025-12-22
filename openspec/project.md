@@ -85,7 +85,7 @@ Relagent ("Relatable Agentic Minion") is a privacy-focused AI assistant for dail
 ### Testing Strategy
 
 - Run tests with: `flutter test`
-- Manual testing logs: `flutter run 2>&1 | tee flutter_log.txt`
+- Manual testing logs: `flutter run 2>&1 | tee flutter.log`
 
 ### Git Workflow
 
