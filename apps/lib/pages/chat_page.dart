@@ -66,8 +66,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
 
     // Show SnackBar when permanent audio focus loss occurs
-    ref.listen<AudioCoordinatorState>(audioCoordinatorProvider,
-        (previous, next) {
+    ref.listen<AudioCoordinatorState>(audioCoordinatorProvider, (
+      previous,
+      next,
+    ) {
       if (previous?.audioFocusState.status != AudioFocusStatus.permanentLoss &&
           next.audioFocusState.status == AudioFocusStatus.permanentLoss) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -112,9 +114,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       ref.read(chatProvider.notifier).retryMessage(text);
                     },
                     onSpeak: (text, messageId) {
-                      ref
-                          .read(ttsProvider.notifier)
-                          .playNow(text, messageId);
+                      ref.read(ttsProvider.notifier).playNow(text, messageId);
                     },
                     getMessagePlaybackStatus: (messageId) =>
                         ttsState.getMessageState(messageId).status,

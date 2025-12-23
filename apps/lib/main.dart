@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
+import 'package:relagent/models/app_info.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '/config/app_config.dart';
@@ -17,6 +18,9 @@ void main() async {
 
   // Load static app config (ASR model, etc.)
   await AppConfig.load();
+
+  // Get runtime app info
+  await AppInfo.initialize();
 
   // Pre-cache TTS model files in background (don't block app startup)
   // This ensures TTS is ready when needed without delaying UI initialization
@@ -49,13 +53,12 @@ class MyApp extends ConsumerWidget {
     ref.read<BackgroundServiceState>(backgroundServiceProvider);
 
     return MaterialApp.router(
-      title: 'Relagent',
+      title: AppInfo.data.toString(),
+      debugShowCheckedModeBanner: AppInfo.data.isDebug,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent),
       ),
       routerConfig: appRouter,
-      // Performance overlay - shows FPS and frame rendering time
-      showPerformanceOverlay: false,
     );
   }
 }

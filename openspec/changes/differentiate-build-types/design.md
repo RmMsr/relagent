@@ -2,108 +2,68 @@
 
 ## Architecture Overview
 
-This design introduces a build information system that detects build type at runtime and displays appropriate UI elements based on the build source.
+This design provides simple build type differentiation using Android manifest configuration and visual indicators to distinguish between debug and release builds.
 
 ## System Components
 
 ### 1. Android Manifest-Based Configuration
 - **Debug manifest**: Set app label to "Relagent develop"
-- **Release manifest**: Set app label to "Relagent" + version info
+- **Release manifest**: Set app label to "Relagent"
 - **No runtime detection needed** - build type determined by manifest selection
+- **Package suffix**: Debug builds use `.debug` suffix for application ID
 
-### 2. Build Information Service (`lib/services/build_info_service.dart`)
-- Simplified: Only provides git info for UI display
-- Methods:
-  - `getBuildName()` - Returns "Relagent" or "Relagent develop"
-  - `getVersionInfo()` - Returns version+commit or branch+commit  
-  - `getBuildTimestamp()` - Returns build time
-  - `getCommitHash()` - Returns short commit hash
+### 2. Visual Differentiation
+- **Debug icon**: Orange-tinted adaptive icon background
+- **Release icon**: Standard white adaptive icon background
+- **Debug banner**: Enabled automatically in debug builds via Flutter
 
-### 3. Build Configuration
-- Use `dart-define` flags to pass git info to display layer
-- Build script extracts: branch name, commit hash, build timestamp
-- Build type handled by manifest selection (no runtime detection)
-
-### 4. UI Integration Points
-- **ChatPage AppBar**: Show version/branch info from BuildInfoService
-- **New InfoPage**: Display comprehensive build information
-- **Debug Banner**: Set `debugShowCheckedModeBanner: false/true` in MaterialApp
-
-## Build Detection Logic
-
-```dart
-enum BuildType {
-  releaseMain,    // Release from main branch
-  debugMain,      // Debug from main branch  
-  otherBranch,    // Any other branch
-}
-
-BuildType get buildType {
-  if (isDebugBuild()) {
-    return isMainBranch() ? BuildType.debugMain : BuildType.otherBranch;
-  } else {
-    return isMainBranch() ? BuildType.releaseMain : BuildType.otherBranch;
-  }
-}
-```
+### 3. Background Service Integration
+- **Dynamic package names**: Services use `context.packageName` instead of hardcoded strings
+- **Permission handling**: Properly scoped to correct application ID
 
 ## Display Strategy
 
-| Build Type | App Name | Version Display | Debug Banner |
-|------------|----------|----------------|--------------|
-| releaseMain | "Relagent" | "v0.1.0+abc1234" | No |
-| debugMain | "Relagent develop" | "v0.1.0+abc1234" | Yes |
-| otherBranch | "Relagent develop" | "feature-xyz+abc1234" | Yes |
+| Build Type | App Name | Icon Color | Package Suffix | Debug Banner |
+|------------|----------|------------|----------------|--------------|
+| debug | "Relagent develop" | Orange | .debug | Yes |
+| release | "Relagent" | White | none | No |
 
 ## Implementation Approach
 
 ### Phase 1: Android Manifest Setup
 1. Update debug AndroidManifest.xml with "Relagent develop" label
-2. Update main AndroidManifest.xml with "Relagent" label
-3. Test app name changes between debug/release builds
+2. Update main AndroidManifest.xml with "Relagent" label  
+3. Configure build.gradle.kts for .debug suffix
 
-### Phase 2: Build Info Service
-1. Create simplified `BuildInfoService` with git info constants
-2. Update build script to extract git information
-3. Add dart-define flags for UI display layer
+### Phase 2: Visual Differentiation
+1. Create debug adaptive icon resources with orange theme
+2. Create debug colors.xml with orange background color
+3. Test icon differentiation between build types
 
-### Phase 3: UI Integration
-1. Update ChatPage AppBar to show version/branch info
-2. Configure debug banner based on build type
-3. Create new info page with build details
-
-### Phase 4: Validation
-1. Test all build type combinations
-2. Verify git information accuracy
-3. Ensure UI consistency across platforms
-
-## Security & Privacy
-
-- Git commit hash provides traceability without exposing sensitive information
-- Branch names may be filtered if sensitive
-- All information is read-only at runtime
-- No additional permissions required
-
-## Simplified Implementation
-
-The debug banner uses Flutter's built-in capability:
-```dart
-MaterialApp(
-  debugShowCheckedModeBanner: buildInfoService.isDebugBuild(),
-  title: buildInfoService.getBuildName(),
-)
-```
+### Phase 3: Background Service Compatibility
+1. Update AudioBackgroundService to use dynamic package names
+2. Update NotificationActionReceiver to use dynamic package names
+3. Test debug functionality with .debug suffix
 
 ## Technical Considerations
 
-- Build-time information embedded as compile-time constants
-- Single boolean flag controls debug banner visibility
-- Graceful fallbacks for missing git information
+- Android resource overlay system for debug-specific resources
+- Dynamic package name resolution for background services
+- Flutter's built-in debug banner for visual indicator
 - Zero runtime overhead for build detection
-- Uses existing Flutter infrastructure only
+- Uses existing Android infrastructure only
 
-## Future Extensions
+## Security & Privacy
 
-- Could integrate with CI/CD pipeline for automated build numbering
-- Potential to add environment info (staging/prod) in the future
-- Could be extended to show build artifact sources
+- No additional information exposed
+- Standard debug/release build security model
+- No additional permissions required
+- Package name isolation maintained
+
+## Completed Implementation
+
+All components have been implemented and tested:
+- ✅ Android manifest configuration
+- ✅ Debug icon differentiation  
+- ✅ Package suffix handling
+- ✅ Dynamic background service integration

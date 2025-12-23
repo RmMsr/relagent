@@ -39,7 +39,7 @@
             android:name=".NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="org.venkado.relagent.STOP" />
+                <action android:name="${applicationId}.STOP" />
             </intent-filter>
         </receiver>
 

@@ -4,8 +4,10 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 import 'package:relagent/chat/models.dart';
 
+import '/models/app_info.dart';
 import '/providers/tts_provider.dart';
 import '/speech_recognition/widgets.dart';
+import '/widgets/version_info_widget.dart';
 
 class ChatInput extends StatefulWidget {
   final ValueChanged<String> onSubmitted;
@@ -103,6 +105,39 @@ class ChatHistory extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final chatWidgets = <Widget>[];
+
+    // Show empty state when there are no messages
+    if (messages.isEmpty && !showAssistantPending) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline,
+                size: 80,
+                color: theme.colorScheme.primary.withAlpha((255 * 0.3).round()),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Welcome to ${AppInfo.data.name}',
+                style: theme.textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const VersionInfoWidget(),
+              const SizedBox(height: 32),
+              Text(
+                'Start a conversation by typing a message or using voice input',
+                style: theme.textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     for (final message in messages) {
       chatWidgets.add(

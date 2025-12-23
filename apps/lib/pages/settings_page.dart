@@ -436,6 +436,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () => context.push('/info'),
+              icon: const Icon(Icons.info_outline),
+              label: const Text('App Info'),
+            ),
           ],
         ),
       ),

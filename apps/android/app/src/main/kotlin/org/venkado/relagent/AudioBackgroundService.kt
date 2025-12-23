@@ -16,6 +16,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
+
 import androidx.core.app.NotificationCompat
 import java.util.Date
 
@@ -54,14 +55,16 @@ class AudioBackgroundService : Service() {
         private const val MODE_RECORDING = "recording"
         private const val MODE_PLAYING = "playing"
 
-        const val ACTION_STOP = "org.venkado.relagent.STOP"
-        private const val ACTION_NOTIFICATION_DISMISSED = "org.venkado.relagent.NOTIFICATION_DISMISSED"
+        private fun getPackageName(context: Context): String = context.packageName
+        
+        fun getActionStop(context: Context): String = "${getPackageName(context)}.STOP"
+        private fun getActionNotificationDismissed(context: Context): String = "${getPackageName(context)}.NOTIFICATION_DISMISSED"
     }
 
     private val dismissalReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                ACTION_NOTIFICATION_DISMISSED -> {
+                getActionNotificationDismissed(context!!) -> {
                     Log.d(TAG, "Notification dismissed - recreating immediately")
                     // Recreate notification immediately if service is still active
                     if (currentMode != MODE_IDLE) {
@@ -84,8 +87,9 @@ class AudioBackgroundService : Service() {
         Log.d(TAG, "Foreground service started immediately in onCreate")
 
         // Register receiver for notification dismissal
+        val notificationDismissedAction = getActionNotificationDismissed(this)
         val filter = IntentFilter().apply {
-            addAction(ACTION_NOTIFICATION_DISMISSED)
+            addAction(notificationDismissedAction)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(dismissalReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -234,7 +238,7 @@ class AudioBackgroundService : Service() {
 
     private fun createNotification(contentText: String): Notification {
         // Create delete intent to detect when notification is dismissed
-        val deleteIntent = Intent(ACTION_NOTIFICATION_DISMISSED).apply {
+        val deleteIntent = Intent(getActionNotificationDismissed(this)).apply {
             setPackage(packageName)
         }
         val deletePendingIntent = PendingIntent.getBroadcast(
@@ -255,7 +259,7 @@ class AudioBackgroundService : Service() {
 
         // Add stop button for recording or playback modes
         if (currentMode != MODE_IDLE) {
-            val stopIntent = Intent(ACTION_STOP).apply {
+            val stopIntent = Intent(getActionStop(this)).apply {
                 setPackage(packageName)
             }
             val stopPendingIntent = PendingIntent.getBroadcast(

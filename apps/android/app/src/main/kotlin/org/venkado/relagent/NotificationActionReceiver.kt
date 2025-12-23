@@ -20,7 +20,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d(TAG, "Received action: ${intent.action}")
 
-        if (intent.action == AudioBackgroundService.ACTION_STOP) {
+        if (intent.action == "${context.packageName}.STOP") {
             Log.d(TAG, "Stop action triggered - going silent")
             methodChannel?.invokeMethod("stop", null)
         }
