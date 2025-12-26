@@ -124,8 +124,9 @@ void main() {
     });
 
     test('Release lock multiple times (idempotent)', () async {
-      final coordinator =
-          fixture.container.read(audioCoordinatorProvider.notifier);
+      final coordinator = fixture.container.read(
+        audioCoordinatorProvider.notifier,
+      );
 
       await coordinator.requestPlayback();
 

@@ -59,6 +59,11 @@ class ConnectivityNotifier extends Notifier<ConnectivityState> {
       _updateConnectivity,
     );
 
+    // Dispose subscription when provider is disposed
+    ref.onDispose(() {
+      _connectivitySubscription?.cancel();
+    });
+
     return ConnectivityState.initial();
   }
 

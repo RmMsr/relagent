@@ -30,13 +30,17 @@ Future<String> copyAssetFileToCache(String src, [String? dst]) async {
           debugPrint('✓ Cached file $src verified ($actualSize bytes)');
           return target;
         } else {
-          debugPrint('✗ Cached file $src is incomplete ($actualSize bytes vs $expectedSize expected), re-copying...');
+          debugPrint(
+            '✗ Cached file $src is incomplete ($actualSize bytes vs $expectedSize expected), re-copying...',
+          );
           // File is corrupted or incomplete, will re-copy below
         }
       } catch (e) {
         // Can't access rootBundle (likely background isolate)
         // Assume file is OK if it's non-zero size
-        debugPrint('✓ Cached file $src (background isolate, size: $actualSize bytes)');
+        debugPrint(
+          '✓ Cached file $src (background isolate, size: $actualSize bytes)',
+        );
         return target;
       }
     } else {

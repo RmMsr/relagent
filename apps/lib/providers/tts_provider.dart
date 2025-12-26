@@ -6,7 +6,14 @@ import '/providers/playback_provider.dart';
 import '/providers/settings_provider.dart';
 import '/tts/services.dart';
 
-enum MessagePlaybackStatus { idle, generating, playing, paused, completed, error }
+enum MessagePlaybackStatus {
+  idle,
+  generating,
+  playing,
+  paused,
+  completed,
+  error,
+}
 
 class MessageTtsState {
   final MessagePlaybackStatus status;

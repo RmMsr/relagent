@@ -27,12 +27,16 @@ void main() {
   group('PlaybackProvider Lock Safety', () {
     test('Denied playback does not release the lock', () async {
       final playback = fixture.container.read(playbackProvider.notifier);
-      final coordinator = fixture.container.read(audioCoordinatorProvider.notifier);
+      final coordinator = fixture.container.read(
+        audioCoordinatorProvider.notifier,
+      );
 
       // Manually acquire playback lock (simulating another source)
       await coordinator.requestPlayback();
       expect(
-          fixture.container.read(audioCoordinatorProvider).mode, AudioMode.playing);
+        fixture.container.read(audioCoordinatorProvider).mode,
+        AudioMode.playing,
+      );
 
       // Try to enqueue an item - should be denied and removed
       final item = PlaybackItem(
@@ -46,7 +50,9 @@ void main() {
 
       // Lock should still be held (mode still playing)
       expect(
-          fixture.container.read(audioCoordinatorProvider).mode, AudioMode.playing);
+        fixture.container.read(audioCoordinatorProvider).mode,
+        AudioMode.playing,
+      );
 
       // Item should be completed (not stuck in queue)
       expect(item.onFinished.isCompleted, true);
@@ -67,13 +73,18 @@ void main() {
 
       // Should have acquired lock
       expect(
-          fixture.container.read(audioCoordinatorProvider).mode, AudioMode.playing);
+        fixture.container.read(audioCoordinatorProvider).mode,
+        AudioMode.playing,
+      );
 
       // Stop playback
       await playback.stop();
 
       // Lock should be released
-      expect(fixture.container.read(audioCoordinatorProvider).mode, AudioMode.idle);
+      expect(
+        fixture.container.read(audioCoordinatorProvider).mode,
+        AudioMode.idle,
+      );
     });
 
     test('Pause preserves the lock', () async {
@@ -89,17 +100,27 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       // Should be playing
-      expect(fixture.container.read(playbackProvider).status, PlaybackStatus.playing);
       expect(
-          fixture.container.read(audioCoordinatorProvider).mode, AudioMode.playing);
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.playing,
+      );
+      expect(
+        fixture.container.read(audioCoordinatorProvider).mode,
+        AudioMode.playing,
+      );
 
       // Pause before auto-completion happens
       await playback.pause();
 
       // Should be paused but lock still held
-      expect(fixture.container.read(playbackProvider).status, PlaybackStatus.paused);
       expect(
-          fixture.container.read(audioCoordinatorProvider).mode, AudioMode.playing);
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.paused,
+      );
+      expect(
+        fixture.container.read(audioCoordinatorProvider).mode,
+        AudioMode.playing,
+      );
     });
 
     test('Resume from pause works correctly', () async {
@@ -116,13 +137,21 @@ void main() {
 
       // Pause before auto-completion
       await playback.pause();
-      expect(fixture.container.read(playbackProvider).status, PlaybackStatus.paused);
+      expect(
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.paused,
+      );
 
       // Resume
       await playback.resume();
-      expect(fixture.container.read(playbackProvider).status, PlaybackStatus.playing);
       expect(
-          fixture.container.read(audioCoordinatorProvider).mode, AudioMode.playing);
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.playing,
+      );
+      expect(
+        fixture.container.read(audioCoordinatorProvider).mode,
+        AudioMode.playing,
+      );
     });
 
     test('Queue with multiple items processes correctly', () async {
@@ -164,7 +193,10 @@ void main() {
 
       // Queue should be empty
       expect(fixture.container.read(playbackProvider).queue.isEmpty, true);
-      expect(fixture.container.read(audioCoordinatorProvider).mode, AudioMode.idle);
+      expect(
+        fixture.container.read(audioCoordinatorProvider).mode,
+        AudioMode.idle,
+      );
     });
   });
 
@@ -181,7 +213,10 @@ void main() {
 
       // Stop when idle
       await playback.stop();
-      expect(fixture.container.read(playbackProvider).status, PlaybackStatus.idle);
+      expect(
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.idle,
+      );
 
       // Create and play item
       final item = PlaybackItem(
@@ -195,7 +230,10 @@ void main() {
       // Stop multiple times - should be idempotent
       await playback.stop();
       await playback.stop();
-      expect(fixture.container.read(playbackProvider).status, PlaybackStatus.idle);
+      expect(
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.idle,
+      );
     });
 
     test('Pause/resume are idempotent', () async {
@@ -203,11 +241,17 @@ void main() {
 
       // Pause when idle - should not crash
       await playback.pause();
-      expect(fixture.container.read(playbackProvider).status, PlaybackStatus.idle);
+      expect(
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.idle,
+      );
 
       // Resume when idle - should not crash
       await playback.resume();
-      expect(fixture.container.read(playbackProvider).status, PlaybackStatus.idle);
+      expect(
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.idle,
+      );
     });
   });
 }

@@ -18,7 +18,8 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     // Use silent voice mode to prevent auto-resume recording
     SharedPreferences.setMockInitialValues({
-      'user_settings': '{"simpleChatBaseUrl":"http://localhost:1234/api/v1","simpleChatModel":"test-model","primeMessage":"test","ttsSpeakerId":0,"ttsSpeed":1.0,"voiceMode":"silent","backgroundListeningDuration":"oneHour"}',
+      'user_settings':
+          '{"simpleChatBaseUrl":"http://localhost:1234/api/v1","simpleChatModel":"test-model","primeMessage":"test","ttsSpeakerId":0,"ttsSpeed":1.0,"voiceMode":"silent","backgroundListeningDuration":"oneHour"}',
     });
     final sharedPreferences = await SharedPreferences.getInstance();
 
@@ -46,8 +47,10 @@ void main() {
       final granted = await coordinator.requestRecording();
 
       expect(granted, true);
-      expect(container.read(audioCoordinatorProvider).mode,
-          AudioMode.recording);
+      expect(
+        container.read(audioCoordinatorProvider).mode,
+        AudioMode.recording,
+      );
     });
 
     test('Can transition from idle to playing', () async {
@@ -55,8 +58,7 @@ void main() {
       final granted = await coordinator.requestPlayback();
 
       expect(granted, true);
-      expect(
-          container.read(audioCoordinatorProvider).mode, AudioMode.playing);
+      expect(container.read(audioCoordinatorProvider).mode, AudioMode.playing);
     });
 
     test('Cannot record while playing (mutual exclusion)', () async {
@@ -71,8 +73,10 @@ void main() {
 
       // requestRecording() stops playback first, then grants recording
       expect(granted, true);
-      expect(container.read(audioCoordinatorProvider).mode,
-          AudioMode.recording);
+      expect(
+        container.read(audioCoordinatorProvider).mode,
+        AudioMode.recording,
+      );
     });
 
     test('Cannot play while recording (mutual exclusion)', () async {
@@ -80,24 +84,27 @@ void main() {
 
       // Start recording
       await coordinator.requestRecording();
-      expect(container.read(audioCoordinatorProvider).mode,
-          AudioMode.recording);
+      expect(
+        container.read(audioCoordinatorProvider).mode,
+        AudioMode.recording,
+      );
 
       // Try to play - should transition through idle first
       final granted = await coordinator.requestPlayback();
 
       // requestPlayback() stops recording first, then grants playback
       expect(granted, true);
-      expect(
-          container.read(audioCoordinatorProvider).mode, AudioMode.playing);
+      expect(container.read(audioCoordinatorProvider).mode, AudioMode.playing);
     });
 
     test('Recording lock can be released', () async {
       final coordinator = container.read(audioCoordinatorProvider.notifier);
 
       await coordinator.requestRecording();
-      expect(container.read(audioCoordinatorProvider).mode,
-          AudioMode.recording);
+      expect(
+        container.read(audioCoordinatorProvider).mode,
+        AudioMode.recording,
+      );
 
       await coordinator.releaseRecording();
       expect(container.read(audioCoordinatorProvider).mode, AudioMode.idle);
@@ -107,8 +114,7 @@ void main() {
       final coordinator = container.read(audioCoordinatorProvider.notifier);
 
       await coordinator.requestPlayback();
-      expect(
-          container.read(audioCoordinatorProvider).mode, AudioMode.playing);
+      expect(container.read(audioCoordinatorProvider).mode, AudioMode.playing);
 
       await coordinator.releasePlayback();
       expect(container.read(audioCoordinatorProvider).mode, AudioMode.idle);
@@ -124,8 +130,7 @@ void main() {
       // Release when playing
       await coordinator.requestPlayback();
       await coordinator.releaseRecording();
-      expect(
-          container.read(audioCoordinatorProvider).mode, AudioMode.playing);
+      expect(container.read(audioCoordinatorProvider).mode, AudioMode.playing);
     });
 
     test('releasePlayback is idempotent when not playing', () async {
@@ -138,8 +143,10 @@ void main() {
       // Release when recording
       await coordinator.requestRecording();
       await coordinator.releasePlayback();
-      expect(container.read(audioCoordinatorProvider).mode,
-          AudioMode.recording);
+      expect(
+        container.read(audioCoordinatorProvider).mode,
+        AudioMode.recording,
+      );
     });
 
     test('State flags match mode correctly', () async {
@@ -173,8 +180,7 @@ void main() {
       coordinator.handleAudioFocusChange('temporary_loss');
 
       expect(container.read(audioCoordinatorProvider).mode, AudioMode.idle);
-      expect(
-          container.read(audioCoordinatorProvider).isWaiting, true);
+      expect(container.read(audioCoordinatorProvider).isWaiting, true);
     });
 
     test('Gain after temporary loss can restore state', () async {
@@ -192,8 +198,10 @@ void main() {
 
       // Should restore recording (implementation-dependent)
       // Note: This tests the current auto-resume behavior
-      expect(container.read(audioCoordinatorProvider).mode,
-          AudioMode.recording);
+      expect(
+        container.read(audioCoordinatorProvider).mode,
+        AudioMode.recording,
+      );
     });
   });
 }

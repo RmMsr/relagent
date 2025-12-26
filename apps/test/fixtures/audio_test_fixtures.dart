@@ -31,10 +31,7 @@ import 'audio_test_fixtures.mocks.dart';
 
 // Generate mocks using build_runner:
 // dart run build_runner build
-@GenerateNiceMocks([
-  MockSpec<AudioSession>(),
-  MockSpec<AudioPlayer>(),
-])
+@GenerateNiceMocks([MockSpec<AudioSession>(), MockSpec<AudioPlayer>()])
 class AudioTestFixture {
   late ProviderContainer container;
   late MockAudioSession mockAudioSession;
@@ -47,7 +44,8 @@ class AudioTestFixture {
 
     // Set up SharedPreferences mocks with silent voice mode to prevent auto-resume
     SharedPreferences.setMockInitialValues({
-      'user_settings': '{"simpleChatBaseUrl":"http://localhost:1234/api/v1","simpleChatModel":"test-model","primeMessage":"test","ttsSpeakerId":0,"ttsSpeed":1.0,"voiceMode":"silent","backgroundListeningDuration":"oneHour"}',
+      'user_settings':
+          '{"simpleChatBaseUrl":"http://localhost:1234/api/v1","simpleChatModel":"test-model","primeMessage":"test","ttsSpeakerId":0,"ttsSpeed":1.0,"voiceMode":"silent","backgroundListeningDuration":"oneHour"}',
     });
     final sharedPreferences = await SharedPreferences.getInstance();
 
@@ -78,9 +76,9 @@ class AudioTestFixture {
     when(mockAudioSession.configure(any)).thenAnswer((_) async {});
 
     // Device streams - return empty by default
-    when(mockAudioSession.devicesStream).thenAnswer(
-      (_) => Stream.value(<AudioDevice>{}),
-    );
+    when(
+      mockAudioSession.devicesStream,
+    ).thenAnswer((_) => Stream.value(<AudioDevice>{}));
 
     // Interruption events - return empty by default
     when(mockAudioSession.interruptionEventStream).thenAnswer(
@@ -108,9 +106,9 @@ class AudioTestFixture {
     // Start with idle state
     playerStateController.add(PlayerState(false, ProcessingState.idle));
 
-    when(mockAudioPlayer.playerStateStream).thenAnswer(
-      (_) => playerStateController.stream,
-    );
+    when(
+      mockAudioPlayer.playerStateStream,
+    ).thenAnswer((_) => playerStateController.stream);
 
     // Playback control
     when(mockAudioPlayer.play()).thenAnswer((_) async {
@@ -119,7 +117,9 @@ class AudioTestFixture {
       // Complete playback after a short delay to allow tests to observe state
       Future.delayed(const Duration(milliseconds: 50), () {
         if (!playerStateController.isClosed) {
-          playerStateController.add(PlayerState(false, ProcessingState.completed));
+          playerStateController.add(
+            PlayerState(false, ProcessingState.completed),
+          );
         }
       });
     });
@@ -149,9 +149,9 @@ class AudioTestFixture {
       type: AudioDeviceType.bluetoothA2dp,
     );
 
-    when(mockAudioSession.devicesStream).thenAnswer(
-      (_) => Stream.value({bluetoothDevice}),
-    );
+    when(
+      mockAudioSession.devicesStream,
+    ).thenAnswer((_) => Stream.value({bluetoothDevice}));
 
     // Trigger device change event
     when(mockAudioSession.devicesChangedEventStream).thenAnswer(
@@ -172,9 +172,9 @@ class AudioTestFixture {
       type: AudioDeviceType.bluetoothA2dp,
     );
 
-    when(mockAudioSession.devicesStream).thenAnswer(
-      (_) => Stream.value(<AudioDevice>{}),
-    );
+    when(
+      mockAudioSession.devicesStream,
+    ).thenAnswer((_) => Stream.value(<AudioDevice>{}));
 
     when(mockAudioSession.devicesChangedEventStream).thenAnswer(
       (_) => Stream.value(
@@ -198,12 +198,7 @@ class AudioTestFixture {
   /// Simulate playback completion
   void simulatePlaybackComplete() {
     when(mockAudioPlayer.playerStateStream).thenAnswer(
-      (_) => Stream.value(
-        PlayerState(
-          false,
-          ProcessingState.completed,
-        ),
-      ),
+      (_) => Stream.value(PlayerState(false, ProcessingState.completed)),
     );
   }
 
@@ -224,18 +219,16 @@ class MockAudioDevice implements AudioDevice {
   @override
   final AudioDeviceType type;
 
-  MockAudioDevice({
-    required this.id,
-    required this.name,
-    required this.type,
-  });
+  MockAudioDevice({required this.id, required this.name, required this.type});
 
   @override
-  bool get isInput => type == AudioDeviceType.builtInMic ||
+  bool get isInput =>
+      type == AudioDeviceType.builtInMic ||
       type == AudioDeviceType.bluetoothSco;
 
   @override
-  bool get isOutput => type == AudioDeviceType.builtInSpeaker ||
+  bool get isOutput =>
+      type == AudioDeviceType.builtInSpeaker ||
       type == AudioDeviceType.builtInEarpiece ||
       type == AudioDeviceType.bluetoothA2dp ||
       type == AudioDeviceType.bluetoothSco;
@@ -284,10 +277,7 @@ class AudioTestScenarios {
     await coordinator.requestPlayback();
 
     // Try to enqueue item - should be denied
-    final item = PlaybackItem(
-      id: 'test',
-      content: Future.value(Uint8List(0)),
-    );
+    final item = PlaybackItem(id: 'test', content: Future.value(Uint8List(0)));
     await playback.enqueue(item);
 
     // Wait for processing
@@ -300,10 +290,7 @@ class AudioTestScenarios {
     );
 
     // Item should be completed
-    assert(
-      item.onFinished.isCompleted,
-      'Denied item should be completed',
-    );
+    assert(item.onFinished.isCompleted, 'Denied item should be completed');
   }
 
   /// Scenario: Phone call interruption
@@ -339,9 +326,7 @@ class AudioTestScenarios {
   }
 
   /// Scenario: Pause/resume preserves lock
-  static Future<void> pauseResumeFlow(
-    ProviderContainer container,
-  ) async {
+  static Future<void> pauseResumeFlow(ProviderContainer container) async {
     final playback = container.read(playbackProvider.notifier);
 
     // Enqueue and play item

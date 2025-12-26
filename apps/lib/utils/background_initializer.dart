@@ -20,6 +20,7 @@ class BackgroundInitializer {
       await Isolate.run(() async {
         await operation();
       });
+      _initialized = true;
       debugPrint('BackgroundInitializer: ✓ $name completed');
     } catch (e) {
       debugPrint('BackgroundInitializer: ✗ $name failed: $e');
