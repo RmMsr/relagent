@@ -9,6 +9,16 @@ import '/providers/settings_provider.dart';
 import '../tts/audio_source.dart';
 import 'audio_coordinator_provider.dart';
 
+/// Provider for AudioPlayer instance with automatic disposal.
+/// This enables dependency injection for testing.
+final audioPlayerProvider = Provider<AudioPlayer>((ref) {
+  final player = AudioPlayer();
+  ref.onDispose(() {
+    player.dispose();
+  });
+  return player;
+});
+
 class PlaybackItem {
   final String id;
   final Future<Uint8List> content;
@@ -23,7 +33,7 @@ class PlaybackItem {
   }) : onFinished = onFinished ?? Completer<void>();
 }
 
-enum PlaybackStatus { idle, playing }
+enum PlaybackStatus { idle, playing, paused }
 
 class PlaybackState {
   final PlaybackStatus status;
@@ -49,6 +59,7 @@ class PlaybackState {
   }
 
   bool get isPlaying => status == PlaybackStatus.playing;
+  bool get isPaused => status == PlaybackStatus.paused;
   bool get isIdle => status == PlaybackStatus.idle;
 }
 
@@ -56,10 +67,11 @@ class PlaybackService extends Notifier<PlaybackState> {
   late final AudioPlayer _player;
   StreamSubscription<PlayerState>? _playerStateSub;
   int _queueChangeCount = 0;
+  bool _ownsPlaybackLock = false;
 
   @override
   PlaybackState build() {
-    _player = AudioPlayer();
+    _player = ref.watch(audioPlayerProvider);
     _playerStateSub = _player.playerStateStream.listen((playerState) {
       if (playerState.processingState == ProcessingState.completed) {
         _onItemFinished();
@@ -75,16 +87,14 @@ class PlaybackService extends Notifier<PlaybackState> {
 
     ref.onDispose(() {
       _playerStateSub?.cancel();
-      _player.dispose();
+      // Provider handles AudioPlayer disposal
     });
 
     return const PlaybackState();
   }
 
   void _handleVoiceModeChanged(VoiceMode? oldMode, VoiceMode newMode) {
-    debugPrint(
-      'PlaybackService: Voice mode changed from $oldMode to $newMode',
-    );
+    debugPrint('PlaybackService: Voice mode changed from $oldMode to $newMode');
 
     // Stop all playback and clear queue when switching to silent mode
     if (newMode == VoiceMode.silent) {
@@ -134,15 +144,39 @@ class PlaybackService extends Notifier<PlaybackState> {
     _queueChangeCount++;
     await _player.stop();
 
-    await ref
-        .read(audioCoordinatorProvider.notifier)
-        .releasePlayback();
+    if (_ownsPlaybackLock) {
+      await ref.read(audioCoordinatorProvider.notifier).releasePlayback();
+      _ownsPlaybackLock = false;
+    }
 
     // Complete current item and all queued items
     _completeCurrentItem();
     _completeQueuedItems();
 
     state = const PlaybackState();
+  }
+
+  /// Pause the currently playing audio.
+  ///
+  /// CRITICAL INVARIANT: Pause does NOT release the playback lock.
+  /// The lock represents ownership of the audio session, not playback state.
+  /// Pausing is a local operation - we still own the session.
+  /// See: AUDIO_ARCHITECTURE.md#pauseresume-semantics
+  Future<void> pause() async {
+    if (state.status != PlaybackStatus.playing) return;
+
+    debugPrint('PlaybackProvider: Pausing playback');
+    await _player.pause();
+    state = state.copyWith(status: PlaybackStatus.paused);
+    // Lock intentionally NOT released - we still own the audio session
+  }
+
+  Future<void> resume() async {
+    if (state.status != PlaybackStatus.paused) return;
+
+    debugPrint('PlaybackProvider: Resuming playback');
+    state = state.copyWith(status: PlaybackStatus.playing);
+    await _player.play();
   }
 
   void _completeQueuedItems() {
@@ -159,9 +193,11 @@ class PlaybackService extends Notifier<PlaybackState> {
 
     if (state.queue.isEmpty) {
       // currentItem already cleared in _finishAndNext, no state update needed
-      await ref
-          .read(audioCoordinatorProvider.notifier)
-          .releasePlayback();
+      // Only release the lock if we own it
+      if (_ownsPlaybackLock) {
+        await ref.read(audioCoordinatorProvider.notifier).releasePlayback();
+        _ownsPlaybackLock = false;
+      }
       return;
     }
 
@@ -176,6 +212,8 @@ class PlaybackService extends Notifier<PlaybackState> {
       );
     }
 
+    // Check if provider is still mounted after async gap
+    if (!ref.mounted) return;
     if (_queueChangeCount != initialVersion) return;
     if (state.queue.isEmpty || state.queue.first != nextItem) return;
 
@@ -189,13 +227,42 @@ class PlaybackService extends Notifier<PlaybackState> {
           .read(audioCoordinatorProvider.notifier)
           .requestPlayback();
 
+      // Check if provider is still mounted after async gap
+      if (!ref.mounted) return;
       if (_queueChangeCount != initialVersion) return;
       if (state.queue.isEmpty || state.queue.first != nextItem) return;
 
       if (!granted) {
-        _finishAndNext(nextItem);
+        // CRITICAL INVARIANT: Do not release the playback lock here!
+        // We never acquired it, so we don't own it. Releasing would
+        // interrupt the current playback holder.
+        // See: AUDIO_ARCHITECTURE.md#lock-ownership
+        //
+        // Playback denied - remove item from queue without releasing lock
+        // (something else is currently holding the playback lock)
+        debugPrint(
+          'PlaybackProvider: Playback denied for ${nextItem.id}, removing from queue',
+        );
+        _queueChangeCount++;
+
+        if (!nextItem.onFinished.isCompleted) {
+          nextItem.onFinished.complete();
+        }
+
+        final currentQueue = List<PlaybackItem>.from(state.queue);
+        if (currentQueue.isNotEmpty && currentQueue.first == nextItem) {
+          currentQueue.removeAt(0);
+          state = state.copyWith(queue: currentQueue);
+        }
+
+        // Don't call releasePlayback() here - we don't own the lock!
+        // Just process the next item in queue
+        _processNext();
         return;
       }
+      // Lock acquired successfully
+      _ownsPlaybackLock = true;
+      // No additional delay needed - AudioCoordinator now handles audio session reset
     }
 
     state = state.copyWith(
@@ -246,10 +313,11 @@ class PlaybackService extends Notifier<PlaybackState> {
 
     // Release playback lock before processing next item
     // This ensures the lock is available for the next item to acquire
-    if (currentQueue.isNotEmpty) {
-      await ref
-          .read(audioCoordinatorProvider.notifier)
-          .releasePlayback();
+    if (currentQueue.isNotEmpty && _ownsPlaybackLock) {
+      await ref.read(audioCoordinatorProvider.notifier).releasePlayback();
+      // Check if provider is still mounted after async gap
+      if (!ref.mounted) return;
+      _ownsPlaybackLock = false;
     }
 
     _processNext();

@@ -135,6 +135,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
   Future<void> _initAudioSession() async {
     try {
       final session = await AudioSession.instance;
+      // Configure for speech mode - enables bidirectional Bluetooth SCO for both recording and playback
       await session.configure(const AudioSessionConfiguration.speech());
 
       // Listen to audio interruptions (phone calls, etc.)
@@ -178,12 +179,43 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
         }
       });
 
+      // Listen to device changes (Bluetooth connect/disconnect)
+      session.devicesChangedEventStream.listen((event) {
+        debugPrint('BackgroundServiceProvider: Audio devices changed');
+        debugPrint('  Devices added: ${event.devicesAdded}');
+        debugPrint('  Devices removed: ${event.devicesRemoved}');
+        _logCurrentAudioRouting(session);
+      });
+
+      // Log initial audio routing
+      _logCurrentAudioRouting(session);
+
       debugPrint('BackgroundServiceProvider: Audio session initialized');
     } catch (e) {
       debugPrint(
         'BackgroundServiceProvider: Failed to initialize audio session: $e',
       );
     }
+  }
+
+  /// Log current audio routing information
+  void _logCurrentAudioRouting(AudioSession session) {
+    debugPrint('=== Current Audio Routes ===');
+    session.devicesStream.listen((devices) {
+      final inputDevices = devices.where((d) => d.isInput).toList();
+      final outputDevices = devices.where((d) => d.isOutput).toList();
+
+      debugPrint('Input devices (${inputDevices.length}):');
+      for (final device in inputDevices) {
+        debugPrint('  - ${device.name} (${device.type.name})');
+      }
+
+      debugPrint('Output devices (${outputDevices.length}):');
+      for (final device in outputDevices) {
+        debugPrint('  - ${device.name} (${device.type.name})');
+      }
+      debugPrint('========================');
+    });
   }
 
   /// Update notification message based on audio focus state
@@ -236,11 +268,8 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
     try {
       switch (mode) {
         case AudioMode.idle:
-          // Keep service alive during IDLE (transition state)
-          // Don't stop it - just update mode to keep notification visible
           await _startService('idle');
         case AudioMode.recording:
-          // Pass background listening duration for wake lock timeout
           final settings = ref.read(settingsProvider);
           final durationMinutes =
               settings.backgroundListeningDuration.duration.inMinutes;

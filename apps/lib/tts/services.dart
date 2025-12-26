@@ -51,10 +51,10 @@ class TtsService {
       return _audioCache[messageId];
     }
 
-    developer.Timeline.startSync('TTS_Generation', arguments: {
-      'text_length': text.length,
-      'message_id': messageId,
-    });
+    developer.Timeline.startSync(
+      'TTS_Generation',
+      arguments: {'text_length': text.length, 'message_id': messageId},
+    );
 
     try {
       final wavBytes = await _worker.generateAudio(

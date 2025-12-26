@@ -10,12 +10,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
+import org.venkado.relagent.BuildConfig
 
 import androidx.core.app.NotificationCompat
 import java.util.Date
@@ -149,6 +152,11 @@ class AudioBackgroundService : Service() {
         currentMode = mode
         Log.d(TAG, "Mode changed to: $mode (duration: $durationMinutes min)")
 
+        // Debug logging - can be removed once audio routing has proven stable
+        if (BuildConfig.DEBUG) {
+            logAudioRouting()
+        }
+
         try {
             when (mode) {
                 MODE_IDLE -> {
@@ -189,6 +197,10 @@ class AudioBackgroundService : Service() {
                     Log.d(TAG, "Starting foreground service for playback")
                     releaseWakeLock() // No wake lock needed for playback
                     stopNotificationUpdates()
+
+                    // Set audio mode to IN_COMMUNICATION for Bluetooth SCO routing
+                    setAudioModeForSpeech()
+
                     val notification = createNotification("Speaking...")
                     startForeground(NOTIFICATION_ID, notification)
                     Log.d(TAG, "Foreground service started with notification")
@@ -444,5 +456,153 @@ class AudioBackgroundService : Service() {
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(ERROR_NOTIFICATION_ID, notification)
+    }
+
+    // Audio Mode Management
+
+    private fun setAudioModeForSpeech() {
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val currentMode = audioManager.mode
+
+            // Only change mode if not already in communication mode
+            if (currentMode != AudioManager.MODE_IN_COMMUNICATION) {
+                Log.d(TAG, "Setting audio mode to IN_COMMUNICATION (was: ${getAudioModeString(currentMode)})")
+                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                Log.d(TAG, "Audio mode set successfully")
+            } else {
+                Log.d(TAG, "Audio mode already IN_COMMUNICATION")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set audio mode: ${e.message}", e)
+        }
+    }
+
+    private fun resetAudioMode() {
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val currentMode = audioManager.mode
+
+            // Reset to normal mode when idle
+            if (currentMode != AudioManager.MODE_NORMAL) {
+                Log.d(TAG, "Resetting audio mode to NORMAL (was: ${getAudioModeString(currentMode)})")
+                audioManager.mode = AudioManager.MODE_NORMAL
+                Log.d(TAG, "Audio mode reset successfully")
+            } else {
+                Log.d(TAG, "Audio mode already NORMAL")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to reset audio mode: ${e.message}", e)
+        }
+    }
+
+    private fun getAudioModeString(mode: Int): String {
+        return when (mode) {
+            AudioManager.MODE_NORMAL -> "NORMAL"
+            AudioManager.MODE_RINGTONE -> "RINGTONE"
+            AudioManager.MODE_IN_CALL -> "IN_CALL"
+            AudioManager.MODE_IN_COMMUNICATION -> "IN_COMMUNICATION"
+            else -> "UNKNOWN($mode)"
+        }
+    }
+
+    // Audio Routing Debugging
+    // NOTE: This extensive logging can be removed once audio routing has proven
+    // stable over extended use. It's currently useful for debugging Bluetooth
+    // and device switching issues.
+
+    private fun logAudioRouting() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            Log.d(TAG, "=== Android AudioManager Routing ===")
+
+            // Get all audio devices
+            val devices = audioManager.getDevices(AudioManager.GET_DEVICES_ALL)
+
+            // Log output devices
+            val outputDevices = devices.filter { it.isSink }
+            Log.d(TAG, "Output devices (${outputDevices.size}):")
+            for (device in outputDevices) {
+                val typeStr = getDeviceTypeString(device.type)
+                val name = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    device.productName.toString()
+                } else {
+                    "unknown"
+                }
+                Log.d(TAG, "  - $typeStr: $name (id=${device.id})")
+            }
+
+            // Log input devices
+            val inputDevices = devices.filter { it.isSource }
+            Log.d(TAG, "Input devices (${inputDevices.size}):")
+            for (device in inputDevices) {
+                val typeStr = getDeviceTypeString(device.type)
+                val name = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    device.productName.toString()
+                } else {
+                    "unknown"
+                }
+                Log.d(TAG, "  - $typeStr: $name (id=${device.id})")
+            }
+
+            // Log communication routing
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val commDevices = audioManager.availableCommunicationDevices
+                Log.d(TAG, "Available communication devices (${commDevices.size}):")
+                for (device in commDevices) {
+                    val typeStr = getDeviceTypeString(device.type)
+                    Log.d(TAG, "  - $typeStr (id=${device.id})")
+                }
+
+                val currentCommDevice = audioManager.communicationDevice
+                if (currentCommDevice != null) {
+                    Log.d(TAG, "Current communication device: ${getDeviceTypeString(currentCommDevice.type)}")
+                } else {
+                    Log.d(TAG, "Current communication device: none (default routing)")
+                }
+            }
+
+            // Log current audio mode
+            val mode = when (audioManager.mode) {
+                AudioManager.MODE_NORMAL -> "NORMAL"
+                AudioManager.MODE_RINGTONE -> "RINGTONE"
+                AudioManager.MODE_IN_CALL -> "IN_CALL"
+                AudioManager.MODE_IN_COMMUNICATION -> "IN_COMMUNICATION"
+                else -> "UNKNOWN(${audioManager.mode})"
+            }
+            Log.d(TAG, "Audio mode: $mode")
+
+            // Log Bluetooth SCO state
+            Log.d(TAG, "Bluetooth SCO on: ${audioManager.isBluetoothScoOn}")
+            Log.d(TAG, "Bluetooth A2DP on: ${audioManager.isBluetoothA2dpOn}")
+            Log.d(TAG, "Speaker phone on: ${audioManager.isSpeakerphoneOn}")
+
+            Log.d(TAG, "===================================")
+        } else {
+            Log.d(TAG, "Audio routing logging requires Android M+")
+        }
+    }
+
+    private fun getDeviceTypeString(type: Int): String {
+        return when (type) {
+            AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> "BUILTIN_EARPIECE"
+            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "BUILTIN_SPEAKER"
+            AudioDeviceInfo.TYPE_WIRED_HEADSET -> "WIRED_HEADSET"
+            AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "WIRED_HEADPHONES"
+            AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "BLUETOOTH_SCO"
+            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "BLUETOOTH_A2DP"
+            AudioDeviceInfo.TYPE_BUILTIN_MIC -> "BUILTIN_MIC"
+            AudioDeviceInfo.TYPE_USB_DEVICE -> "USB_DEVICE"
+            AudioDeviceInfo.TYPE_USB_HEADSET -> "USB_HEADSET"
+            AudioDeviceInfo.TYPE_TELEPHONY -> "TELEPHONY"
+            else -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                when (type) {
+                    AudioDeviceInfo.TYPE_HEARING_AID -> "HEARING_AID"
+                    else -> "UNKNOWN($type)"
+                }
+            } else {
+                "UNKNOWN($type)"
+            }
+        }
     }
 }

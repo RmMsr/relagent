@@ -21,3 +21,17 @@ This software should be usable and fluent enough for daily use. But no extensive
 - Various audio session configurations (mixWithOthers, duckOthers, voiceChat mode, etc.)
 
 The package continues to request exclusive audio focus, causing other apps' audio to stop completely.
+
+## Phone call notification state (Android)
+
+**Issue:** During phone calls or audio interruptions, the app notification may not update to show "Waiting..." status, continuing to display "Listening..." or "Speaking..." even though audio has paused.
+
+**Root cause:** Phone call interruptions cannot be reliably detected:
+
+- The `record` package handles audio focus internally but doesn't emit state change events during interruptions
+- The `audio_session` package's interruption events are inconsistent (work for playback, not for recording)
+- Internal app transitions (TTS→recording) trigger false positive interruption events
+
+**Impact:** Low - Audio correctly pauses during calls and resumes after, but notification state is misleading. The underlying functionality works correctly.
+
+**Potential solutions:** Monitor Android telephony broadcasts via platform channels, or contribute audio focus event handling to the `record` package.

@@ -1,0 +1,10 @@
+targets:
+  $default:
+    builders:
+      mockito:
+        # Only generate mocks for test files
+        generate_for:
+          - test/fixtures/audio_test_fixtures.dart
+        options:
+          # Disable relaxed types to catch errors early
+          relaxed_mode: false

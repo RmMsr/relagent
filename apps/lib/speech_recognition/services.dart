@@ -96,7 +96,9 @@ class ASR {
 
         final config = RecordConfig(
           androidConfig: AndroidRecordConfig(
-            audioManagerMode: AudioManagerMode.modeNormal,
+            // Use communication mode to enable Bluetooth SCO for voice communication
+            // This allows Bluetooth headset microphones to work properly
+            audioManagerMode: AudioManagerMode.modeInCommunication,
           ),
           encoder: encoder,
           sampleRate: 16000,
@@ -106,6 +108,8 @@ class ASR {
           audioInterruption: AudioInterruptionMode.pauseResume,
         );
 
+        debugPrint('ASR: Starting recording with Bluetooth SCO mode');
+        debugPrint('ASR: Starting recording with Bluetooth SCO mode');
         final stream = await _audioRecorder!.startStream(config);
         String? lastText;
 

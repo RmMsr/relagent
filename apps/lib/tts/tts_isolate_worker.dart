@@ -85,23 +85,31 @@ void _ttsWorkerIsolate(_IsolateTask task) {
               debugPrint('[TTS Worker] Initializing Sherpa-ONNX bindings...');
               sherpa_onnx.initBindings();
               bindingsStopwatch.stop();
-              debugPrint('[TTS Worker] ✓ Sherpa-ONNX bindings initialized (${bindingsStopwatch.elapsedMilliseconds}ms)');
+              debugPrint(
+                '[TTS Worker] ✓ Sherpa-ONNX bindings initialized (${bindingsStopwatch.elapsedMilliseconds}ms)',
+              );
 
               final modelStopwatch = Stopwatch()..start();
               debugPrint('[TTS Worker] Creating TTS model...');
               // BackgroundIsolateBinaryMessenger allows file system access for asset copying
               tts = await createOfflineTts(modelName: modelName);
               modelStopwatch.stop();
-              debugPrint('[TTS Worker] ✓ TTS model created (${(modelStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s)');
+              debugPrint(
+                '[TTS Worker] ✓ TTS model created (${(modelStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s)',
+              );
 
               totalStopwatch.stop();
               isInitialized = true;
-              debugPrint('[TTS Worker] ✓ Initialization complete (Total: ${(totalStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s)');
+              debugPrint(
+                '[TTS Worker] ✓ Initialization complete (Total: ${(totalStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s)',
+              );
               message.responsePort.send(InitializedResponse());
             } catch (e, stackTrace) {
               debugPrint('[TTS Worker] ✗ Initialization failed: $e');
               debugPrint('[TTS Worker] Stack trace: $stackTrace');
-              message.responsePort.send(ErrorResponse('Initialization failed: $e'));
+              message.responsePort.send(
+                ErrorResponse('Initialization failed: $e'),
+              );
             }
           } else {
             message.responsePort.send(InitializedResponse());
@@ -109,14 +117,14 @@ void _ttsWorkerIsolate(_IsolateTask task) {
 
         case GenerateAudioMessage():
           if (!isInitialized || tts == null) {
-            message.responsePort.send(
-              ErrorResponse('TTS not initialized'),
-            );
+            message.responsePort.send(ErrorResponse('TTS not initialized'));
             return;
           }
 
           final totalStopwatch = Stopwatch()..start();
-          debugPrint('[TTS Worker] Generating audio for [${message.messageId}] (${message.text.length} chars)...');
+          debugPrint(
+            '[TTS Worker] Generating audio for [${message.messageId}] (${message.text.length} chars)...',
+          );
 
           final generateStopwatch = Stopwatch()..start();
           final audio = tts!.generate(
@@ -139,15 +147,28 @@ void _ttsWorkerIsolate(_IsolateTask task) {
 
           totalStopwatch.stop();
           final audioDuration = audio.samples.length / audio.sampleRate;
-          final rtf = (totalStopwatch.elapsedMilliseconds / 1000) / audioDuration;
+          final rtf =
+              (totalStopwatch.elapsedMilliseconds / 1000) / audioDuration;
 
-          debugPrint('[TTS Worker] ✓ Audio generated for [${message.messageId}]:');
-          debugPrint('  - Generate: ${(generateStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s');
-          debugPrint('  - Convert to WAV: ${convertStopwatch.elapsedMilliseconds}ms');
-          debugPrint('  - Total: ${(totalStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s');
-          debugPrint('  - Audio duration: ${audioDuration.toStringAsFixed(2)}s');
+          debugPrint(
+            '[TTS Worker] ✓ Audio generated for [${message.messageId}]:',
+          );
+          debugPrint(
+            '  - Generate: ${(generateStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s',
+          );
+          debugPrint(
+            '  - Convert to WAV: ${convertStopwatch.elapsedMilliseconds}ms',
+          );
+          debugPrint(
+            '  - Total: ${(totalStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s',
+          );
+          debugPrint(
+            '  - Audio duration: ${audioDuration.toStringAsFixed(2)}s',
+          );
           debugPrint('  - RTF (Real-time Factor): ${rtf.toStringAsFixed(3)}x');
-          debugPrint('  - Output size: ${(wavBytes.length / 1024).toStringAsFixed(1)} KB');
+          debugPrint(
+            '  - Output size: ${(wavBytes.length / 1024).toStringAsFixed(1)} KB',
+          );
 
           message.responsePort.send(AudioGeneratedResponse(wavBytes));
 
@@ -189,7 +210,9 @@ class TtsIsolateWorker {
     // Get the root isolate token to pass to the background isolate
     final rootIsolateToken = RootIsolateToken.instance;
     if (rootIsolateToken == null) {
-      throw Exception('RootIsolateToken is null - ensure this is called from main isolate');
+      throw Exception(
+        'RootIsolateToken is null - ensure this is called from main isolate',
+      );
     }
 
     _isolate = await Isolate.spawn(
@@ -204,10 +227,12 @@ class TtsIsolateWorker {
 
     // Initialize TTS in the worker, passing the model name from main isolate
     final initResponsePort = ReceivePort();
-    _workerSendPort!.send(InitializeTtsMessage(
-      initResponsePort.sendPort,
-      AppConfig.ttsModelName, // Loaded in main isolate
-    ));
+    _workerSendPort!.send(
+      InitializeTtsMessage(
+        initResponsePort.sendPort,
+        AppConfig.ttsModelName, // Loaded in main isolate
+      ),
+    );
 
     final response = await initResponsePort.first;
     initResponsePort.close();
@@ -232,13 +257,15 @@ class TtsIsolateWorker {
     }
 
     final responsePort = ReceivePort();
-    _workerSendPort!.send(GenerateAudioMessage(
-      text: text,
-      messageId: messageId,
-      speakerId: speakerId,
-      speed: speed,
-      responsePort: responsePort.sendPort,
-    ));
+    _workerSendPort!.send(
+      GenerateAudioMessage(
+        text: text,
+        messageId: messageId,
+        speakerId: speakerId,
+        speed: speed,
+        responsePort: responsePort.sendPort,
+      ),
+    );
 
     final response = await responsePort.first;
     responsePort.close();

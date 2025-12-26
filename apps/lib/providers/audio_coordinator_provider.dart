@@ -1,3 +1,4 @@
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -149,9 +150,7 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
     // Only restore if we were temporarily interrupted
     if (state.audioFocusState.status == AudioFocusStatus.temporaryLoss) {
       final previousMode = state.audioFocusState.stateBeforeInterruption;
-      debugPrint(
-        'AudioCoordinator: Restoring previous mode: $previousMode',
-      );
+      debugPrint('AudioCoordinator: Restoring previous mode: $previousMode');
 
       // Clear waiting state
       state = state.copyWith(
@@ -182,8 +181,9 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
       debugPrint('AudioCoordinator: Must stop playback first');
       // Transition to idle, which will trigger TTS to stop
       state = const AudioCoordinatorState(mode: AudioMode.idle);
-      // Give TTS a moment to stop
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      // Give TTS a moment to stop and reset audio session
+      await _resetAudioSession();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
     }
 
     if (state.mode != AudioMode.idle) {
@@ -207,10 +207,10 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
 
     if (state.mode == AudioMode.recording) {
       debugPrint('AudioCoordinator: Must stop recording first');
-      // Transition to idle, which will trigger Recording to stop
       state = const AudioCoordinatorState(mode: AudioMode.idle);
-      // Give Recording a moment to stop
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      // Reset audio session to clear Bluetooth SCO state from recording
+      await _resetAudioSession();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
     }
 
     if (state.mode != AudioMode.idle) {
@@ -218,7 +218,10 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
       return false;
     }
 
-    // Transition to playing (synchronous)
+    // Configure audio session for speech/communication mode before playback
+    // This ensures Android routes audio to Bluetooth SCO instead of speaker
+    await _configureSpeechMode();
+
     debugPrint('AudioCoordinator: Transitioning to playing mode');
     state = const AudioCoordinatorState(mode: AudioMode.playing);
 
@@ -232,12 +235,11 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
 
     state = const AudioCoordinatorState(mode: AudioMode.idle);
 
-    // Check if we should auto-resume based on voice mode
+    // Auto-resume if in listening/conversation mode
     final voiceMode = ref.read(settingsProvider).voiceMode;
     if (voiceMode == VoiceMode.listening ||
         voiceMode == VoiceMode.conversation) {
       debugPrint('AudioCoordinator: Auto-resuming continuous recording');
-      // Auto-resume continuous recording
       await requestRecording();
     }
   }
@@ -248,13 +250,58 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
 
     state = const AudioCoordinatorState(mode: AudioMode.idle);
 
-    // Check if we should auto-resume recording
-    final voiceMode = ref.read(settingsProvider).voiceMode;
-    if (voiceMode == VoiceMode.listening ||
-        voiceMode == VoiceMode.conversation) {
-      debugPrint('AudioCoordinator: Auto-resuming continuous recording');
-      // Auto-resume continuous recording
-      await requestRecording();
+    // Delay auto-resume to allow any queued TTS messages to request playback first
+    // This prevents rapid mode switching that confuses audio routing
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    // Only auto-resume if still idle (no new playback started)
+    if (state.mode == AudioMode.idle) {
+      final voiceMode = ref.read(settingsProvider).voiceMode;
+      if (voiceMode == VoiceMode.listening ||
+          voiceMode == VoiceMode.conversation) {
+        debugPrint('AudioCoordinator: Auto-resuming continuous recording');
+        await requestRecording();
+      }
+    }
+  }
+
+  /// Configure audio session for speech/communication mode
+  /// This ensures Android routes audio to Bluetooth SCO for TTS playback
+  Future<void> _configureSpeechMode() async {
+    try {
+      debugPrint('AudioCoordinator: Configuring audio session for speech mode');
+      final session = await AudioSession.instance;
+
+      // Ensure session is active with speech configuration
+      // This should set Android audio mode to IN_COMMUNICATION
+      await session.setActive(true);
+      debugPrint('AudioCoordinator: Audio session activated for speech');
+    } catch (e) {
+      debugPrint('AudioCoordinator: Failed to configure speech mode: $e');
+      // Don't fail the operation if configuration fails - continue anyway
+    }
+  }
+
+  /// Reset audio session to clear Bluetooth SCO routing state
+  /// This ensures clean transitions between recording and playback modes
+  Future<void> _resetAudioSession() async {
+    try {
+      debugPrint('AudioCoordinator: Resetting audio session for clean routing');
+      final session = await AudioSession.instance;
+
+      // Deactivate to release Bluetooth SCO connection from record package
+      await session.setActive(false);
+      debugPrint('AudioCoordinator: Audio session deactivated');
+
+      // Small delay to allow Android audio system to reset routing
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      // Reactivate with speech configuration for next operation
+      await session.setActive(true);
+      debugPrint('AudioCoordinator: Audio session reactivated');
+    } catch (e) {
+      debugPrint('AudioCoordinator: Failed to reset audio session: $e');
+      // Don't fail the operation if reset fails - continue anyway
     }
   }
 }

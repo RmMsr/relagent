@@ -258,7 +258,12 @@ class ChatMessageBubble extends StatelessWidget {
     switch (playbackStatus) {
       case MessagePlaybackStatus.playing:
         ttsIcon = Icons.pause;
-        ttsTooltip = 'Playing';
+        ttsTooltip = 'Pause';
+        iconColor = theme.colorScheme.primary;
+        break;
+      case MessagePlaybackStatus.paused:
+        ttsIcon = Icons.play_arrow;
+        ttsTooltip = 'Resume';
         iconColor = theme.colorScheme.primary;
         break;
       case MessagePlaybackStatus.generating:

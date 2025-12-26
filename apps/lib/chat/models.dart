@@ -22,15 +22,12 @@ class ChatMessage {
     String? id,
     this.role = ChatRole.assistant,
     DateTime? timestamp,
-  })  : id = id ?? generateMessageId(),
-        timestamp = timestamp ?? DateTime.now();
+  }) : id = id ?? generateMessageId(),
+       timestamp = timestamp ?? DateTime.now();
 
   // Factory for creating error messages
   factory ChatMessage.error(String errorText) {
-    return ChatMessage(
-      errorText,
-      role: ChatRole.error,
-    );
+    return ChatMessage(errorText, role: ChatRole.error);
   }
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {

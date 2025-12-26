@@ -6,7 +6,7 @@ import '/providers/playback_provider.dart';
 import '/providers/settings_provider.dart';
 import '/tts/services.dart';
 
-enum MessagePlaybackStatus { idle, generating, playing, completed, error }
+enum MessagePlaybackStatus { idle, generating, playing, paused, completed, error }
 
 class MessageTtsState {
   final MessagePlaybackStatus status;
@@ -196,6 +196,18 @@ class TtsNotifier extends Notifier<TtsState> {
     }
   }
 
+  /// Pause the currently playing message
+  Future<void> pause() async {
+    debugPrint('TtsProvider: Pausing playback');
+    await ref.read(playbackProvider.notifier).pause();
+  }
+
+  /// Resume the currently paused message
+  Future<void> resume() async {
+    debugPrint('TtsProvider: Resuming playback');
+    await ref.read(playbackProvider.notifier).resume();
+  }
+
   void _handlePlaybackStateChange(PlaybackState? prev, PlaybackState next) {
     // Handle completion FIRST (transition from playing to idle/next)
     if (prev?.currentItem != null) {
@@ -204,18 +216,17 @@ class TtsNotifier extends Notifier<TtsState> {
 
       // Item is completed if it changed (new item started or became null)
       if (prevId != nextId) {
-        _updateMessageState(
-          prevId,
-          status: MessagePlaybackStatus.completed,
-        );
+        _updateMessageState(prevId, status: MessagePlaybackStatus.completed);
       }
     }
 
-    // Update playing status of current item
+    // Update playing/paused status of current item
     if (next.currentItem != null) {
       final messageId = next.currentItem!.id;
       if (next.isPlaying) {
         _updateMessageState(messageId, status: MessagePlaybackStatus.playing);
+      } else if (next.isPaused) {
+        _updateMessageState(messageId, status: MessagePlaybackStatus.paused);
       }
     }
 
