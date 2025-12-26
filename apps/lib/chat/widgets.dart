@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:relagent/chat/models.dart';
 
 import '/models/app_info.dart';
+import '/providers/chat_provider.dart';
 import '/providers/tts_provider.dart';
 import '/speech_recognition/widgets.dart';
 import '/widgets/version_info_widget.dart';
@@ -88,6 +89,7 @@ class ChatInputState extends State<ChatInput> {
 class ChatHistory extends StatelessWidget {
   final List<ChatMessage> messages;
   final bool showAssistantPending;
+  final RetryState retryState;
   final void Function(String)? onRetry;
   final void Function(String, String)? onSpeak;
   final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
@@ -96,6 +98,7 @@ class ChatHistory extends StatelessWidget {
     super.key,
     required this.messages,
     this.showAssistantPending = false,
+    this.retryState = const RetryState(),
     this.onRetry,
     this.onSpeak,
     this.getMessagePlaybackStatus,
@@ -152,17 +155,57 @@ class ChatHistory extends StatelessWidget {
 
     // Add pending assistant placeholder if waiting for response
     if (showAssistantPending) {
+      final pendingState = retryState.lastError != null
+          ? PendingAssistantState.delayed
+          : PendingAssistantState.waiting;
+
+      final (displayText, textColor) = switch (pendingState) {
+        PendingAssistantState.waiting => (
+          'Waiting for assistant response...',
+          null,
+        ),
+        PendingAssistantState.delayed => (
+          'Delayed assistance response',
+          theme.colorScheme.secondary,
+        ),
+        PendingAssistantState.error => (
+          'Error getting assistant response.',
+          theme.colorScheme.error,
+        ),
+      };
+
       chatWidgets.add(
         Container(
           alignment: Alignment.bottomCenter,
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            ChatRole.assistant.name,
-            style: theme.textTheme.labelSmall,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                displayText,
+                style: theme.textTheme.labelSmall?.copyWith(color: textColor),
+              ),
+              if (pendingState == PendingAssistantState.delayed &&
+                  (retryState.lastError != null ||
+                      retryState.lastErrorTechnical != null))
+                Container(
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.only(left: 20),
+                  child: ExpandableErrorDetails(
+                    errorMessage: retryState.lastError,
+                    technicalDetails: retryState.lastErrorTechnical,
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+            ],
           ),
         ),
       );
-      chatWidgets.add(const AssistantPendingPlaceholder());
+
+      // Only show grey box for waiting and delayed states, not for final error
+      if (pendingState != PendingAssistantState.error) {
+        chatWidgets.add(AssistantPendingPlaceholder());
+      }
     }
 
     return Column(
@@ -207,8 +250,12 @@ class ChatMessageBubble extends StatelessWidget {
           alignment: Alignment.bottomCenter,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
-            '${message.role.name} @ $time',
-            style: theme.textTheme.labelSmall,
+            isError
+                ? 'Error getting assistant response.'
+                : '${message.role.name} @ $time',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: isError ? theme.colorScheme.error : null,
+            ),
           ),
         ),
         // Message bubble with action buttons
@@ -320,13 +367,7 @@ class ChatMessageBubble extends StatelessWidget {
         },
       ),
       child: isError
-          ? Text(
-              message.text,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-                fontStyle: FontStyle.italic,
-              ),
-            )
+          ? ErrorMessageWithDetails(message: message, theme: theme)
           : SelectableRegion(
               selectionControls: MaterialTextSelectionControls(),
               child: GptMarkdown(
@@ -334,6 +375,147 @@ class ChatMessageBubble extends StatelessWidget {
                 style: theme.textTheme.bodyMedium,
               ),
             ),
+    );
+  }
+}
+
+class ExpandableErrorDetails extends StatefulWidget {
+  final String? errorMessage;
+  final String? technicalDetails;
+  final Color color;
+
+  const ExpandableErrorDetails({
+    super.key,
+    required this.errorMessage,
+    required this.technicalDetails,
+    required this.color,
+  });
+
+  @override
+  State<ExpandableErrorDetails> createState() => _ExpandableErrorDetailsState();
+}
+
+class _ExpandableErrorDetailsState extends State<ExpandableErrorDetails> {
+  bool _showDetails = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.errorMessage == null && widget.technicalDetails == null) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 4),
+        InkWell(
+          onTap: () => setState(() => _showDetails = !_showDetails),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _showDetails
+                    ? Icons.keyboard_arrow_up
+                    : Icons.keyboard_arrow_down,
+                size: 14,
+                color: widget.color,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Error details',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: widget.color,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_showDetails) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(8),
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.3,
+              ),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: _buildErrorContent(theme),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildErrorContent(ThemeData theme) {
+    final List<Widget> children = [];
+
+    if (widget.errorMessage != null) {
+      children.add(
+        SelectableText(
+          'Error: ${widget.errorMessage}',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: widget.color,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      );
+    }
+
+    if (widget.technicalDetails != null) {
+      if (children.isNotEmpty) {
+        children.add(const SizedBox(height: 4));
+      }
+
+      children.add(
+        _buildFormattedTechnicalDetails(widget.technicalDetails!, theme),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+
+  Widget _buildFormattedTechnicalDetails(String details, ThemeData theme) {
+    final lines = details.split('\n');
+    final List<Widget> lineWidgets = [];
+
+    for (final line in lines) {
+      final colonIndex = line.indexOf(':');
+      if (colonIndex != -1 && colonIndex < line.length - 1) {
+        final label = line.substring(0, colonIndex + 1); // Include the colon
+        final value = line.substring(colonIndex + 1).trim();
+
+        lineWidgets.add(
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(text: label, style: theme.textTheme.bodySmall),
+                TextSpan(
+                  text: value,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      } else {
+        lineWidgets.add(SelectableText(line, style: theme.textTheme.bodySmall));
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: lineWidgets,
     );
   }
 }
@@ -392,6 +574,45 @@ class _GeneratingIndicatorState extends State<_GeneratingIndicator>
   }
 }
 
+class ErrorMessageWithDetails extends StatefulWidget {
+  final ChatMessage message;
+  final ThemeData theme;
+
+  const ErrorMessageWithDetails({
+    super.key,
+    required this.message,
+    required this.theme,
+  });
+
+  @override
+  State<ErrorMessageWithDetails> createState() =>
+      _ErrorMessageWithDetailsState();
+}
+
+class _ErrorMessageWithDetailsState extends State<ErrorMessageWithDetails> {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.message.text,
+          style: widget.theme.textTheme.bodyMedium?.copyWith(
+            color: widget.theme.colorScheme.error,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+        if (widget.message.technicalDetails != null)
+          ExpandableErrorDetails(
+            errorMessage: widget.message.text,
+            technicalDetails: widget.message.technicalDetails,
+            color: widget.theme.colorScheme.primary,
+          ),
+      ],
+    );
+  }
+}
+
 class AssistantPendingPlaceholder extends StatefulWidget {
   const AssistantPendingPlaceholder({super.key});
 
@@ -445,7 +666,18 @@ class _AssistantPendingPlaceholderState
                 borderRadius: const BorderRadius.all(Radius.circular(5)),
                 color: theme.splashColor,
               ),
-              child: Text('...', style: theme.textTheme.bodyMedium),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         );

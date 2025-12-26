@@ -64,8 +64,17 @@ Future<ChatMessage> getChatResponse(
       headers: {'content-type': 'application/json'},
     );
   } catch (e) {
+    // Check if it's a network-related error
+    final isNetworkError =
+        e.toString().contains('SocketException') ||
+        e.toString().contains('Connection refused') ||
+        e.toString().contains('Network is unreachable') ||
+        e.toString().contains('Connection timeout');
+
     throw ChatApiException(
-      userMessage: 'Could not connect to the chat server',
+      userMessage: isNetworkError
+          ? 'Network connection error'
+          : 'Could not connect to the chat server',
       technicalDetails: e.toString(),
       url: uri.toString(),
     );

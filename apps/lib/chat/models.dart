@@ -2,6 +2,8 @@ import 'dart:math';
 
 enum ChatRole { user, assistant, error }
 
+enum PendingAssistantState { waiting, delayed, error }
+
 /// Generate a random 8-character hexadecimal message ID
 /// Format: lowercase hex (e.g., "a3f7e2b9")
 /// Uniqueness: 2^32 = 4,294,967,296 combinations
@@ -15,25 +17,32 @@ class ChatMessage {
   final String id;
   final String text;
   final ChatRole role;
+  final String? technicalDetails;
   late final DateTime timestamp;
 
   ChatMessage(
     this.text, {
     String? id,
     this.role = ChatRole.assistant,
+    this.technicalDetails,
     DateTime? timestamp,
   }) : id = id ?? generateMessageId(),
        timestamp = timestamp ?? DateTime.now();
 
   // Factory for creating error messages
-  factory ChatMessage.error(String errorText) {
-    return ChatMessage(errorText, role: ChatRole.error);
+  factory ChatMessage.error(String errorText, {String? technicalDetails}) {
+    return ChatMessage(
+      errorText,
+      role: ChatRole.error,
+      technicalDetails: technicalDetails,
+    );
   }
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
       json['content'].toString(),
       role: ChatRole.values.byName(json['role']),
+      technicalDetails: json['technicalDetails']?.toString(),
     );
   }
 

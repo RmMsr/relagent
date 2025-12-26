@@ -81,6 +81,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       }
     });
 
+    // Show status for retry state changes
+    ref.listen<ChatState>(chatProvider, (previous, next) {
+      if (previous?.retryState.status != next.retryState.status) {
+        if (next.retryState.isRetrying && next.retryState.retryCount == 1) {
+          // Only show snackbar on first retry to avoid spam
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Connection issue detected. Retrying...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        // No snackbar for final failure - error will be shown in chat
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         actions: [
@@ -110,8 +126,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   ChatHistory(
                     messages: chatState.messages,
                     showAssistantPending: chatState.showAssistantPending,
+                    retryState: chatState.retryState,
                     onRetry: (text) {
-                      ref.read(chatProvider.notifier).retryMessage(text);
+                      ref.read(chatProvider.notifier).sendMessage(text);
                     },
                     onSpeak: (text, messageId) {
                       final status = ttsState.getMessageState(messageId).status;
