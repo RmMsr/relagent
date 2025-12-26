@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
@@ -24,7 +22,7 @@ void main() async {
 
   // Pre-cache TTS model files in background (don't block app startup)
   // This ensures TTS is ready when needed without delaying UI initialization
-  unawaited(preCacheTtsModelFiles());
+  Future.microtask(() => preCacheTtsModelFiles());
 
   // Initialize SharedPreferences for user settings
   final sharedPreferences = await SharedPreferences.getInstance();

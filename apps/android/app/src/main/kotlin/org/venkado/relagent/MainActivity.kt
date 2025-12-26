@@ -61,10 +61,27 @@ class MainActivity : FlutterActivity() {
             putExtra("mode", mode)
             putExtra("durationMinutes", durationMinutes)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        } catch (e: SecurityException) {
+            android.util.Log.e("MainActivity", "SecurityException starting foreground service: ${e.message}")
+            android.util.Log.e("MainActivity", "This usually means the app is not in foreground or permissions are missing")
+            // Retry after a short delay to allow activity to become visible
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(intent)
+                    } else {
+                        startService(intent)
+                    }
+                } catch (e2: Exception) {
+                    android.util.Log.e("MainActivity", "Retry failed: ${e2.message}")
+                }
+            }, 1000)
         }
     }
 

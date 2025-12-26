@@ -265,6 +265,13 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
   Future<void> _syncServiceWithAudioMode(AudioMode mode) async {
     debugPrint('BackgroundServiceProvider: Syncing service with mode: $mode');
 
+    // Android 14+ (API 34+) requires the activity to be fully visible before
+    // starting a foreground service with microphone type. Add a small delay
+    // to ensure the activity is visible.
+    if (!state.isActive) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+
     try {
       switch (mode) {
         case AudioMode.idle:

@@ -25,6 +25,13 @@ Future<void> preCacheTtsModelFiles({String? modelName}) async {
 
 Future<sherpa_onnx.OfflineTts> createOfflineTts({String? modelName}) async {
   final modelConfig = await getOfflineTtsModelConfig(modelName: modelName);
+
+  debugPrint('[TTS] Creating OfflineTts with config:');
+  debugPrint('  - Model: ${modelConfig.kokoro.model}');
+  debugPrint('  - Voices: ${modelConfig.kokoro.voices}');
+  debugPrint('  - DataDir: ${modelConfig.kokoro.dataDir}');
+  debugPrint('  - Tokens: ${modelConfig.kokoro.tokens}');
+
   final config = sherpa_onnx.OfflineTtsConfig(
     model: modelConfig,
     ruleFsts: '',
