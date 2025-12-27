@@ -86,6 +86,52 @@ class ChatInputState extends State<ChatInput> {
   }
 }
 
+// Helper class to represent a group of consecutive messages from the same sender
+class _MessageGroup {
+  final ChatRole sender;
+  final List<ChatMessage> messages;
+  final DateTime firstMessageTime;
+
+  _MessageGroup({
+    required this.sender,
+    required this.messages,
+    required this.firstMessageTime,
+  });
+
+  bool shouldBreakGroup(ChatMessage nextMessage) {
+    // Break if sender changes
+    if (nextMessage.role != sender) return true;
+
+    // Break if time gap > 5 minutes
+    final lastMessageTime = messages.last.timestamp;
+    final timeDiff = nextMessage.timestamp.difference(lastMessageTime);
+    return timeDiff.inMinutes > 5;
+  }
+}
+
+// Group messages by sender with time threshold
+List<_MessageGroup> _groupMessages(List<ChatMessage> messages) {
+  final groups = <_MessageGroup>[];
+  _MessageGroup? currentGroup;
+
+  for (final message in messages) {
+    if (currentGroup == null || currentGroup.shouldBreakGroup(message)) {
+      // Start new group
+      currentGroup = _MessageGroup(
+        sender: message.role,
+        messages: [message],
+        firstMessageTime: message.timestamp,
+      );
+      groups.add(currentGroup);
+    } else {
+      // Add to existing group
+      currentGroup.messages.add(message);
+    }
+  }
+
+  return groups;
+}
+
 class ChatHistory extends StatelessWidget {
   final List<ChatMessage> messages;
   final bool showAssistantPending;
@@ -142,15 +188,40 @@ class ChatHistory extends StatelessWidget {
       );
     }
 
-    for (final message in messages) {
+    // Group messages and build widgets with appropriate spacing
+    final groups = _groupMessages(messages);
+    for (int i = 0; i < groups.length; i++) {
+      final group = groups[i];
+
+      // First message in group: show timestamp + role
       chatWidgets.add(
         ChatMessageBubble(
-          message: message,
+          message: group.messages.first,
+          showHeader: true,
           onRetry: onRetry,
           onSpeak: onSpeak,
           getMessagePlaybackStatus: getMessagePlaybackStatus,
         ),
       );
+
+      // Subsequent messages in group: no timestamp
+      for (int j = 1; j < group.messages.length; j++) {
+        chatWidgets.add(const SizedBox(height: 8)); // Within-group spacing
+        chatWidgets.add(
+          ChatMessageBubble(
+            message: group.messages[j],
+            showHeader: false,
+            onRetry: onRetry,
+            onSpeak: onSpeak,
+            getMessagePlaybackStatus: getMessagePlaybackStatus,
+          ),
+        );
+      }
+
+      // Between-group spacing (if not last group)
+      if (i < groups.length - 1) {
+        chatWidgets.add(const SizedBox(height: 20));
+      }
     }
 
     // Add pending assistant placeholder if waiting for response
@@ -173,6 +244,11 @@ class ChatHistory extends StatelessWidget {
           theme.colorScheme.error,
         ),
       };
+
+      // Add spacing before pending state
+      if (chatWidgets.isNotEmpty) {
+        chatWidgets.add(const SizedBox(height: 20));
+      }
 
       chatWidgets.add(
         Container(
@@ -212,7 +288,6 @@ class ChatHistory extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.end,
-      spacing: 10,
       children: chatWidgets,
     );
   }
@@ -220,6 +295,7 @@ class ChatHistory extends StatelessWidget {
 
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
+  final bool showHeader;
   final void Function(String)? onRetry;
   final void Function(String, String)? onSpeak;
   final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
@@ -227,6 +303,7 @@ class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({
     super.key,
     required this.message,
+    this.showHeader = true,
     this.onRetry,
     this.onSpeak,
     this.getMessagePlaybackStatus,
@@ -242,53 +319,115 @@ class ChatMessageBubble extends StatelessWidget {
         getMessagePlaybackStatus?.call(message.id) ??
         MessagePlaybackStatus.idle;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Message header
-        Container(
-          alignment: Alignment.bottomCenter,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            isError
-                ? 'Error getting assistant response.'
-                : '${message.role.name} @ $time',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: isError ? theme.colorScheme.error : null,
+    return Container(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      padding: isUser
+          ? const EdgeInsets.only(left: 10)
+          : const EdgeInsets.symmetric(horizontal: 10),
+      child: Column(
+        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Message header (timestamp + role) - only shown for first message in group
+          if (showHeader)
+            Padding(
+              padding: isUser
+                  ? const EdgeInsets.only(left: 10, bottom: 4)
+                  : const EdgeInsets.only(left: 10, right: 10, bottom: 4),
+              child: Text(
+                isError
+                    ? 'Error getting assistant response.'
+                    : '${message.role.name} • $time',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: isError
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
             ),
-          ),
-        ),
-        // Message bubble with action buttons
-        SizedBox(
-          width: double.infinity,
-          child: SizedBox(
-            width: double.infinity,
-            child: Row(
+          // Message bubble
+          Container(
+            padding: isUser
+                ? const EdgeInsets.fromLTRB(10, 10, 16, 10)
+                : const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              shape: BoxShape.rectangle,
+              borderRadius: isUser
+                  ? const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                      topRight: Radius.zero,
+                      bottomRight: Radius.zero,
+                    )
+                  : const BorderRadius.all(Radius.circular(5)),
+              color: switch (message.role) {
+                ChatRole.user => theme.colorScheme.onInverseSurface.withValues(
+                  alpha: 0.6,
+                ),
+                ChatRole.assistant => null,
+                ChatRole.error => theme.colorScheme.errorContainer.withValues(
+                  alpha: 0.3,
+                ),
+              },
+              boxShadow: isUser
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 4,
+                        offset: const Offset(-2, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // TTS button for assistant messages (on the left)
-                if (message.role == ChatRole.assistant && onSpeak != null)
-                  _buildTtsButton(theme, playbackStatus, message.id),
                 // Message content
-                Expanded(child: _buildMessageContent(theme, isError)),
-                // Retry button for user messages (on the right)
-                if (isUser && onRetry != null)
-                  Container(
-                    margin: const EdgeInsets.only(right: 10, top: 5),
-                    child: IconButton(
-                      icon: const Icon(Icons.refresh, size: 20),
-                      iconSize: 20,
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(),
-                      tooltip: 'Retry',
-                      onPressed: () => onRetry!(message.text),
+                isError
+                    ? ErrorMessageWithDetails(message: message, theme: theme)
+                    : SelectableRegion(
+                        selectionControls: MaterialTextSelectionControls(),
+                        child: GptMarkdown(
+                          message.text,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                // Action buttons footer
+                if ((message.role == ChatRole.assistant && onSpeak != null) ||
+                    (isUser && onRetry != null))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: message.role == ChatRole.assistant
+                          ? MainAxisAlignment.start
+                          : MainAxisAlignment.end,
+                      children: [
+                        // TTS button for assistant messages
+                        if (message.role == ChatRole.assistant && onSpeak != null)
+                          _buildTtsButton(theme, playbackStatus, message.id),
+                        // Retry button for user messages
+                        if (isUser && onRetry != null)
+                          IconButton.outlined(
+                            icon: const Icon(Icons.refresh, size: 18),
+                            iconSize: 18,
+                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(
+                              minWidth: 36,
+                              minHeight: 36,
+                            ),
+                            tooltip: 'Retry',
+                            onPressed: () => onRetry!(message.text),
+                          ),
+                      ],
                     ),
                   ),
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -331,51 +470,19 @@ class ChatMessageBubble extends StatelessWidget {
         break;
     }
 
-    return Container(
-      margin: const EdgeInsets.only(left: 10, top: 5),
-      child: playbackStatus == MessagePlaybackStatus.generating
-          ? _GeneratingIndicator(tooltip: ttsTooltip)
-          : IconButton(
-              icon: Icon(ttsIcon, size: 20, color: iconColor),
-              iconSize: 20,
-              padding: const EdgeInsets.all(4),
-              constraints: const BoxConstraints(),
-              tooltip: ttsTooltip,
-              onPressed: () => onSpeak!(message.text, messageId),
+    return playbackStatus == MessagePlaybackStatus.generating
+        ? _GeneratingIndicator(tooltip: ttsTooltip)
+        : IconButton.outlined(
+            icon: Icon(ttsIcon, size: 18, color: iconColor),
+            iconSize: 18,
+            padding: const EdgeInsets.all(8),
+            constraints: const BoxConstraints(
+              minWidth: 36,
+              minHeight: 36,
             ),
-    );
-  }
-
-  Widget _buildMessageContent(ThemeData theme, bool isError) {
-    return Container(
-      alignment: message.role == ChatRole.user
-          ? Alignment.centerRight
-          : Alignment.centerLeft,
-      padding: const EdgeInsets.all(10),
-      margin: const EdgeInsets.only(left: 10, right: 10, bottom: 20),
-      decoration: BoxDecoration(
-        shape: BoxShape.rectangle,
-        borderRadius: const BorderRadius.all(Radius.circular(5)),
-        color: switch (message.role) {
-          ChatRole.user => theme.colorScheme.onInverseSurface.withValues(
-            alpha: 0.6,
-          ),
-          ChatRole.assistant => null,
-          ChatRole.error => theme.colorScheme.errorContainer.withValues(
-            alpha: 0.3,
-          ),
-        },
-      ),
-      child: isError
-          ? ErrorMessageWithDetails(message: message, theme: theme)
-          : SelectableRegion(
-              selectionControls: MaterialTextSelectionControls(),
-              child: GptMarkdown(
-                message.text,
-                style: theme.textTheme.bodyMedium,
-              ),
-            ),
-    );
+            tooltip: ttsTooltip,
+            onPressed: () => onSpeak!(message.text, messageId),
+          );
   }
 }
 
@@ -563,9 +670,11 @@ class _GeneratingIndicatorState extends State<_GeneratingIndicator>
         builder: (context, child) {
           return Opacity(
             opacity: _animation.value,
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: const Icon(Icons.hourglass_empty, size: 20),
+            child: Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              child: const Icon(Icons.hourglass_empty, size: 18),
             ),
           );
         },
