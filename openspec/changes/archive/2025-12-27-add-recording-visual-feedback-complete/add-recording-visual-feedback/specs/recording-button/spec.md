@@ -70,33 +70,7 @@ The recording button SHALL display real-time audio signal strength using animate
 - **THEN** volume bars are not displayed
 - **AND** appropriate state icon is shown instead
 
-### Requirement: Audio Quality Indicator
 
-The recording button SHALL provide visual feedback about audio quality issues to help users troubleshoot recording problems.
-
-#### Scenario: Low signal detection
-
-- **WHEN** audio amplitude is consistently below threshold (e.g., < -40 dBFS)
-- **THEN** button displays a low-signal warning indicator (e.g., amber color or icon)
-- **AND** volume bars remain visible with warning overlay
-
-#### Scenario: Noise or clipping detection
-
-- **WHEN** audio amplitude is too high (near 0 dBFS) or highly erratic
-- **THEN** button displays a noise/clipping warning (e.g., red color or icon)
-- **AND** indicates audio quality may be degraded
-
-#### Scenario: Good audio quality
-
-- **WHEN** audio amplitude is in acceptable range (-40 to -10 dBFS)
-- **THEN** no quality warning is displayed
-- **AND** volume bars show normal visualization without overlay
-
-#### Scenario: Quality indicator does not block interaction
-
-- **WHEN** quality warning is displayed
-- **THEN** button remains clickable and functional
-- **AND** quality indicator does not prevent stopping/starting recording
 
 ### Requirement: Visual State Transitions
 

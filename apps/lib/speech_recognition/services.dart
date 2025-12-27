@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -20,12 +21,14 @@ class ASR {
   final int _sampleRate = 16000;
 
   StreamSubscription<RecordState>? _recordSub;
+  StreamSubscription<Amplitude>? _amplitudeSub;
   RecordState _recordState = RecordState.stop;
 
   final ValueChanged<String> textRecognized;
   final VoidCallback textFinished;
   final ValueChanged<RecordState>? onRecordStateChanged;
   final VoidCallback? onAudioDataReceived;
+  final ValueChanged<double>? onAmplitudeChanged;
   final ValueChanged<Object>? onStreamError;
   final VoidCallback? onStreamDone;
 
@@ -36,6 +39,7 @@ class ASR {
     required this.textFinished,
     this.onRecordStateChanged,
     this.onAudioDataReceived,
+    this.onAmplitudeChanged,
     this.onStreamError,
     this.onStreamDone,
   });
@@ -48,6 +52,16 @@ class ASR {
     _recordSub = _audioRecorder!.onStateChanged().listen((recordState) {
       _updateRecordState(recordState);
     });
+
+    _amplitudeSub = _audioRecorder!
+        .onAmplitudeChanged(
+          const Duration(milliseconds: 200),
+        ) // Even faster updates
+        .listen((amplitude) {
+          // The record package already returns dBFS values
+          final dbFS = amplitude.current;
+          onAmplitudeChanged?.call(dbFS);
+        });
 
     _isAudioRecorderInitialized = true;
   }
@@ -195,6 +209,7 @@ class ASR {
 
   void dispose() {
     _recordSub?.cancel();
+    _amplitudeSub?.cancel();
     _audioRecorder?.dispose();
     _stream?.free();
     _recognizer?.free();

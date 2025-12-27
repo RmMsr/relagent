@@ -13,18 +13,27 @@ import '/speech_recognition/services.dart';
 class RecordingState {
   final bool isRecording;
   final bool isContinuous;
+  final bool isInitializing; // ASR startup/init in progress
   final String recognizedText;
   final String? textToSubmit; // Text ready to be submitted (endpoint detected)
   final String? error;
   final RecordState recordState;
+  final double? currentAmplitude; // Current amplitude in dBFS
+  final List<double>
+  amplitudeHistory; // Last 5 amplitude readings for visualization
+  final List<double> barHeights; // Pre-calculated bar heights for visualization
 
   const RecordingState({
     this.isRecording = false,
     this.isContinuous = false,
+    this.isInitializing = false,
     this.recognizedText = '',
     this.textToSubmit,
     this.error,
     this.recordState = RecordState.stop,
+    this.currentAmplitude,
+    this.amplitudeHistory = const [],
+    this.barHeights = const [],
   });
 
   factory RecordingState.initial() {
@@ -34,18 +43,26 @@ class RecordingState {
   RecordingState copyWith({
     bool? isRecording,
     bool? isContinuous,
+    bool? isInitializing,
     String? recognizedText,
     String? Function()? textToSubmit,
     String? error,
     RecordState? recordState,
+    double? currentAmplitude,
+    List<double>? amplitudeHistory,
+    List<double>? barHeights,
   }) {
     return RecordingState(
       isRecording: isRecording ?? this.isRecording,
       isContinuous: isContinuous ?? this.isContinuous,
+      isInitializing: isInitializing ?? this.isInitializing,
       recognizedText: recognizedText ?? this.recognizedText,
       textToSubmit: textToSubmit != null ? textToSubmit() : this.textToSubmit,
       error: error,
       recordState: recordState ?? this.recordState,
+      currentAmplitude: currentAmplitude ?? this.currentAmplitude,
+      amplitudeHistory: amplitudeHistory ?? this.amplitudeHistory,
+      barHeights: barHeights ?? this.barHeights,
     );
   }
 }
@@ -70,6 +87,10 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
   // Duration-based shutoff field
   Timer? _durationTimer;
+
+  // Baseline calculation for volume visualization
+  double _currentBaseline = -60.0; // Initial baseline
+  static const double _baselineAlpha = 0.1; // EMA smoothing factor
 
   @override
   RecordingState build() {
@@ -120,10 +141,12 @@ class RecordingNotifier extends Notifier<RecordingState> {
   /// Called by initialization code (e.g., startup sequence) to pre-initialize ASR
   void initialize() {
     debugPrint('RecordingProvider: initializing ASR...');
+    state = state.copyWith(isInitializing: true);
     _initASR();
     if (_asr != null) {
       _asr!.init();
     }
+    state = state.copyWith(isInitializing: false);
   }
 
   /// Called by UI when ready to handle recording (e.g. ChatPage mounted)
@@ -160,32 +183,39 @@ class RecordingNotifier extends Notifier<RecordingState> {
     if (state.isContinuous) return;
 
     debugPrint('RecordingProvider: Starting continuous recording');
-    final granted = await ref
-        .read(audioCoordinatorProvider.notifier)
-        .requestRecording();
 
-    if (!granted) {
-      debugPrint('RecordingProvider: Coordinator denied recording request');
-      return;
-    }
+    // Update UI state immediately to show recording has started
+    state = state.copyWith(isRecording: true, isContinuous: true, error: null);
 
     try {
+      final granted = await ref
+          .read(audioCoordinatorProvider.notifier)
+          .requestRecording();
+
+      if (!granted) {
+        debugPrint('RecordingProvider: Coordinator denied recording request');
+        // Revert UI state on failure
+        state = state.copyWith(isRecording: false, isContinuous: false);
+        return;
+      }
+
+      state = state.copyWith(isInitializing: true);
       _initASR();
       // Ensure initialization is complete (defensive check)
       if (_asr != null) _asr!.init();
       await _asr!.start();
-      state = state.copyWith(
-        isRecording: true,
-        isContinuous: true,
-        error: null,
-      );
+      state = state.copyWith(isInitializing: false);
       _recoveryAttempts = 0; // Reset recovery counter on successful start
       _startHealthMonitoring();
       _startDurationTimer();
       debugPrint('RecordingProvider: Continuous recording started');
     } catch (e) {
       debugPrint('RecordingProvider: Failed to start continuous recording: $e');
-      state = state.copyWith(error: 'Failed to start continuous recording: $e');
+      state = state.copyWith(
+        isRecording: false,
+        isContinuous: false,
+        error: 'Failed to start continuous recording: $e',
+      );
       // Release coordinator lock on failure
       await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
     }
@@ -219,31 +249,42 @@ class RecordingNotifier extends Notifier<RecordingState> {
     if (state.isRecording) return;
 
     debugPrint('RecordingProvider: Starting single recording');
-    final granted = await ref
-        .read(audioCoordinatorProvider.notifier)
-        .requestRecording();
 
-    if (!granted) {
-      debugPrint('RecordingProvider: Coordinator denied recording request');
-      state = state.copyWith(error: 'Cannot record while audio is playing');
-      return;
-    }
+    // Update UI state immediately
+    state = state.copyWith(
+      isRecording: true,
+      isContinuous: false,
+      recognizedText: '',
+      error: null,
+    );
 
     try {
+      final granted = await ref
+          .read(audioCoordinatorProvider.notifier)
+          .requestRecording();
+
+      if (!granted) {
+        debugPrint('RecordingProvider: Coordinator denied recording request');
+        state = state.copyWith(
+          isRecording: false,
+          error: 'Cannot record while audio is playing',
+        );
+        return;
+      }
+
+      state = state.copyWith(isInitializing: true);
       _initASR();
       // Ensure initialization is complete (defensive check)
       if (_asr != null) _asr!.init();
       await _asr!.start();
-      state = state.copyWith(
-        isRecording: true,
-        isContinuous: false,
-        recognizedText: '',
-        error: null,
-      );
+      state = state.copyWith(isInitializing: false);
       debugPrint('RecordingProvider: Single recording started');
     } catch (e) {
       debugPrint('RecordingProvider: Failed to start single recording: $e');
-      state = state.copyWith(error: 'Failed to start recording: $e');
+      state = state.copyWith(
+        isRecording: false,
+        error: 'Failed to start recording: $e',
+      );
       // Release coordinator lock on failure
       await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
     }
@@ -259,7 +300,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
       debugPrint('RecordingProvider: Error during stop: $e');
     } finally {
       // Always update state and release lock, even if stop fails
-      state = state.copyWith(isRecording: false);
+      state = state.copyWith(isRecording: false, amplitudeHistory: []);
       await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
       debugPrint('RecordingProvider: Single recording stopped (state reset)');
     }
@@ -271,6 +312,52 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
   void clearTextToSubmit() {
     state = state.copyWith(textToSubmit: () => null);
+  }
+
+  void _updateAmplitude(double amplitudeDbFS) {
+    // Update baseline first
+    _updateBaseline(amplitudeDbFS);
+
+    // Update amplitude history (keep last 5 readings for visualization)
+    final newHistory = [...state.amplitudeHistory, amplitudeDbFS];
+    if (newHistory.length > 5) {
+      newHistory.removeAt(0);
+    }
+
+    // Calculate bar heights from amplitude history
+    final barHeights = _calculateBarHeights(newHistory);
+
+    state = state.copyWith(
+      currentAmplitude: amplitudeDbFS,
+      amplitudeHistory: newHistory,
+      barHeights: barHeights,
+    );
+  }
+
+  void _updateBaseline(double amplitudeDbFS) {
+    // Update EMA baseline with new amplitude
+    _currentBaseline =
+        _baselineAlpha * amplitudeDbFS +
+        (1.0 - _baselineAlpha) * _currentBaseline;
+  }
+
+  List<double> _calculateBarHeights(List<double> amplitudes) {
+    const minBarHeight = 0.1;
+    const maxBarHeight = 1.0;
+    const upperLimitDb = -6.0;
+
+    // Convert amplitudes to bar heights using current baseline
+    final heights = <double>[];
+    for (final amp in amplitudes) {
+      double scaledValue = minBarHeight;
+      if (amp > _currentBaseline && _currentBaseline < upperLimitDb) {
+        scaledValue =
+            (amp - _currentBaseline) / (upperLimitDb - _currentBaseline);
+      }
+      heights.add(scaledValue.clamp(minBarHeight, maxBarHeight));
+    }
+
+    return heights;
   }
 
   // Internal methods called by AudioCoordinator for forced stop/resume
@@ -286,6 +373,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
       // Always update state, even if stop fails
       state = state.copyWith(
         isRecording: false,
+        amplitudeHistory: [], // Clear amplitude history on stop
         // Keep isContinuous flag so we know to resume later
       );
       debugPrint('RecordingProvider: Internal stop completed (state reset)');
@@ -295,11 +383,16 @@ class RecordingNotifier extends Notifier<RecordingState> {
   Future<void> internalStart() async {
     debugPrint('RecordingProvider: internalStart() called for auto-resume');
     try {
+      state = state.copyWith(isInitializing: true);
       _initASR();
       // Ensure initialization is complete (defensive check)
       if (_asr != null) _asr!.init();
       await _asr!.start();
-      state = state.copyWith(isRecording: true, error: null);
+      state = state.copyWith(
+        isInitializing: false,
+        isRecording: true,
+        error: null,
+      );
       // Restart health monitoring and duration timer if this is continuous mode
       if (state.isContinuous) {
         _startHealthMonitoring();
@@ -340,6 +433,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
       onAudioDataReceived: () {
         // Track last audio data time for health monitoring
         _lastAudioDataTime = DateTime.now();
+      },
+      onAmplitudeChanged: (amplitudeDbFS) {
+        _updateAmplitude(amplitudeDbFS);
       },
       onStreamError: (error) {
         debugPrint('RecordingProvider: Audio stream error: $error');
