@@ -21,6 +21,8 @@ import android.util.Log
 import org.venkado.relagent.BuildConfig
 
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
+import android.content.pm.ServiceInfo
 import java.util.Date
 
 /**
@@ -85,8 +87,18 @@ class AudioBackgroundService : Service() {
         createErrorNotificationChannel()
 
         // Start foreground immediately to avoid ForegroundServiceDidNotStartInTimeException
+        // Use MEDIA_PLAYBACK type initially as it has fewer restrictions than MICROPHONE
         val initialNotification = createNotification("Initializing...")
-        startForeground(NOTIFICATION_ID, initialNotification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                initialNotification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, initialNotification)
+        }
         Log.d(TAG, "Foreground service started immediately in onCreate")
 
         // Register receiver for notification dismissal
@@ -165,7 +177,16 @@ class AudioBackgroundService : Service() {
                     stopNotificationUpdates()
                     // Update notification for idle mode instead of removing
                     val idleNotification = createNotification("Ready")
-                    startForeground(NOTIFICATION_ID, idleNotification)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        ServiceCompat.startForeground(
+                            this,
+                            NOTIFICATION_ID,
+                            idleNotification,
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                        )
+                    } else {
+                        startForeground(NOTIFICATION_ID, idleNotification)
+                    }
                 }
                 MODE_RECORDING -> {
                     Log.d(TAG, "Starting foreground service for recording")
@@ -184,7 +205,16 @@ class AudioBackgroundService : Service() {
                     }
 
                     val notification = createNotificationWithTime()
-                    startForeground(NOTIFICATION_ID, notification)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        ServiceCompat.startForeground(
+                            this,
+                            NOTIFICATION_ID,
+                            notification,
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                        )
+                    } else {
+                        startForeground(NOTIFICATION_ID, notification)
+                    }
 
                     // Start periodic updates for limited durations
                     if (durationMinutes > 0) {
@@ -202,7 +232,16 @@ class AudioBackgroundService : Service() {
                     setAudioModeForSpeech()
 
                     val notification = createNotification("Speaking...")
-                    startForeground(NOTIFICATION_ID, notification)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        ServiceCompat.startForeground(
+                            this,
+                            NOTIFICATION_ID,
+                            notification,
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                        )
+                    } else {
+                        startForeground(NOTIFICATION_ID, notification)
+                    }
                     Log.d(TAG, "Foreground service started with notification")
                 }
             }
