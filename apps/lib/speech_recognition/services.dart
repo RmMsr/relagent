@@ -9,6 +9,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
 import '/speech_recognition/sherpa_streaming_asr.dart';
 import '/speech_recognition/utils.dart';
+import '../../utils/logger.dart';
 
 class ASR {
   AudioRecorder? _audioRecorder;
@@ -100,13 +101,13 @@ class ASR {
         }
 
         if (supportedEncoder == null) {
-          debugPrint('No supported encoder found.');
+          Logger.debug('No supported encoder found.');
           return;
         }
 
         final AudioEncoder encoder = supportedEncoder;
         final devs = await _audioRecorder!.listInputDevices();
-        debugPrint(devs.toString());
+        Logger.debug(devs.toString());
 
         final config = RecordConfig(
           androidConfig: AndroidRecordConfig(
@@ -122,8 +123,8 @@ class ASR {
           audioInterruption: AudioInterruptionMode.pauseResume,
         );
 
-        debugPrint('ASR: Starting recording with Bluetooth SCO mode');
-        debugPrint('ASR: Starting recording with Bluetooth SCO mode');
+        Logger.debug('ASR: Starting recording with Bluetooth SCO mode');
+        Logger.debug('ASR: Starting recording with Bluetooth SCO mode');
         final stream = await _audioRecorder!.startStream(config);
         String? lastText;
 
@@ -160,17 +161,17 @@ class ASR {
             developer.Timeline.finishSync();
           },
           onError: (Object error) {
-            debugPrint('Audio stream error: $error');
+            Logger.debug('Audio stream error: $error');
             onStreamError?.call(error);
           },
           onDone: () {
-            debugPrint('Audio stream done (unexpected closure)');
+            Logger.debug('Audio stream done (unexpected closure)');
             onStreamDone?.call();
           },
         );
       }
     } catch (e) {
-      debugPrint(e.toString());
+      Logger.debug(e.toString());
     }
   }
 
@@ -194,12 +195,12 @@ class ASR {
     final isSupported = await _audioRecorder!.isEncoderSupported(encoder);
 
     if (!isSupported) {
-      debugPrint('${encoder.name} is not supported on this platform.');
-      debugPrint('Supported encoders are:');
+      Logger.debug('${encoder.name} is not supported on this platform.');
+      Logger.debug('Supported encoders are:');
 
       for (final e in AudioEncoder.values) {
         if (await _audioRecorder!.isEncoderSupported(e)) {
-          debugPrint('- ${e.name}');
+          Logger.debug('- ${e.name}');
         }
       }
     }

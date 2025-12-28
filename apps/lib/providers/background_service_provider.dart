@@ -1,11 +1,11 @@
 import 'package:audio_session/audio_session.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
 import '/providers/audio_coordinator_provider.dart';
 import '/providers/settings_provider.dart';
+import '../utils/logger.dart';
 
 /// State for the background service
 class BackgroundServiceState {
@@ -52,7 +52,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
     // Sync initial state
     final initialAudioState = ref.read(audioCoordinatorProvider);
     if (initialAudioState.mode != AudioMode.idle) {
-      debugPrint(
+      Logger.debug(
         'BackgroundServiceProvider: Syncing initial state: ${initialAudioState.mode}',
       );
       _syncServiceWithAudioMode(initialAudioState.mode);
@@ -70,7 +70,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
         // Also update notification when mode changes during waiting state
         // This catches interruptions that don't fire audio session events
         if (next.audioFocusState.status == AudioFocusStatus.temporaryLoss) {
-          debugPrint(
+          Logger.debug(
             'BackgroundServiceProvider: Mode changed during temporary loss, updating notification',
           );
           _updateNotificationForAudioFocus(next);
@@ -97,7 +97,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
           next.backgroundListeningDuration) {
         final currentMode = ref.read(audioCoordinatorProvider).mode;
         if (currentMode == AudioMode.recording) {
-          debugPrint(
+          Logger.debug(
             'BackgroundServiceProvider: Background listening duration changed, restarting service',
           );
           _syncServiceWithAudioMode(AudioMode.recording);
@@ -111,7 +111,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
     // Setup notification action handlers
     _setupNotificationActionHandlers();
 
-    debugPrint('BackgroundServiceProvider: Initialized');
+    Logger.debug('BackgroundServiceProvider: Initialized');
   }
 
   /// Handles notification button action from the native service.
@@ -122,7 +122,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
   void _setupNotificationActionHandlers() {
     _notificationActions.setMethodCallHandler((call) async {
       if (call.method == 'stop') {
-        debugPrint(
+        Logger.debug(
           'BackgroundServiceProvider: User requested silence via notification',
         );
         await ref
@@ -140,7 +140,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
 
       // Listen to audio interruptions (phone calls, etc.)
       session.interruptionEventStream.listen((event) {
-        debugPrint(
+        Logger.debug(
           'BackgroundServiceProvider: Audio interruption: type=${event.type}, begin=${event.begin}',
         );
 
@@ -149,7 +149,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
         // "unknown" events occur during normal app audio transitions (TTS→recording)
         // and are not real external interruptions
         if (event.type != AudioInterruptionType.pause) {
-          debugPrint(
+          Logger.debug(
             'BackgroundServiceProvider: Ignoring non-pause interruption: ${event.type}',
           );
           return;
@@ -160,19 +160,19 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
           // Only handle if we're actively using audio (not idle)
           final currentMode = ref.read(audioCoordinatorProvider).mode;
           if (currentMode == AudioMode.idle) {
-            debugPrint(
+            Logger.debug(
               'BackgroundServiceProvider: Ignoring interruption start while idle',
             );
             return;
           }
 
-          debugPrint('BackgroundServiceProvider: Real interruption began');
+          Logger.debug('BackgroundServiceProvider: Real interruption began');
           ref
               .read(audioCoordinatorProvider.notifier)
               .handleAudioFocusChange('temporary_loss');
         } else {
           // Interruption ended - always handle to restore from waiting state
-          debugPrint('BackgroundServiceProvider: Interruption ended');
+          Logger.debug('BackgroundServiceProvider: Interruption ended');
           ref
               .read(audioCoordinatorProvider.notifier)
               .handleAudioFocusChange('gain');
@@ -181,18 +181,18 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
 
       // Listen to device changes (Bluetooth connect/disconnect)
       session.devicesChangedEventStream.listen((event) {
-        debugPrint('BackgroundServiceProvider: Audio devices changed');
-        debugPrint('  Devices added: ${event.devicesAdded}');
-        debugPrint('  Devices removed: ${event.devicesRemoved}');
+        Logger.debug('BackgroundServiceProvider: Audio devices changed');
+        Logger.debug('  Devices added: ${event.devicesAdded}');
+        Logger.debug('  Devices removed: ${event.devicesRemoved}');
         _logCurrentAudioRouting(session);
       });
 
       // Log initial audio routing
       _logCurrentAudioRouting(session);
 
-      debugPrint('BackgroundServiceProvider: Audio session initialized');
+      Logger.debug('BackgroundServiceProvider: Audio session initialized');
     } catch (e) {
-      debugPrint(
+      Logger.debug(
         'BackgroundServiceProvider: Failed to initialize audio session: $e',
       );
     }
@@ -200,21 +200,21 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
 
   /// Log current audio routing information
   void _logCurrentAudioRouting(AudioSession session) {
-    debugPrint('=== Current Audio Routes ===');
+    Logger.debug('=== Current Audio Routes ===');
     session.devicesStream.listen((devices) {
       final inputDevices = devices.where((d) => d.isInput).toList();
       final outputDevices = devices.where((d) => d.isOutput).toList();
 
-      debugPrint('Input devices (${inputDevices.length}):');
+      Logger.debug('Input devices (${inputDevices.length}):');
       for (final device in inputDevices) {
-        debugPrint('  - ${device.name} (${device.type.name})');
+        Logger.debug('  - ${device.name} (${device.type.name})');
       }
 
-      debugPrint('Output devices (${outputDevices.length}):');
+      Logger.debug('Output devices (${outputDevices.length}):');
       for (final device in outputDevices) {
-        debugPrint('  - ${device.name} (${device.type.name})');
+        Logger.debug('  - ${device.name} (${device.type.name})');
       }
-      debugPrint('========================');
+      Logger.debug('========================');
     });
   }
 
@@ -222,13 +222,13 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
   Future<void> _updateNotificationForAudioFocus(
     AudioCoordinatorState state,
   ) async {
-    debugPrint(
+    Logger.debug(
       'BackgroundServiceProvider: Updating notification for audio focus: ${state.audioFocusState.status}, isWaiting: ${state.isWaiting}, mode: ${state.mode}',
     );
 
     // Don't update notification if we're truly idle (not waiting)
     if (state.mode == AudioMode.idle && !state.isWaiting) {
-      debugPrint(
+      Logger.debug(
         'BackgroundServiceProvider: Skipping notification update for idle state',
       );
       return;
@@ -253,9 +253,9 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
 
     try {
       await _platform.invokeMethod('updateNotification', {'message': message});
-      debugPrint('BackgroundServiceProvider: Notification updated: $message');
+      Logger.debug('BackgroundServiceProvider: Notification updated: $message');
     } on PlatformException catch (e) {
-      debugPrint(
+      Logger.debug(
         'BackgroundServiceProvider: Failed to update notification: ${e.message}',
       );
     }
@@ -263,7 +263,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
 
   /// Sync the native service with the current AudioMode
   Future<void> _syncServiceWithAudioMode(AudioMode mode) async {
-    debugPrint('BackgroundServiceProvider: Syncing service with mode: $mode');
+    Logger.debug('BackgroundServiceProvider: Syncing service with mode: $mode');
 
     // Android 14+ (API 34+) requires the activity to be fully visible before
     // starting a foreground service with microphone type. Add a small delay
@@ -285,7 +285,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
           await _startService('playing');
       }
     } catch (e) {
-      debugPrint('BackgroundServiceProvider: Error syncing service: $e');
+      Logger.debug('BackgroundServiceProvider: Error syncing service: $e');
       state = state.copyWith(error: () => e.toString());
     }
   }
@@ -295,13 +295,15 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
       final arguments = <String, dynamic>{'mode': mode};
       if (mode == 'recording') {
         arguments['durationMinutes'] = durationMinutes;
-        debugPrint(
+        Logger.debug(
           'BackgroundServiceProvider: Starting service with duration: ${durationMinutes}min',
         );
       }
       await _platform.invokeMethod('startService', arguments);
       state = state.copyWith(isActive: true, error: () => null);
-      debugPrint('BackgroundServiceProvider: Service started with mode: $mode');
+      Logger.debug(
+        'BackgroundServiceProvider: Service started with mode: $mode',
+      );
     } on PlatformException catch (e) {
       // Android 12+ restriction: Cannot start foreground service from background
       // This is expected when app is backgrounded - service will resume when app returns to foreground
@@ -312,16 +314,16 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
           false;
 
       if (isForegroundRestriction || isForegroundException) {
-        debugPrint(
+        Logger.debug(
           'BackgroundServiceProvider: Cannot start service from background (Android 12+ restriction)',
         );
-        debugPrint(
+        Logger.debug(
           'BackgroundServiceProvider: Service will start when app returns to foreground',
         );
         state = state.copyWith(isActive: false, error: () => null);
         // Don't rethrow - this is expected behavior when backgrounded
       } else {
-        debugPrint(
+        Logger.debug(
           'BackgroundServiceProvider: Failed to start service: ${e.message}',
         );
         state = state.copyWith(error: () => e.message);
@@ -334,9 +336,9 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
     try {
       await _platform.invokeMethod('stopService');
       state = state.copyWith(isActive: false, error: () => null);
-      debugPrint('BackgroundServiceProvider: Service stopped');
+      Logger.debug('BackgroundServiceProvider: Service stopped');
     } on PlatformException catch (e) {
-      debugPrint(
+      Logger.debug(
         'BackgroundServiceProvider: Failed to stop service: ${e.message}',
       );
       state = state.copyWith(error: () => e.message);

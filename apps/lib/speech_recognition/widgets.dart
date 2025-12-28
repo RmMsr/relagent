@@ -5,6 +5,7 @@ import 'package:record/record.dart';
 import '/models/settings.dart';
 import '/providers/recording_provider.dart';
 import '/providers/settings_provider.dart';
+import '../../utils/logger.dart';
 
 class RecordingStateIndicator extends StatelessWidget {
   final RecordingState recordingState;
@@ -290,7 +291,7 @@ class RecorderButtonState extends ConsumerState<RecorderButton> {
       }
       if (next.textToSubmit != null &&
           previous?.textToSubmit != next.textToSubmit) {
-        debugPrint('RecorderButton: textToSubmit: "${next.textToSubmit}"');
+        Logger.debug('RecorderButton: textToSubmit: "${next.textToSubmit}"');
         widget.onTextRecognized(next.textToSubmit!);
         widget.onTextFinished();
         ref.read(recordingProvider.notifier).clearTextToSubmit();

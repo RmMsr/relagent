@@ -1,5 +1,6 @@
 import 'dart:isolate';
-import 'package:flutter/foundation.dart';
+
+import 'logger.dart';
 
 /// Utility to run expensive operations in background isolates to prevent ANR
 class BackgroundInitializer {
@@ -13,7 +14,7 @@ class BackgroundInitializer {
     if (_initialized) return;
 
     final name = operationName ?? 'Background operation';
-    debugPrint('BackgroundInitializer: Starting $name in background...');
+    Logger.debug('BackgroundInitializer: Starting $name in background...');
 
     try {
       // Run in a temporary isolate to avoid blocking main thread
@@ -21,9 +22,9 @@ class BackgroundInitializer {
         await operation();
       });
       _initialized = true;
-      debugPrint('BackgroundInitializer: ✓ $name completed');
+      Logger.debug('BackgroundInitializer: ✓ $name completed');
     } catch (e) {
-      debugPrint('BackgroundInitializer: ✗ $name failed: $e');
+      Logger.debug('BackgroundInitializer: ✗ $name failed: $e');
       rethrow;
     }
   }
@@ -34,13 +35,13 @@ class BackgroundInitializer {
     String? operationName,
   }) async {
     final name = operationName ?? 'Quick operation';
-    debugPrint('BackgroundInitializer: Starting $name...');
+    Logger.debug('BackgroundInitializer: Starting $name...');
 
     try {
       await operation();
-      debugPrint('BackgroundInitializer: ✓ $name completed');
+      Logger.debug('BackgroundInitializer: ✓ $name completed');
     } catch (e) {
-      debugPrint('BackgroundInitializer: ✗ $name failed: $e');
+      Logger.debug('BackgroundInitializer: ✗ $name failed: $e');
     }
   }
 }

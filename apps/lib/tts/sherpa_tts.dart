@@ -1,14 +1,14 @@
-import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
 import '/config/app_config.dart';
 import '/utils/files.dart';
+import '/utils/logger.dart';
 
 /// Pre-cache TTS model files to allow background isolate access
 /// MUST be called from main isolate before spawning TTS worker
 Future<void> preCacheTtsModelFiles({String? modelName}) async {
   final name = modelName ?? AppConfig.ttsModelName;
-  debugPrint('[TTS] Pre-caching model files for $name...');
+  Logger.debug('[TTS] Pre-caching model files for $name...');
 
   final stopwatch = Stopwatch()..start();
 
@@ -20,17 +20,19 @@ Future<void> preCacheTtsModelFiles({String? modelName}) async {
   await copyAssetFileToCache('$name/tokens.txt');
 
   stopwatch.stop();
-  debugPrint('[TTS] ✓ Model files cached (${stopwatch.elapsedMilliseconds}ms)');
+  Logger.debug(
+    '[TTS] ✓ Model files cached (${stopwatch.elapsedMilliseconds}ms)',
+  );
 }
 
 Future<sherpa_onnx.OfflineTts> createOfflineTts({String? modelName}) async {
   final modelConfig = await getOfflineTtsModelConfig(modelName: modelName);
 
-  debugPrint('[TTS] Creating OfflineTts with config:');
-  debugPrint('  - Model: ${modelConfig.kokoro.model}');
-  debugPrint('  - Voices: ${modelConfig.kokoro.voices}');
-  debugPrint('  - DataDir: ${modelConfig.kokoro.dataDir}');
-  debugPrint('  - Tokens: ${modelConfig.kokoro.tokens}');
+  Logger.debug('[TTS] Creating OfflineTts with config:');
+  Logger.debug('  - Model: ${modelConfig.kokoro.model}');
+  Logger.debug('  - Voices: ${modelConfig.kokoro.voices}');
+  Logger.debug('  - DataDir: ${modelConfig.kokoro.dataDir}');
+  Logger.debug('  - Tokens: ${modelConfig.kokoro.tokens}');
 
   final config = sherpa_onnx.OfflineTtsConfig(
     model: modelConfig,

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/chat/models.dart';
@@ -6,6 +5,7 @@ import '/chat/services.dart';
 import '/providers/connectivity_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/tts_provider.dart';
+import '../utils/logger.dart';
 
 // Retry configuration constants
 const Duration _initialRetryDelay = Duration(seconds: 2);
@@ -150,11 +150,11 @@ class ChatNotifier extends Notifier<ChatState> {
       showAssistantPending: false, // Hide pending indicator on final failure
     );
 
-    debugPrint('ChatProvider: Retry failed: $reason');
+    Logger.debug('ChatProvider: Retry failed: $reason');
   }
 
   void _retryPendingMessage() {
-    debugPrint(
+    Logger.debug(
       'ChatProvider: Connectivity restored, checking if retry should be scheduled',
     );
 
@@ -162,7 +162,7 @@ class ChatNotifier extends Notifier<ChatState> {
     if (state.retryState.firstAttempt != null &&
         DateTime.now().difference(state.retryState.firstAttempt!) >=
             _maxRetryDuration) {
-      debugPrint(
+      Logger.debug(
         'ChatProvider: Message ${state.retryState.messageId} has timed out, failing permanently',
       );
       _markRetryFailed(
@@ -173,12 +173,12 @@ class ChatNotifier extends Notifier<ChatState> {
 
     // Only schedule a retry if we're in retrying state and no retry is currently scheduled
     if (state.retryState.isRetrying && state.retryState.nextRetry == null) {
-      debugPrint(
+      Logger.debug(
         'ChatProvider: Scheduling postponed retry for message ${state.retryState.messageId}',
       );
       _scheduleRetry(state.retryState);
     } else if (state.retryState.nextRetry != null) {
-      debugPrint(
+      Logger.debug(
         'ChatProvider: Retry already scheduled for ${DateTime.now().difference(state.retryState.nextRetry!).inMilliseconds}ms from now',
       );
     }
@@ -219,7 +219,7 @@ class ChatNotifier extends Notifier<ChatState> {
       final preview = response.text.length > 50
           ? '${response.text.substring(0, 50)}...'
           : response.text;
-      debugPrint('ChatProvider: Received message [${response.id}]: $preview');
+      Logger.debug('ChatProvider: Received message [${response.id}]: $preview');
 
       // Auto-queue the assistant response for TTS playback if in auto-playback mode
       if (settings.isAutoPlayback) {
@@ -243,7 +243,9 @@ class ChatNotifier extends Notifier<ChatState> {
     if (isRetryableError) {
       // Network error - start retry process (only for initial failure)
       _startRetry(messageId, text);
-      debugPrint('ChatProvider: Started retry process for message $messageId');
+      Logger.debug(
+        'ChatProvider: Started retry process for message $messageId',
+      );
     } else {
       // Non-retryable error - show error immediately
       _showErrorMessage(error);
@@ -270,7 +272,7 @@ class ChatNotifier extends Notifier<ChatState> {
     Future.delayed(_maxRetryDuration, () {
       if (state.retryState.messageId == messageId &&
           state.retryState.isRetrying) {
-        debugPrint(
+        Logger.debug(
           'ChatProvider: Message $messageId timed out after ${_maxRetryDuration.inMinutes} minutes',
         );
         _markRetryFailed(
@@ -291,7 +293,7 @@ class ChatNotifier extends Notifier<ChatState> {
     );
 
     state = state.copyWith(retryState: updatedRetry);
-    debugPrint('ChatProvider: Retry error updated: $errorMessage');
+    Logger.debug('ChatProvider: Retry error updated: $errorMessage');
   }
 
   void _showErrorMessage(Object error) {
@@ -305,7 +307,7 @@ class ChatNotifier extends Notifier<ChatState> {
       isLoading: false,
       showAssistantPending: false,
     );
-    debugPrint('ChatProvider: Error: $errorText');
+    Logger.debug('ChatProvider: Error: $errorText');
   }
 
   void _scheduleRetry(RetryState retryState) {
@@ -343,13 +345,13 @@ class ChatNotifier extends Notifier<ChatState> {
         }
       });
 
-      debugPrint(
+      Logger.debug(
         'ChatProvider: Scheduled retry in ${backoffMs}ms for message ${retryState.messageId}',
       );
     } else {
       // No connectivity - don't schedule retry yet, keep current state
       // The connectivity listener will schedule it when connectivity is restored
-      debugPrint(
+      Logger.debug(
         'ChatProvider: No connectivity, will retry when connection is restored for message ${retryState.messageId}',
       );
     }
@@ -413,7 +415,7 @@ class ChatNotifier extends Notifier<ChatState> {
       final preview = response.text.length > 50
           ? '${response.text.substring(0, 50)}...'
           : response.text;
-      debugPrint(
+      Logger.debug(
         'ChatProvider: Retry successful, received message [${response.id}]: $preview',
       );
 

@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
 import '/config/app_config.dart'; // Only used by TtsIsolateWorker (main isolate)
 import '/tts/audio_source.dart';
 import '/tts/sherpa_tts.dart';
+import '/utils/logger.dart';
 
 /// Task data passed to the isolate on spawn
 class _IsolateTask {
@@ -79,34 +79,34 @@ void _ttsWorkerIsolate(_IsolateTask task) {
               final totalStopwatch = Stopwatch()..start();
 
               modelName = message.modelName;
-              debugPrint('[TTS Worker] Received TTS model name: $modelName');
+              Logger.debug('[TTS Worker] Received TTS model name: $modelName');
 
               final bindingsStopwatch = Stopwatch()..start();
-              debugPrint('[TTS Worker] Initializing Sherpa-ONNX bindings...');
+              Logger.debug('[TTS Worker] Initializing Sherpa-ONNX bindings...');
               sherpa_onnx.initBindings();
               bindingsStopwatch.stop();
-              debugPrint(
+              Logger.debug(
                 '[TTS Worker] ✓ Sherpa-ONNX bindings initialized (${bindingsStopwatch.elapsedMilliseconds}ms)',
               );
 
               final modelStopwatch = Stopwatch()..start();
-              debugPrint('[TTS Worker] Creating TTS model...');
+              Logger.debug('[TTS Worker] Creating TTS model...');
               // BackgroundIsolateBinaryMessenger allows file system access for asset copying
               tts = await createOfflineTts(modelName: modelName);
               modelStopwatch.stop();
-              debugPrint(
+              Logger.debug(
                 '[TTS Worker] ✓ TTS model created (${(modelStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s)',
               );
 
               totalStopwatch.stop();
               isInitialized = true;
-              debugPrint(
+              Logger.debug(
                 '[TTS Worker] ✓ Initialization complete (Total: ${(totalStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s)',
               );
               message.responsePort.send(InitializedResponse());
             } catch (e, stackTrace) {
-              debugPrint('[TTS Worker] ✗ Initialization failed: $e');
-              debugPrint('[TTS Worker] Stack trace: $stackTrace');
+              Logger.debug('[TTS Worker] ✗ Initialization failed: $e');
+              Logger.debug('[TTS Worker] Stack trace: $stackTrace');
               message.responsePort.send(
                 ErrorResponse('Initialization failed: $e'),
               );
@@ -122,7 +122,7 @@ void _ttsWorkerIsolate(_IsolateTask task) {
           }
 
           final totalStopwatch = Stopwatch()..start();
-          debugPrint(
+          Logger.debug(
             '[TTS Worker] Generating audio for [${message.messageId}] (${message.text.length} chars)...',
           );
 
@@ -150,37 +150,39 @@ void _ttsWorkerIsolate(_IsolateTask task) {
           final rtf =
               (totalStopwatch.elapsedMilliseconds / 1000) / audioDuration;
 
-          debugPrint(
+          Logger.debug(
             '[TTS Worker] ✓ Audio generated for [${message.messageId}]:',
           );
-          debugPrint(
+          Logger.debug(
             '  - Generate: ${(generateStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s',
           );
-          debugPrint(
+          Logger.debug(
             '  - Convert to WAV: ${convertStopwatch.elapsedMilliseconds}ms',
           );
-          debugPrint(
+          Logger.debug(
             '  - Total: ${(totalStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s',
           );
-          debugPrint(
+          Logger.debug(
             '  - Audio duration: ${audioDuration.toStringAsFixed(2)}s',
           );
-          debugPrint('  - RTF (Real-time Factor): ${rtf.toStringAsFixed(3)}x');
-          debugPrint(
+          Logger.debug(
+            '  - RTF (Real-time Factor): ${rtf.toStringAsFixed(3)}x',
+          );
+          Logger.debug(
             '  - Output size: ${(wavBytes.length / 1024).toStringAsFixed(1)} KB',
           );
 
           message.responsePort.send(AudioGeneratedResponse(wavBytes));
 
         case DisposeTtsMessage():
-          debugPrint('[TTS Worker] Disposing TTS');
+          Logger.debug('[TTS Worker] Disposing TTS');
           tts?.free();
           tts = null;
           isInitialized = false;
           receivePort.close();
       }
     } catch (e, stackTrace) {
-      debugPrint('[TTS Worker] Error: $e\n$stackTrace');
+      Logger.debug('[TTS Worker] Error: $e\n$stackTrace');
       if (message is InitializeTtsMessage) {
         message.responsePort.send(ErrorResponse('Initialization failed: $e'));
       } else if (message is GenerateAudioMessage) {
@@ -204,7 +206,7 @@ class TtsIsolateWorker {
     // Background isolates can't access rootBundle, so files must be cached first
     await preCacheTtsModelFiles(modelName: AppConfig.ttsModelName);
 
-    debugPrint('[TTS Manager] Spawning worker isolate...');
+    Logger.debug('[TTS Manager] Spawning worker isolate...');
     final receivePort = ReceivePort();
 
     // Get the root isolate token to pass to the background isolate
@@ -223,7 +225,7 @@ class TtsIsolateWorker {
 
     // Get the worker's SendPort
     _workerSendPort = await receivePort.first as SendPort;
-    debugPrint('[TTS Manager] Worker isolate spawned');
+    Logger.debug('[TTS Manager] Worker isolate spawned');
 
     // Initialize TTS in the worker, passing the model name from main isolate
     final initResponsePort = ReceivePort();
@@ -242,7 +244,7 @@ class TtsIsolateWorker {
     }
 
     _isInitialized = true;
-    debugPrint('[TTS Manager] TTS initialized in background');
+    Logger.debug('[TTS Manager] TTS initialized in background');
   }
 
   /// Generate audio in the background isolate

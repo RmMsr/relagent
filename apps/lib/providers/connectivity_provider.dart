@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../utils/logger.dart';
 
 class ConnectivityState {
   final ConnectivityResult connectivity;
@@ -74,7 +75,7 @@ class ConnectivityNotifier extends Notifier<ConnectivityState> {
         _updateConnectivity(results);
       }
     } catch (e) {
-      debugPrint('ConnectivityProvider: Error checking connectivity: $e');
+      Logger.debug('ConnectivityProvider: Error checking connectivity: $e');
     }
   }
 
@@ -86,7 +87,7 @@ class ConnectivityNotifier extends Notifier<ConnectivityState> {
     final hasInternet = result != ConnectivityResult.none;
     state = state.copyWith(connectivity: result, hasInternet: hasInternet);
 
-    debugPrint(
+    Logger.debug(
       'ConnectivityProvider: Connectivity changed to $result (hasInternet: $hasInternet)',
     );
   }

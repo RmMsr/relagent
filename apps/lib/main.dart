@@ -9,6 +9,7 @@ import '/providers/background_service_provider.dart';
 import '/providers/settings_provider.dart';
 import '/router/app_router.dart';
 import '/tts/sherpa_tts.dart';
+import '/utils/logger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,8 +29,8 @@ void main() async {
   final sharedPreferences = await SharedPreferences.getInstance();
 
   // Log SharedPreferences keys for debugging
-  debugPrint('SharedPreferences initialized');
-  debugPrint('Existing keys: ${sharedPreferences.getKeys()}');
+  Logger.debug('SharedPreferences initialized');
+  Logger.debug('Existing keys: ${sharedPreferences.getKeys()}');
 
   runApp(
     ProviderScope(

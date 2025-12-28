@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
 import '../tts/audio_source.dart';
+import '../utils/logger.dart';
 import 'audio_coordinator_provider.dart';
 
 /// Provider for AudioPlayer instance with automatic disposal.
@@ -94,12 +95,14 @@ class PlaybackService extends Notifier<PlaybackState> {
   }
 
   void _handleVoiceModeChanged(VoiceMode? oldMode, VoiceMode newMode) {
-    debugPrint('PlaybackService: Voice mode changed from $oldMode to $newMode');
+    Logger.debug(
+      'PlaybackService: Voice mode changed from $oldMode to $newMode',
+    );
 
     // Stop all playback and clear queue when switching to silent mode
     if (newMode == VoiceMode.silent) {
       if (state.isPlaying || state.queue.isNotEmpty) {
-        debugPrint(
+        Logger.debug(
           'PlaybackService: Stopping playback and clearing queue due to silent mode',
         );
         stop();
@@ -165,7 +168,7 @@ class PlaybackService extends Notifier<PlaybackState> {
   Future<void> pause() async {
     if (state.status != PlaybackStatus.playing) return;
 
-    debugPrint('PlaybackProvider: Pausing playback');
+    Logger.debug('PlaybackProvider: Pausing playback');
     await _player.pause();
     state = state.copyWith(status: PlaybackStatus.paused);
     // Lock intentionally NOT released - we still own the audio session
@@ -174,7 +177,7 @@ class PlaybackService extends Notifier<PlaybackState> {
   Future<void> resume() async {
     if (state.status != PlaybackStatus.paused) return;
 
-    debugPrint('PlaybackProvider: Resuming playback');
+    Logger.debug('PlaybackProvider: Resuming playback');
     state = state.copyWith(status: PlaybackStatus.playing);
     await _player.play();
   }
@@ -207,7 +210,7 @@ class PlaybackService extends Notifier<PlaybackState> {
     try {
       data = await nextItem.content;
     } catch (e) {
-      debugPrint(
+      Logger.debug(
         'PlaybackProvider: Error loading content for ${nextItem.id}: $e',
       );
     }
@@ -240,7 +243,7 @@ class PlaybackService extends Notifier<PlaybackState> {
         //
         // Playback denied - remove item from queue without releasing lock
         // (something else is currently holding the playback lock)
-        debugPrint(
+        Logger.debug(
           'PlaybackProvider: Playback denied for ${nextItem.id}, removing from queue',
         );
         _queueChangeCount++;
@@ -278,11 +281,11 @@ class PlaybackService extends Notifier<PlaybackState> {
       final source = InMemoryAudioSource(data);
       await _player.setAudioSource(source);
       _player.play().catchError((Object e) {
-        debugPrint('PlaybackProvider: Play error: $e');
+        Logger.debug('PlaybackProvider: Play error: $e');
         _onItemFinished();
       });
     } catch (e) {
-      debugPrint('PlaybackProvider: Setup error: $e');
+      Logger.debug('PlaybackProvider: Setup error: $e');
       _onItemFinished();
     }
   }
