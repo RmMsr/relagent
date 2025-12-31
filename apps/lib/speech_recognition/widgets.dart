@@ -309,12 +309,13 @@ class RecorderButtonState extends ConsumerState<RecorderButton> {
               ? VoiceMode.silent
               : VoiceMode.reading;
           ref.read(settingsProvider.notifier).updateVoiceMode(newMode);
+          return; // Fix: Return early after voice mode change to prevent falling through to one-shot logic
+        }
+
+        if (recordingState.isRecording) {
+          ref.read(recordingProvider.notifier).stopOneShot();
         } else {
-          if (recordingState.isRecording) {
-            ref.read(recordingProvider.notifier).stopOneShot();
-          } else {
-            ref.read(recordingProvider.notifier).startOneShot();
-          }
+          ref.read(recordingProvider.notifier).startOneShot();
         }
       },
       icon: SizedBox(

@@ -139,23 +139,26 @@ class ASR {
               Uint8List.fromList(data),
             );
 
-            _stream!.acceptWaveform(
-              samples: samplesFloat32,
-              sampleRate: _sampleRate,
-            );
-            while (_recognizer!.isReady(_stream!)) {
-              _recognizer!.decode(_stream!);
-            }
-            final text = _recognizer!.getResult(_stream!).text;
+            // Fix: Add null checks to prevent race conditions
+            if (_stream != null) {
+              _stream!.acceptWaveform(
+                samples: samplesFloat32,
+                sampleRate: _sampleRate,
+              );
+              while (_recognizer!.isReady(_stream!)) {
+                _recognizer!.decode(_stream!);
+              }
+              final text = _recognizer!.getResult(_stream!).text;
 
-            if (text != '' && text != lastText) {
-              lastText = text;
-              textRecognized(text);
-            }
+              if (text != '' && text != lastText) {
+                lastText = text;
+                textRecognized(text);
+              }
 
-            if (_recognizer!.isEndpoint(_stream!)) {
-              _recognizer!.reset(_stream!);
-              textFinished();
+              if (_recognizer!.isEndpoint(_stream!)) {
+                _recognizer!.reset(_stream!);
+                textFinished();
+              }
             }
 
             developer.Timeline.finishSync();
@@ -176,10 +179,24 @@ class ASR {
   }
 
   Future<void> stop() async {
-    _stream!.free();
-    _stream = _recognizer!.createStream();
+    Logger.debug('ASR: Stopping recording...');
 
-    await _audioRecorder!.stop();
+    try {
+      // Stop the audio recorder first - this should stop the stream callbacks
+      await _audioRecorder!.stop();
+      Logger.debug('ASR: Audio recorder stopped');
+    } catch (e) {
+      Logger.debug('ASR: Error stopping audio recorder: $e');
+    }
+
+    // Free the stream to clean up resources
+    if (_stream != null) {
+      _stream!.free();
+      _stream = null;
+      Logger.debug('ASR: Stream freed and nulled');
+    }
+
+    Logger.debug('ASR: Recording stop completed');
   }
 
   Future<void> pause() => _audioRecorder!.pause();

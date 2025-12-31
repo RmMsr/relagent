@@ -90,7 +90,13 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
   // Baseline calculation for volume visualization
   double _currentBaseline = -60.0; // Initial baseline
-  static const double _baselineAlpha = 0.1; // EMA smoothing factor
+  static const double _baselineAlpha =
+      0.05; // Reduced EMA smoothing factor for better responsiveness
+  static const double _baselineDecayAlpha =
+      0.02; // Decay factor for baseline during silence
+  static const double _minBaseline = -80.0; // Minimum baseline level
+  static const double _maxBaseline = -30.0; // Maximum baseline level
+  DateTime? _lastSignificantAudioTime;
 
   @override
   RecordingState build() {
@@ -184,6 +190,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
     Logger.debug('RecordingProvider: Starting continuous recording');
 
+    // Reset baseline and tracking for new recording session
+    _resetAudioLevelTracking();
+
     // Update UI state immediately to show recording has started
     state = state.copyWith(isRecording: true, isContinuous: true, error: null);
 
@@ -252,6 +261,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
     Logger.debug('RecordingProvider: Starting single recording');
 
+    // Reset baseline for new recording session
+    _resetAudioLevelTracking();
+
     // Update UI state immediately
     state = state.copyWith(
       isRecording: true,
@@ -317,8 +329,18 @@ class RecordingNotifier extends Notifier<RecordingState> {
   }
 
   void _updateAmplitude(double amplitudeDbFS) {
+    // Store old baseline for debugging
+    final oldBaseline = _currentBaseline;
+
     // Update baseline first
     _updateBaseline(amplitudeDbFS);
+
+    // Debug log baseline changes
+    if ((_currentBaseline - oldBaseline).abs() > 1.0) {
+      Logger.debug(
+        'RecordingProvider: Baseline updated from ${oldBaseline.toStringAsFixed(1)}dB to ${_currentBaseline.toStringAsFixed(1)}dB (input: ${amplitudeDbFS.toStringAsFixed(1)}dB)',
+      );
+    }
 
     // Update amplitude history (keep last 5 readings for visualization)
     final newHistory = [...state.amplitudeHistory, amplitudeDbFS];
@@ -337,25 +359,59 @@ class RecordingNotifier extends Notifier<RecordingState> {
   }
 
   void _updateBaseline(double amplitudeDbFS) {
-    // Update EMA baseline with new amplitude
-    _currentBaseline =
-        _baselineAlpha * amplitudeDbFS +
-        (1.0 - _baselineAlpha) * _currentBaseline;
+    final now = DateTime.now();
+
+    // Define significant audio threshold (10dB above current baseline)
+    final significantThreshold = _currentBaseline + 10.0;
+    final isSignificantAudio = amplitudeDbFS > significantThreshold;
+
+    if (isSignificantAudio) {
+      // Fast adaptation when there's significant audio
+      _currentBaseline =
+          _baselineAlpha * amplitudeDbFS +
+          (1.0 - _baselineAlpha) * _currentBaseline;
+      _lastSignificantAudioTime = now;
+    } else if (_lastSignificantAudioTime != null) {
+      // Apply decay during silence periods
+      final timeSinceSignificant = now.difference(_lastSignificantAudioTime!);
+      if (timeSinceSignificant.inSeconds > 2) {
+        // Gradually decay baseline towards minimum during extended silence
+        _currentBaseline =
+            _baselineDecayAlpha * _minBaseline +
+            (1.0 - _baselineDecayAlpha) * _currentBaseline;
+      }
+    }
+
+    // Clamp baseline to reasonable bounds
+    _currentBaseline = _currentBaseline.clamp(_minBaseline, _maxBaseline);
   }
 
   List<double> _calculateBarHeights(List<double> amplitudes) {
     const minBarHeight = 0.1;
     const maxBarHeight = 1.0;
     const upperLimitDb = -6.0;
+    const minDynamicRangeDb =
+        20.0; // Minimum dynamic range to ensure responsiveness
+
+    // Calculate effective upper limit to maintain dynamic range
+    final effectiveUpperLimit = _currentBaseline + minDynamicRangeDb;
+    final usedUpperLimit = effectiveUpperLimit > upperLimitDb
+        ? upperLimitDb
+        : effectiveUpperLimit;
 
     // Convert amplitudes to bar heights using current baseline
     final heights = <double>[];
     for (final amp in amplitudes) {
       double scaledValue = minBarHeight;
-      if (amp > _currentBaseline && _currentBaseline < upperLimitDb) {
-        scaledValue =
-            (amp - _currentBaseline) / (upperLimitDb - _currentBaseline);
+
+      // Only calculate if amplitude is above baseline
+      if (amp > _currentBaseline) {
+        final dynamicRange = usedUpperLimit - _currentBaseline;
+        if (dynamicRange > 0) {
+          scaledValue = (amp - _currentBaseline) / dynamicRange;
+        }
       }
+
       heights.add(scaledValue.clamp(minBarHeight, maxBarHeight));
     }
 
@@ -385,6 +441,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
   Future<void> internalStart() async {
     Logger.debug('RecordingProvider: internalStart() called for auto-resume');
     try {
+      // Reset baseline for resumed recording session
+      _resetAudioLevelTracking();
+
       state = state.copyWith(isInitializing: true);
       _initASR();
       // Ensure initialization is complete (defensive check)
@@ -627,5 +686,15 @@ class RecordingNotifier extends Notifier<RecordingState> {
     Logger.debug('RecordingProvider: Stopping duration timer');
     _durationTimer?.cancel();
     _durationTimer = null;
+  }
+
+  void _resetAudioLevelTracking() {
+    _currentBaseline = -60.0; // Reset to initial baseline
+    _lastSignificantAudioTime = null; // Reset significant audio tracking
+
+    // Start with empty bar heights - let real audio drive the visualization
+    state = state.copyWith(barHeights: []);
+
+    Logger.debug('RecordingProvider: Reset audio level tracking baseline');
   }
 }
