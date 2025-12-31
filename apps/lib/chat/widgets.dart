@@ -325,7 +325,9 @@ class ChatMessageBubble extends StatelessWidget {
           ? const EdgeInsets.only(left: 10)
           : const EdgeInsets.symmetric(horizontal: 10),
       child: Column(
-        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           // Message header (timestamp + role) - only shown for first message in group
@@ -405,7 +407,8 @@ class ChatMessageBubble extends StatelessWidget {
                           : MainAxisAlignment.end,
                       children: [
                         // TTS button for assistant messages
-                        if (message.role == ChatRole.assistant && onSpeak != null)
+                        if (message.role == ChatRole.assistant &&
+                            onSpeak != null)
                           _buildTtsButton(theme, playbackStatus, message.id),
                         // Retry button for user messages
                         if (isUser && onRetry != null)
@@ -476,10 +479,7 @@ class ChatMessageBubble extends StatelessWidget {
             icon: Icon(ttsIcon, size: 18, color: iconColor),
             iconSize: 18,
             padding: const EdgeInsets.all(8),
-            constraints: const BoxConstraints(
-              minWidth: 36,
-              minHeight: 36,
-            ),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             tooltip: ttsTooltip,
             onPressed: () => onSpeak!(message.text, messageId),
           );
