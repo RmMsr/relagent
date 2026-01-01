@@ -21,9 +21,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 **IMPORTANT: When working on Flutter app code, also read @apps/AGENTS.md for Flutter-specific patterns, MCP tools, and architectural guidelines.**
 
-**Note**: The Flutter app requires MCP configuration to work properly since it's located in the `apps/` directory. See apps/AGENTS.md for setup instructions.
-
-**Flutter MCP Tool Preference**: ALWAYS prefer Flutter MCP tools (dart-flutter_*) over shell commands when available. See apps/AGENTS.md for complete reference table and usage guidelines.
+**MCP Tool Preference**: ALWAYS prefer MCP tools especially for flutter (dart-flutter_*) over shell commands when available. See apps/AGENTS.md for complete reference table and usage guidelines.
 
 This file provides high-level guidance for working with the Relagent codebase.
 
@@ -41,44 +39,36 @@ The current development focus is on the Flutter app, which connects to any OpenA
 **CRITICAL RULES - Always follow these:**
 
 ### Branching Strategy
-**Use branches for complex changes** - Simple isolated changes can go directly to main:
+**Use git worktree workflow**: This projects includes scripts to simplify
+creation of branches and merging them back on a local scenarion.
 
-**Direct to main (single commit):**
-- Documentation updates (`docs/`, `README.md`, `AGENTS.md`)
-- Simple code style/formatting changes
-- Typos and minor fixes
-- Single-file changes with no dependencies
+To start a branch:
+1. Run `bin/start-worktree.sh`
+2. Change into the newly created directory
+3. Make your changes using small iterative commits
 
-**Use branches for complex changes:**
-- **New features**: `experiment/feature-name`
-- **Bug fixes**: `fix/issue-description`
-- **Refactoring**: `refactor/component-name`
-- **Performance**: `perf/optimization-area`
-- **Dependencies**: `deps/package-name`
-- **OpenSpec changes**: `openspec/change-description`
-- Any change requiring multiple commits or affecting multiple files
+When done, squash all into main:
+1. Run `bin/apply-worktree.sh`
+2. Change into the main worktree directory.
+3. You see a single new commit on top of the main branch.
 
-**Branch workflow**:
-1. Create appropriate branch from main
-2. Make changes with small, focused commits  
-3. Test changes thoroughly
-4. Merge as one commit to main when ready
+This is a substitute for classic branches and pull requests and optimized for a
+single user and high level of automation.
 
 ### Commit Messages
-- **Small, focused commits** - One aspect per commit
-- **Main branch commits**: Isolated changes focusing on one aspect
-- **Feature branch commits**: After every small increment for anchor points
-- **Commit message format**: 
-  - Start with short summary block
+Commit frequently to build checkpoints for all increments.
+- **Commit message format**:
+  - Start with short summary title.
   - Answer: What's new for users, bugs fixed, major changes, relation to previous/future work
   - Examples: `Add prime message to initialize chat context`, `Update gitignore`, `Fix navigation issue`
+  - Leave out insignificant details.
 
-**Security**: Never commit device names, IP addresses, or other dev environment details.
+**Security**: Never commit personal data, device names, IP addresses, or other dev environment details.
 
 ### Implementation Priorities
 When implementing features, prioritize:
 1. **Existing functionality** over custom solutions
-2. **Simple implementation** over optimization or customization  
+2. **Simple implementation** over optimization or customization
 3. **Smaller, focused classes** over complex monolithic code
 4. **Readable and maintainable code** over quick results
 
@@ -97,8 +87,6 @@ This project prioritizes:
 - **Simplicity** - Easy to understand, minimal dependencies, readable code
 - **Open source** - 100% open source with open-weight AI models
 - **Accessibility** - Runnable on consumer-grade hardware
-
-
 
 ### Code Comments
 
@@ -149,7 +137,7 @@ relagent/
 ## Getting Started
 
 1. **For Flutter app development**: See [apps/AGENTS.md](apps/AGENTS.md) for architecture and patterns
-2. **For project vision and goals**: Review docs in `docs/` directory  
+2. **For project vision and goals**: Review docs in `docs/` directory
 3. **For installation**: Follow instructions in [README.md](README.md)
 
 ## Build/Lint/Test Commands
