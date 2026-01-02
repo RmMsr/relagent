@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '/config/app_config.dart';
 import '/providers/background_service_provider.dart';
+import '/providers/health_check_provider.dart';
 import '/providers/settings_provider.dart';
 import '/router/app_router.dart';
 import '/tts/sherpa_tts.dart';
@@ -50,6 +51,11 @@ class MyApp extends ConsumerWidget {
     // Initialize background service provider to start listening to AudioCoordinator
     // This ensures the service syncs with audio state changes
     ref.read<BackgroundServiceState>(backgroundServiceProvider);
+
+    // Trigger automatic health check on app startup with retry logic
+    // This validates API connectivity with exponential backoff to allow
+    // system recovery (network initialization, server startup, etc.)
+    ref.read(healthCheckProvider.notifier).triggerStartupHealthCheck();
 
     return MaterialApp.router(
       title: AppInfo.data.toString(),

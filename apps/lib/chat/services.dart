@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:relagent/chat/models.dart';
+import 'package:relagent/models/settings.dart';
 
 enum InputClassification { request, abort, confirm, ignore, clientControl }
 
@@ -33,6 +34,9 @@ Future<ChatMessage> getChatResponse(
   required String baseUrl,
   required String model,
   required String primeMessage,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
 }) async {
   final uri = Uri.parse('$baseUrl/chat/completions');
   var messages = <dynamic>[];
@@ -56,12 +60,21 @@ Future<ChatMessage> getChatResponse(
   }
   final body = {'messages': messages, 'model': model};
 
+  // Build headers with authentication
+  final headers = <String, String>{'content-type': 'application/json'};
+
+  // Add HTTP Basic Auth header if configured
+  if (authType == AuthType.basic && username != null && password != null) {
+    final credentials = base64Encode(utf8.encode('$username:$password'));
+    headers['authorization'] = 'Basic $credentials';
+  }
+
   final http.Response response;
   try {
     response = await http.post(
       uri,
       body: jsonEncode(body),
-      headers: {'content-type': 'application/json'},
+      headers: headers,
     );
   } catch (e) {
     // Check if it's a network-related error

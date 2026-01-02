@@ -5,6 +5,11 @@ enum VoiceMode {
   reading, // One-shot recording + auto-playback
 }
 
+enum AuthType {
+  none, // No authentication required
+  basic, // HTTP Basic authentication
+}
+
 enum BackgroundListeningDuration {
   fiveMinutes(Duration(minutes: 5)),
   fifteenMinutes(Duration(minutes: 15)),
@@ -95,6 +100,10 @@ class Settings {
   // Background listening duration limit
   final BackgroundListeningDuration backgroundListeningDuration;
 
+  // Authentication settings
+  final AuthType authType;
+  final String? username; // For Basic Auth only
+
   const Settings({
     required this.simpleChatBaseUrl,
     required this.simpleChatModel,
@@ -103,6 +112,8 @@ class Settings {
     required this.ttsSpeed,
     required this.voiceMode,
     required this.backgroundListeningDuration,
+    required this.authType,
+    this.username,
   });
 
   factory Settings.defaults() {
@@ -114,6 +125,8 @@ class Settings {
       ttsSpeed: 1.0,
       voiceMode: VoiceMode.conversation, // Conversation mode by default
       backgroundListeningDuration: BackgroundListeningDuration.oneHour,
+      authType: AuthType.none,
+      username: null,
     );
   }
 
@@ -125,6 +138,8 @@ class Settings {
     double? ttsSpeed,
     VoiceMode? voiceMode,
     BackgroundListeningDuration? backgroundListeningDuration,
+    AuthType? authType,
+    String? username,
   }) {
     return Settings(
       simpleChatBaseUrl: simpleChatBaseUrl ?? this.simpleChatBaseUrl,
@@ -135,6 +150,8 @@ class Settings {
       voiceMode: voiceMode ?? this.voiceMode,
       backgroundListeningDuration:
           backgroundListeningDuration ?? this.backgroundListeningDuration,
+      authType: authType ?? this.authType,
+      username: username ?? this.username,
     );
   }
 
@@ -154,6 +171,8 @@ class Settings {
       'ttsSpeed': ttsSpeed,
       'voiceMode': voiceMode.name,
       'backgroundListeningDuration': backgroundListeningDuration.name,
+      'authType': authType.name,
+      'username': username,
     };
   }
 
@@ -186,6 +205,18 @@ class Settings {
       duration = BackgroundListeningDuration.oneHour;
     }
 
+    // Parse authType (defaults to none for existing settings)
+    AuthType authType;
+    if (json.containsKey('authType')) {
+      final authTypeStr = json['authType'] as String;
+      authType = AuthType.values.firstWhere(
+        (e) => e.name == authTypeStr,
+        orElse: () => AuthType.none,
+      );
+    } else {
+      authType = AuthType.none;
+    }
+
     return Settings(
       simpleChatBaseUrl: json['simpleChatBaseUrl'] as String,
       simpleChatModel: json['simpleChatModel'] as String,
@@ -194,6 +225,8 @@ class Settings {
       ttsSpeed: (json['ttsSpeed'] as num?)?.toDouble() ?? 1.0,
       voiceMode: mode,
       backgroundListeningDuration: duration,
+      authType: authType,
+      username: json['username'] as String?,
     );
   }
 
@@ -207,7 +240,9 @@ class Settings {
         other.ttsSpeakerId == ttsSpeakerId &&
         other.ttsSpeed == ttsSpeed &&
         other.voiceMode == voiceMode &&
-        other.backgroundListeningDuration == backgroundListeningDuration;
+        other.backgroundListeningDuration == backgroundListeningDuration &&
+        other.authType == authType &&
+        other.username == username;
   }
 
   @override
@@ -219,6 +254,8 @@ class Settings {
     ttsSpeed,
     voiceMode,
     backgroundListeningDuration,
+    authType,
+    username,
   );
 }
 

@@ -199,6 +199,10 @@ class ChatNotifier extends Notifier<ChatState> {
     try {
       // Get settings for API call
       final settings = ref.read(settingsProvider);
+      final settingsNotifier = ref.read(settingsProvider.notifier);
+
+      // Retrieve credentials for authentication
+      final password = await settingsNotifier.getPassword();
 
       // Get response from chat service
       final response = await getChatResponse(
@@ -206,6 +210,9 @@ class ChatNotifier extends Notifier<ChatState> {
         baseUrl: settings.simpleChatBaseUrl,
         model: settings.simpleChatModel,
         primeMessage: settings.primeMessage,
+        authType: settings.authType,
+        username: settings.username,
+        password: password,
       );
 
       // Add assistant response
@@ -395,6 +402,10 @@ class ChatNotifier extends Notifier<ChatState> {
     try {
       // Get settings for API call
       final settings = ref.read(settingsProvider);
+      final settingsNotifier = ref.read(settingsProvider.notifier);
+
+      // Retrieve credentials for authentication
+      final password = await settingsNotifier.getPassword();
 
       // Get response from chat service
       final response = await getChatResponse(
@@ -402,6 +413,9 @@ class ChatNotifier extends Notifier<ChatState> {
         baseUrl: settings.simpleChatBaseUrl,
         model: settings.simpleChatModel,
         primeMessage: settings.primeMessage,
+        authType: settings.authType,
+        username: settings.username,
+        password: password,
       );
 
       // Success - clear retry state and pending indicator

@@ -27,6 +27,7 @@ dependencies:
   media_kit_libs_linux: ^1.2.1 # just_audio linux support
   package_info_plus: ^9.0.0
   connectivity_plus: ^7.0.0
+  flutter_secure_storage: 9.2.2
 
 dev_dependencies:
   flutter_test:

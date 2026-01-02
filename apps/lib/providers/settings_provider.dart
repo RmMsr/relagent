@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '/models/settings.dart';
+import '/services/secure_credential_service.dart';
 
 const _settingsKey = 'user_settings';
 const _historyKey = 'settings_history';
@@ -15,6 +16,11 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('SharedPreferences must be overridden in main.dart');
 });
 
+/// Provider for secure credential storage
+final secureCredentialServiceProvider = Provider<SecureCredentialService>((ref) {
+  return SecureCredentialService();
+});
+
 /// Settings provider that persists to SharedPreferences
 final settingsProvider = NotifierProvider<SettingsNotifier, Settings>(() {
   return SettingsNotifier();
@@ -22,6 +28,7 @@ final settingsProvider = NotifierProvider<SettingsNotifier, Settings>(() {
 
 class SettingsNotifier extends Notifier<Settings> {
   late final SharedPreferences _prefs;
+  late final SecureCredentialService _credentialService;
   List<SettingsHistoryEntry> _history = [];
 
   List<SettingsHistoryEntry> get history => _history;
@@ -29,6 +36,7 @@ class SettingsNotifier extends Notifier<Settings> {
   @override
   Settings build() {
     _prefs = ref.watch(sharedPreferencesProvider);
+    _credentialService = ref.watch(secureCredentialServiceProvider);
 
     // Try to load settings, fall back to defaults if loading fails
     Settings loadedSettings = _loadSettings();
@@ -91,6 +99,11 @@ class SettingsNotifier extends Notifier<Settings> {
   }
 
   Future<bool> updateSimpleChatBaseUrl(String url) async {
+    // Clear credentials when URL changes
+    if (url != state.simpleChatBaseUrl) {
+      await clearCredentials();
+    }
+
     state = state.copyWith(simpleChatBaseUrl: url);
     _addToHistory(url, state.simpleChatModel);
     return await _saveSettings();
@@ -230,4 +243,35 @@ class SettingsNotifier extends Notifier<Settings> {
     state = Settings.defaults();
     return await _saveSettings();
   }
+
+  // Authentication methods
+
+  Future<bool> updateAuthType(AuthType type) async {
+    state = state.copyWith(authType: type);
+    return await _saveSettings();
+  }
+
+  Future<bool> updateUsername(String? username) async {
+    state = state.copyWith(username: username);
+    return await _saveSettings();
+  }
+
+  /// Store password in secure storage (not persisted to SharedPreferences)
+  Future<void> setPassword(String password) async {
+    await _credentialService.storePassword(state.simpleChatBaseUrl, password);
+  }
+
+  /// Retrieve password from secure storage
+  Future<String?> getPassword() async {
+    return await _credentialService.getPassword(state.simpleChatBaseUrl);
+  }
+
+  /// Clear all credentials for current endpoint
+  Future<void> clearCredentials() async {
+    await _credentialService.clearCredentials(state.simpleChatBaseUrl);
+    // Also clear auth type and username from settings
+    state = state.copyWith(authType: AuthType.none, username: null);
+    await _saveSettings();
+  }
 }
+

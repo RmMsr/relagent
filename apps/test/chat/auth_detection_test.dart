@@ -1,0 +1,95 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:relagent/chat/auth_detection.dart';
+import 'package:relagent/models/settings.dart';
+
+void main() {
+  group('detectAuthType', () {
+    test('detects no authentication for 200 OK', () {
+      final response = http.Response('', 200);
+      final result = detectAuthType(response);
+
+      expect(result.authType, AuthType.none);
+      expect(result.isSuccess, true);
+    });
+
+    test('detects Basic Auth from WWW-Authenticate header', () {
+      final response = http.Response(
+        '',
+        401,
+        headers: {'www-authenticate': 'Basic realm="My API"'},
+      );
+      final result = detectAuthType(response);
+
+      expect(result.authType, AuthType.basic);
+      expect(result.realm, 'My API');
+      expect(result.isSuccess, true);
+    });
+
+    test('detects Basic Auth with case-insensitive header', () {
+      final response = http.Response(
+        '',
+        401,
+        headers: {'www-authenticate': 'BASIC realm="Test"'},
+      );
+      final result = detectAuthType(response);
+
+      expect(result.authType, AuthType.basic);
+      expect(result.realm, 'Test');
+    });
+
+    test('returns error for unsupported Bearer authentication', () {
+      final response = http.Response(
+        '',
+        401,
+        headers: {'www-authenticate': 'Bearer realm="OAuth"'},
+      );
+      final result = detectAuthType(response);
+
+      expect(result.authType, AuthType.none);
+      expect(result.isSuccess, false);
+      expect(result.errorMessage, contains('Unsupported'));
+      expect(result.errorMessage, contains('Bearer'));
+    });
+
+    test('returns error for unsupported Digest authentication', () {
+      final response = http.Response(
+        '',
+        401,
+        headers: {
+          'www-authenticate':
+              'Digest realm="Test", qop="auth", nonce="123"',
+        },
+      );
+      final result = detectAuthType(response);
+
+      expect(result.authType, AuthType.none);
+      expect(result.isSuccess, false);
+      expect(result.errorMessage, contains('Unsupported'));
+    });
+  });
+
+  group('extractBasicAuthRealm', () {
+    test('extracts realm from standard header', () {
+      final realm = extractBasicAuthRealm('Basic realm="My API"');
+      expect(realm, 'My API');
+    });
+
+    test('extracts realm with special characters', () {
+      final realm = extractBasicAuthRealm('Basic realm="Test\'s API: v2.0"');
+      expect(realm, 'Test\'s API: v2.0');
+    });
+
+    test('returns null for header without realm', () {
+      final realm = extractBasicAuthRealm('Basic');
+      expect(realm, null);
+    });
+
+    test('extracts first realm if multiple present', () {
+      final realm = extractBasicAuthRealm(
+        'Basic realm="First", realm="Second"',
+      );
+      expect(realm, 'First');
+    });
+  });
+}
