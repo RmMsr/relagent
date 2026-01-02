@@ -65,7 +65,7 @@ if [ -z "$WORKTREE_NAME" ]; then
   # Try to generate a human-friendly suffix using opencode with seed
   suffix=""
   if command -v opencode >/dev/null 2>&1; then
-    suffix=$(opencode run "Generate a short random fantasy name made of 2 words (seed $seed). No tool usage." 2>/dev/null | head -n 3 | tr -dc 'a-zA-Z0-9-')
+    suffix=$(opencode run "Generate a short random name made of 2-3 words (seed $seed). Lower case. No tool usage." 2>/dev/null | head -n 3 | tr -dc 'a-zA-Z0-9-')
     if [ -z "$suffix" ] || [ ${#suffix} -gt 20 ]; then
       suffix=""
     fi
