@@ -31,18 +31,40 @@ Commits to main should be isolated changes and focus on one aspect.
 
 Commits to feature branches should happen after every small increment. So we get anchor points to compare or go back to.
 
-Commits messages should start with one short block summarizing the change. Major points can be added as list below. Main answers a commit message should give are:
+Conventional commits are a good baseline. Commit messages should start with one short block summarizing the change. Major points can be added as list below. Main answers a commit message should give are:
 
 - What is new and different form an user perspective
-- Which bugs have been fixed
 - What are the major changes if any in architecture, patterns or dependencies
+- Which bugs have been fixed
 - If this is part of a previous or future change, say brief what this build upon and what is next
+
+Leave out insignificant details.
 
 ### Branches
 
-Features and all changes most likely requiring more than one commit are developed in a branch. When the change is ready it can be merged as one commit to main.
+All changes should happen in branches. For local development git worktrees are very useful to isolate changes into separate worktrees.
 
-Smaller changes that very likely do not break anything can go directly to `main`. For example documentation or minor updates.
+To start a branch:
+
+1. Run `bin/start-worktree.sh`
+2. Change into the newly created directory
+3. Make your changes using small iterative commits
+
+When done, squash all into main:
+
+1. Run `bin/apply-worktree.sh`
+2. Change into the main worktree directory.
+3. You see a single new commit on top of the main branch.
+
+## Architecture and patterns
+
+Simple and predictable solutions are most important. Things should do what they say and not more. When there is complicated logic needed it should be contained locally with clear boundaries and expectations.
+
+Follow common practices for architecture, organization and library usage.
+
+Keep the number of class members small. Functions should be short and have only one effect. Break apart classes, structured and functions early.
+
+Exceptions can be made, but need to be clearly stated as such.
 
 ## Environment
 
@@ -70,9 +92,6 @@ Buttons should show the state that they will activate on press.
 
 **Alternative Method**: Capture full logs with shell commands:
 
-```
-cd apps
-flutter run 2>&1 | tee flutter.log
 ```
 cd apps
 flutter run 2>&1 | tee flutter.log
