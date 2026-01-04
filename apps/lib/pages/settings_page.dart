@@ -26,7 +26,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   HealthCheckResult? _healthCheckResult;
   bool _isHealthCheckRunning = false;
   bool _obscurePassword = true;
-  bool _authenticationExpanded = true; // Authentication section expanded by default
+  bool _authenticationExpanded =
+      true; // Authentication section expanded by default
 
   @override
   void initState() {
@@ -42,9 +43,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _ttsSpeakerIdController = TextEditingController(
       text: settings.ttsSpeakerId.toString(),
     );
-    _usernameController = TextEditingController(
-      text: settings.username ?? '',
-    );
+    _usernameController = TextEditingController(text: settings.username ?? '');
     _passwordController = TextEditingController();
     _ttsSpeed = settings.ttsSpeed;
     _backgroundListeningDuration = settings.backgroundListeningDuration;
@@ -139,9 +138,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               },
               child: Text(
                 'OK',
-                style: TextStyle(
-                  color: theme.colorScheme.onSecondaryContainer,
-                ),
+                style: TextStyle(color: theme.colorScheme.onSecondaryContainer),
               ),
             ),
           ],
@@ -175,10 +172,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           Expanded(
             child: SelectableText(
               value,
-              style: const TextStyle(
-                fontSize: 11,
-                fontFamily: 'monospace',
-              ),
+              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
             ),
           ),
         ],
@@ -373,9 +367,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final history = ref.watch(settingsProvider.notifier).history;
-    final urlSuggestions = history.map((entry) => entry.url).toSet().toList();
-    final modelSuggestions = history
+    final settings = ref.watch(settingsProvider);
+    final urlSuggestions = settings.history
+        .map((entry) => entry.url)
+        .toSet()
+        .toList();
+    final modelSuggestions = settings.history
         .map((entry) => entry.model)
         .toSet()
         .toList();
@@ -529,9 +526,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             const SizedBox(height: 32),
             Theme(
-              data: Theme.of(context).copyWith(
-                dividerColor: Colors.transparent,
-              ),
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 title: const Text(
                   'Authentication',
@@ -588,106 +585,113 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           label: const Text('Clear Credentials'),
                         ),
                         if (_healthCheckResult != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _healthCheckResult!.isSuccess
-                      ? Colors.green.withValues(alpha: 0.1)
-                      : Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _healthCheckResult!.isSuccess
-                        ? Colors.green
-                        : Colors.red,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          _healthCheckResult!.isSuccess
-                              ? Icons.check_circle
-                              : Icons.error,
-                          color: _healthCheckResult!.isSuccess
-                              ? Colors.green
-                              : Colors.red,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _healthCheckResult!.message,
-                            style: TextStyle(
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
                               color: _healthCheckResult!.isSuccess
-                                  ? Colors.green
-                                  : Colors.red,
-                              fontWeight: FontWeight.bold,
+                                  ? Colors.green.withValues(alpha: 0.1)
+                                  : Colors.red.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _healthCheckResult!.isSuccess
+                                    ? Colors.green
+                                    : Colors.red,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _healthCheckResult!.isSuccess
+                                          ? Icons.check_circle
+                                          : Icons.error,
+                                      color: _healthCheckResult!.isSuccess
+                                          ? Colors.green
+                                          : Colors.red,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _healthCheckResult!.message,
+                                        style: TextStyle(
+                                          color: _healthCheckResult!.isSuccess
+                                              ? Colors.green
+                                              : Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                const Divider(height: 1),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Request Details:',
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                _buildDebugInfo('Method', 'POST'),
+                                _buildDebugInfo(
+                                  'URL',
+                                  '${_baseUrlController.text.trim()}/chat/completions',
+                                ),
+                                _buildDebugInfo(
+                                  'Body',
+                                  '{"messages": [{"role": "user", "content": "test"}], "model": "${_modelController.text.trim()}", "max_completion_tokens": 100}',
+                                ),
+                                if (_healthCheckResult!.httpStatusCode != null)
+                                  _buildDebugInfo(
+                                    'Status',
+                                    'HTTP ${_healthCheckResult!.httpStatusCode}',
+                                  ),
+                                if (ref.read(settingsProvider).authType ==
+                                    AuthType.basic)
+                                  _buildDebugInfo(
+                                    'Auth',
+                                    'Basic ${_usernameController.text.isNotEmpty ? _usernameController.text : "(no username)"}',
+                                  ),
+                                if (_healthCheckResult!.requiresAuth) ...[
+                                  const SizedBox(height: 8),
+                                  const Divider(height: 1),
+                                  const SizedBox(height: 8),
+                                  _buildDebugInfo(
+                                    'Detected Auth Type',
+                                    _healthCheckResult!.detectedAuthType?.name
+                                            .toUpperCase() ??
+                                        'Unknown',
+                                  ),
+                                  if (_healthCheckResult!.realm != null)
+                                    _buildDebugInfo(
+                                      'Realm',
+                                      _healthCheckResult!.realm!,
+                                    ),
+                                  if (_healthCheckResult!.loginUrl != null)
+                                    _buildDebugInfo(
+                                      'Login URL',
+                                      _healthCheckResult!.loginUrl!,
+                                    ),
+                                ],
+                              ],
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Request Details:',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    _buildDebugInfo('Method', 'POST'),
-                    _buildDebugInfo(
-                      'URL',
-                      '${_baseUrlController.text.trim()}/chat/completions',
-                    ),
-                    _buildDebugInfo(
-                      'Body',
-                      '{"messages": [{"role": "user", "content": "test"}], "model": "${_modelController.text.trim()}", "max_completion_tokens": 100}',
-                    ),
-                    if (_healthCheckResult!.httpStatusCode != null)
-                      _buildDebugInfo(
-                        'Status',
-                        'HTTP ${_healthCheckResult!.httpStatusCode}',
-                      ),
-                    if (ref.read(settingsProvider).authType == AuthType.basic)
-                      _buildDebugInfo(
-                        'Auth',
-                        'Basic ${_usernameController.text.isNotEmpty ? _usernameController.text : "(no username)"}',
-                      ),
-                    if (_healthCheckResult!.requiresAuth) ...[
-                      const SizedBox(height: 8),
-                      const Divider(height: 1),
-                      const SizedBox(height: 8),
-                      _buildDebugInfo(
-                        'Detected Auth Type',
-                        _healthCheckResult!.detectedAuthType?.name.toUpperCase() ??
-                            'Unknown',
-                      ),
-                      if (_healthCheckResult!.realm != null)
-                        _buildDebugInfo('Realm', _healthCheckResult!.realm!),
-                      if (_healthCheckResult!.loginUrl != null)
-                        _buildDebugInfo(
-                          'Login URL',
-                          _healthCheckResult!.loginUrl!,
-                        ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+                        ],
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed:
-                              _isHealthCheckRunning ? null : _testConnection,
+                          onPressed: _isHealthCheckRunning
+                              ? null
+                              : _testConnection,
                           icon: _isHealthCheckRunning
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Icon(Icons.health_and_safety),
                           label: Text(

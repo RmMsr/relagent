@@ -211,8 +211,8 @@ class ChatNotifier extends Notifier<ChatState> {
         model: settings.simpleChatModel,
         primeMessage: settings.primeMessage,
         authType: settings.authType,
-        username: settings.username,
-        password: password,
+        basicAuthUsername: settings.username,
+        basicAuthPassword: password,
       );
 
       // Add assistant response
@@ -414,8 +414,8 @@ class ChatNotifier extends Notifier<ChatState> {
         model: settings.simpleChatModel,
         primeMessage: settings.primeMessage,
         authType: settings.authType,
-        username: settings.username,
-        password: password,
+        basicAuthUsername: settings.username,
+        basicAuthPassword: password,
       );
 
       // Success - clear retry state and pending indicator

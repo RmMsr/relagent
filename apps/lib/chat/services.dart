@@ -35,8 +35,8 @@ Future<ChatMessage> getChatResponse(
   required String model,
   required String primeMessage,
   AuthType authType = AuthType.none,
-  String? username,
-  String? password,
+  String? basicAuthUsername,
+  String? basicAuthPassword,
 }) async {
   final uri = Uri.parse('$baseUrl/chat/completions');
   var messages = <dynamic>[];
@@ -64,18 +64,18 @@ Future<ChatMessage> getChatResponse(
   final headers = <String, String>{'content-type': 'application/json'};
 
   // Add HTTP Basic Auth header if configured
-  if (authType == AuthType.basic && username != null && password != null) {
-    final credentials = base64Encode(utf8.encode('$username:$password'));
+  if (authType == AuthType.basic &&
+      basicAuthUsername != null &&
+      basicAuthPassword != null) {
+    final credentials = base64Encode(
+      utf8.encode('$basicAuthUsername:$basicAuthPassword'),
+    );
     headers['authorization'] = 'Basic $credentials';
   }
 
   final http.Response response;
   try {
-    response = await http.post(
-      uri,
-      body: jsonEncode(body),
-      headers: headers,
-    );
+    response = await http.post(uri, body: jsonEncode(body), headers: headers);
   } catch (e) {
     // Check if it's a network-related error
     final isNetworkError =
@@ -95,12 +95,12 @@ Future<ChatMessage> getChatResponse(
 
   if (response.statusCode >= 300) {
     String userMessage;
-    if (response.statusCode == 404) {
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      userMessage = 'Authentication failed';
+    } else if (response.statusCode == 404) {
       userMessage = 'Chat endpoint not found (check your settings)';
     } else if (response.statusCode >= 500) {
       userMessage = 'Server error occurred';
-    } else if (response.statusCode == 401 || response.statusCode == 403) {
-      userMessage = 'Authentication failed';
     } else {
       userMessage = 'Request failed';
     }

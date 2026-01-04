@@ -8,7 +8,6 @@ import '/models/settings.dart';
 import '/services/secure_credential_service.dart';
 
 const _settingsKey = 'user_settings';
-const _historyKey = 'settings_history';
 const _maxHistoryEntries = 5;
 
 /// Provider for accessing SharedPreferences instance
@@ -17,7 +16,9 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 });
 
 /// Provider for secure credential storage
-final secureCredentialServiceProvider = Provider<SecureCredentialService>((ref) {
+final secureCredentialServiceProvider = Provider<SecureCredentialService>((
+  ref,
+) {
   return SecureCredentialService();
 });
 
@@ -29,9 +30,6 @@ final settingsProvider = NotifierProvider<SettingsNotifier, Settings>(() {
 class SettingsNotifier extends Notifier<Settings> {
   late final SharedPreferences _prefs;
   late final SecureCredentialService _credentialService;
-  List<SettingsHistoryEntry> _history = [];
-
-  List<SettingsHistoryEntry> get history => _history;
 
   @override
   Settings build() {
@@ -40,7 +38,6 @@ class SettingsNotifier extends Notifier<Settings> {
 
     // Try to load settings, fall back to defaults if loading fails
     Settings loadedSettings = _loadSettings();
-    _loadHistory();
 
     return loadedSettings;
   }
@@ -68,33 +65,6 @@ class SettingsNotifier extends Notifier<Settings> {
       final defaultSettings = Settings.defaults();
       state = defaultSettings;
       return defaultSettings;
-    }
-  }
-
-  void _loadHistory() {
-    try {
-      final jsonString = _prefs.getString(_historyKey);
-      if (jsonString != null) {
-        debugPrint('Loading settings history from SharedPreferences...');
-        final jsonList = jsonDecode(jsonString) as List<dynamic>;
-        _history = jsonList
-            .map(
-              (item) =>
-                  SettingsHistoryEntry.fromJson(item as Map<String, dynamic>),
-            )
-            .toList();
-        debugPrint(
-          'Settings history loaded successfully: ${_history.length} entries',
-        );
-      } else {
-        debugPrint('No saved settings history found');
-        _history = [];
-      }
-    } catch (e, stackTrace) {
-      // If loading fails, start with empty history
-      debugPrint('Failed to load settings history: $e');
-      debugPrint('Stack trace: $stackTrace');
-      _history = [];
     }
   }
 
@@ -197,46 +167,25 @@ class SettingsNotifier extends Notifier<Settings> {
     }
   }
 
-  Future<bool> _saveHistory() async {
-    try {
-      debugPrint('Saving settings history to SharedPreferences...');
-      final jsonList = _history.map((entry) => entry.toJson()).toList();
-      final jsonString = jsonEncode(jsonList);
-      final success = await _prefs.setString(_historyKey, jsonString);
-
-      if (success) {
-        debugPrint(
-          'Settings history saved successfully: ${_history.length} entries',
-        );
-      } else {
-        debugPrint('ERROR: Failed to save settings history');
-        return false;
-      }
-
-      return success;
-    } catch (e, stackTrace) {
-      debugPrint('ERROR: Failed to save settings history: $e');
-      debugPrint('Stack trace: $stackTrace');
-      return false;
-    }
-  }
-
   void _addToHistory(String url, String model) {
     final newEntry = SettingsHistoryEntry(url: url, model: model);
 
+    // Create new history list with deduplication
+    final newHistory = List<SettingsHistoryEntry>.from(state.history);
+
     // Remove existing entry if it exists (deduplication)
-    _history.removeWhere((entry) => entry == newEntry);
+    newHistory.removeWhere((SettingsHistoryEntry entry) => entry == newEntry);
 
     // Add to the beginning of the list
-    _history.insert(0, newEntry);
+    newHistory.insert(0, newEntry);
 
     // Enforce 5-entry limit
-    if (_history.length > _maxHistoryEntries) {
-      _history = _history.sublist(0, _maxHistoryEntries);
-    }
+    final limitedHistory = newHistory.length > _maxHistoryEntries
+        ? newHistory.sublist(0, _maxHistoryEntries)
+        : newHistory;
 
-    // Save to persistence
-    _saveHistory();
+    // Update state with new history (will be saved with settings)
+    state = state.copyWith(history: limitedHistory);
   }
 
   Future<bool> resetToDefaults() async {
@@ -274,4 +223,3 @@ class SettingsNotifier extends Notifier<Settings> {
     await _saveSettings();
   }
 }
-

@@ -104,6 +104,9 @@ class Settings {
   final AuthType authType;
   final String? username; // For Basic Auth only
 
+  // History of previously used URL/model combinations for autocomplete
+  final List<SettingsHistoryEntry> history;
+
   const Settings({
     required this.simpleChatBaseUrl,
     required this.simpleChatModel,
@@ -114,6 +117,7 @@ class Settings {
     required this.backgroundListeningDuration,
     required this.authType,
     this.username,
+    this.history = const [],
   });
 
   factory Settings.defaults() {
@@ -140,6 +144,7 @@ class Settings {
     BackgroundListeningDuration? backgroundListeningDuration,
     AuthType? authType,
     String? username,
+    List<SettingsHistoryEntry>? history,
   }) {
     return Settings(
       simpleChatBaseUrl: simpleChatBaseUrl ?? this.simpleChatBaseUrl,
@@ -152,6 +157,7 @@ class Settings {
           backgroundListeningDuration ?? this.backgroundListeningDuration,
       authType: authType ?? this.authType,
       username: username ?? this.username,
+      history: history ?? this.history,
     );
   }
 
@@ -173,6 +179,7 @@ class Settings {
       'backgroundListeningDuration': backgroundListeningDuration.name,
       'authType': authType.name,
       'username': username,
+      'history': history.map((entry) => entry.toJson()).toList(),
     };
   }
 
@@ -217,6 +224,18 @@ class Settings {
       authType = AuthType.none;
     }
 
+    // Parse history (defaults to empty list for existing settings)
+    List<SettingsHistoryEntry> history = [];
+    if (json.containsKey('history')) {
+      final historyJson = json['history'] as List<dynamic>;
+      history = historyJson
+          .map(
+            (item) =>
+                SettingsHistoryEntry.fromJson(item as Map<String, dynamic>),
+          )
+          .toList();
+    }
+
     return Settings(
       simpleChatBaseUrl: json['simpleChatBaseUrl'] as String,
       simpleChatModel: json['simpleChatModel'] as String,
@@ -227,6 +246,7 @@ class Settings {
       backgroundListeningDuration: duration,
       authType: authType,
       username: json['username'] as String?,
+      history: history,
     );
   }
 
@@ -242,7 +262,8 @@ class Settings {
         other.voiceMode == voiceMode &&
         other.backgroundListeningDuration == backgroundListeningDuration &&
         other.authType == authType &&
-        other.username == username;
+        other.username == username &&
+        _listEquals(other.history, history);
   }
 
   @override
@@ -256,7 +277,18 @@ class Settings {
     backgroundListeningDuration,
     authType,
     username,
+    Object.hashAll(history),
   );
+
+  // Helper for list equality
+  static bool _listEquals<T>(List<T>? a, List<T>? b) {
+    if (a == null) return b == null;
+    if (b == null || a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 }
 
 const _defaultPrimeMessage = '''
