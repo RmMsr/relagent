@@ -1,5 +1,9 @@
 # Proposal: Add API Authentication Support
 
+## Why
+
+Many self-hosted or enterprise OpenAI-compatible APIs require authentication, which prevents users from connecting to these services. The app currently only supports unauthenticated API endpoints or APIs where authentication is handled externally.
+
 ## Summary
 
 Add support for authenticated OpenAI-compatible chat completion APIs using HTTP Basic authentication with secure credential storage. Form-based authentication was removed from scope to maintain simplicity and focus on the most common authentication method used by self-hosted AI APIs.
