@@ -42,15 +42,8 @@ The current development focus is on the Flutter app, which connects to any OpenA
 **Use git worktree workflow**: This projects includes scripts to simplify
 creation of branches and merging them back on a local scenarion.
 
-To start a branch:
-1. Run `bin/start-worktree.sh`
-2. Change into the newly created directory
-3. Make your changes using small iterative commits
-
-When done, squash all into main:
-1. Run `bin/apply-worktree.sh`
-2. Change into the main worktree directory.
-3. You see a single new commit on top of the main branch.
+1. Run `bin/start-worktree.sh` to start a worktree.
+2. Run `bin/apply-worktree.sh` from the worktree to merge all changes.
 
 This is a substitute for classic branches and pull requests and optimized for a
 single user and high level of automation.
@@ -67,7 +60,7 @@ Commit frequently to build checkpoints for all increments.
 
 ### Implementation Priorities
 When implementing features, prioritize:
-1. **Existing functionality** over custom solutions
+1. **Existing functionality** in app code or dependencies over custom solutions
 2. **Simple implementation** over optimization or customization
 3. **Smaller, focused classes** over complex monolithic code
 4. **Readable and maintainable code** over quick results
@@ -139,24 +132,6 @@ relagent/
 1. **For Flutter app development**: See [apps/AGENTS.md](apps/AGENTS.md) for architecture and patterns
 2. **For project vision and goals**: Review docs in `docs/` directory
 3. **For installation**: Follow instructions in [README.md](README.md)
-
-## Build/Lint/Test Commands
-
-**Flutter (apps/):**
-- See [apps/AGENTS.md](apps/AGENTS.md) for Flutter-specific commands
-- **IMPORTANT**: Always address warnings, deprecations, and analysis issues as part of any iteration
-- Run `flutter analyze` and fix all issues before completing changes
-
-**Python (experiments/):**
-- `uv sync` - Install dependencies
-- No specific test framework configured
-
-## Code Style Guidelines
-
-**General:**
-- Prefer self-explanatory code over comments
-- Break complex logic into smaller functions
-- Follow existing patterns in neighboring files
 
 ## Tool Usage Priority
 

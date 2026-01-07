@@ -15,7 +15,7 @@ class SecureCredentialService {
   bool? _isSecureStorageAvailable;
 
   SecureCredentialService({FlutterSecureStorage? secureStorage})
-      : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   /// Check if secure storage is available on this platform
   Future<bool> isSecureStorageAvailable() async {

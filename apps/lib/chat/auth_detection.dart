@@ -33,10 +33,7 @@ AuthDetectionResult detectAuthType(http.Response response) {
       // Check for Basic authentication
       if (wwwAuth.toLowerCase().startsWith('basic')) {
         final realm = extractBasicAuthRealm(wwwAuth);
-        return AuthDetectionResult(
-          authType: AuthType.basic,
-          realm: realm,
-        );
+        return AuthDetectionResult(authType: AuthType.basic, realm: realm);
       }
 
       // Unsupported authentication schemes

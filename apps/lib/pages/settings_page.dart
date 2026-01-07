@@ -53,8 +53,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _loadPassword() async {
-    final settingsNotifier = ref.read(settingsProvider.notifier);
-    final password = await settingsNotifier.getPassword();
+    final password = await ref.read(settingsProvider.notifier).getPassword();
     if (password != null && mounted) {
       _passwordController.text = password;
     }
@@ -82,23 +81,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final baseUrl = _baseUrlController.text.trim();
     final model = _modelController.text.trim();
     final settings = ref.read(settingsProvider);
-    final settingsNotifier = ref.read(settingsProvider.notifier);
 
     try {
       final service = ApiHealthCheckService();
-      final password = await settingsNotifier.getPassword();
 
       final result = await service.performHealthCheck(
         baseUrl: baseUrl,
         model: model,
         authType: settings.authType,
         username: _usernameController.text.trim(),
-        password: password,
+        password: _passwordController.text.trim().isNotEmpty
+            ? _passwordController.text.trim()
+            : null,
       );
 
       // Auto-update authType if authentication is detected
       if (result.requiresAuth && result.detectedAuthType != null) {
-        await settingsNotifier.updateAuthType(result.detectedAuthType!);
+        await ref
+            .read(settingsProvider.notifier)
+            .updateAuthType(result.detectedAuthType!);
       }
 
       setState(() {
@@ -240,14 +241,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     try {
       final service = ApiHealthCheckService();
-      final password = await settingsNotifier.getPassword();
 
       final healthResult = await service.performHealthCheck(
         baseUrl: baseUrl,
         model: model,
         authType: updatedSettings.authType,
         username: _usernameController.text.trim(),
-        password: password,
+        password: _passwordController.text.trim().isNotEmpty
+            ? _passwordController.text.trim()
+            : null,
       );
 
       if (mounted) {

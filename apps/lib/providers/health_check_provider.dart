@@ -9,8 +9,8 @@ import '/utils/logger.dart';
 /// Provider for automatic API health checks
 final healthCheckProvider =
     NotifierProvider<HealthCheckNotifier, HealthCheckState>(() {
-  return HealthCheckNotifier();
-});
+      return HealthCheckNotifier();
+    });
 
 /// State for health check provider
 class HealthCheckState {

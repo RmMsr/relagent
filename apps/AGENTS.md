@@ -1,7 +1,3 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with the Flutter app code.
-
 ## Project Overview
 
 This is the Relagent ("Relatable Agentic Minion") frontend. A multi-platform Flutter app (Android/iOS/Linux) with speech recognition capabilities that connects to any OpenAI-compatible chat API server.
@@ -13,17 +9,6 @@ This is the Relagent ("Relatable Agentic Minion") frontend. A multi-platform Flu
 - **go_router** - Navigation
 - **Sherpa-ONNX** - On-device streaming speech recognition
 - **SharedPreferences** - Settings persistence
-
-## Development Commands
-
-```bash
-# Setup - create config from template
-cp assets/config.template.json assets/config.json
-# Edit config.json to configure chat API endpoint and ASR model
-
-# Standard Flutter commands (via fvm): fvm flutter pub get, fvm flutter run, fvm flutter build, fvm flutter test, fvm flutter analyze
-# ⚠️  PREFER MCP TOOLS: Use dart-flutter_* MCP tools instead of shell commands when available
-```
 
 ### Flutter MCP Tools (Preferred)
 
@@ -71,33 +56,32 @@ These tools provide programmatic control and are **ALWAYS preferred** over bash 
 - ✅ **USE MCP**: `dart-flutter_hot_reload` - Works with connected app instances
 - ❌ **AVOID**: Manual hot reload via shell - Less reliable
 
-Logs after manual testing are found in flutter_$platform.log (e.g., flutter_android.log).
+## Log Files from Manual Testing
+
+**Location**: Log files are created in the Flutter app directory with platform-specific names:
+
+- **Android**: `flutter_android.log` (in `apps/` directory)
+- **iOS**: `flutter_ios.log`
+- **Linux**: `flutter_linux.log`
+- **Web**: `flutter_web.log`
+
+**How to Capture Logs**:
+```bash
+cd apps
+flutter run 2>&1 | tee flutter.log          # Captures both stdout and stderr
+# OR for specific platform:
+flutter run 2>&1 | tee flutter_android.log  # Android debugging
+```
+
+**Log Analysis Tools**:
+- Use `grep` to filter specific issues: `grep -E "(ERROR|FATAL|Exception)" flutter.log`
+- Use `tail -f` for real-time monitoring: `tail -f flutter.log`
+- Use `adb logcat` for Android system logs alongside Flutter logs
+
+**Important**: Always capture logs when testing new features, audio issues, or authentication problems.
 
 **Common Debugging Issues**:
 - **Notification not dismissed when switching off continuous listening**: Fixed by calling `stopForeground(STOP_FOREGROUND_REMOVE)` when switching to IDLE mode in AudioBackgroundService
-
-## MCP vs Shell Command Reference
-
-### Common Replacements
-
-| Shell Command | MCP Tool | Why MCP is Better |
-|---------------|-----------|-------------------|
-| `fvm flutter test` | `dart-flutter_run_tests` | Structured output, better error handling |
-| `fvm flutter analyze` | `dart-flutter_analyze_files` | Direct codebase integration |
-| `fvm flutter format .` | `dart-flutter_dart_format` | Targeted formatting, better control |
-| `fvm dart fix --apply` | `dart-flutter_dart_fix` | Safer automated fixes |
-| `fvm flutter pub get` | `dart-flutter_pub --command get` | Better dependency resolution |
-| `fvm flutter pub add package` | `dart-flutter_pub --command add --packageName package` | Safer package management |
-| `adb logcat` | `dart-flutter_get_runtime_errors` | Flutter-specific error filtering |
-| Manual hot reload | `dart-flutter_hot_reload` | Works with connected instances |
-
-### When Shell Commands Are Still Needed
-
-- **File operations**: `cp`, `mv`, `rm` for file management
-- **Git operations**: `git status`, `git commit`, etc.
-- **System operations**: `ls`, `find`, `grep` for exploration
-- **Build deployment**: `fvm flutter build apk` (if MCP equivalent not available)
-- **Device management**: `adb devices` when MCP device listing fails
 
 ## Architecture
 

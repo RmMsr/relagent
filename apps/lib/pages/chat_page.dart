@@ -78,10 +78,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     // Show snackbar if settings returned a message
     if (result != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result),
-          duration: const Duration(seconds: 3),
-        ),
+        SnackBar(content: Text(result), duration: const Duration(seconds: 3)),
       );
     }
   }
@@ -213,8 +210,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     HealthCheckResult result,
   ) {
     final theme = Theme.of(context);
-    final bool isAuthIssue = result.requiresAuth ||
-        result.status == HealthCheckStatus.authFailed;
+    final bool isAuthIssue =
+        result.requiresAuth || result.status == HealthCheckStatus.authFailed;
 
     String title;
     String message;
@@ -242,10 +239,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       decoration: BoxDecoration(
         color: theme.colorScheme.errorContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.error,
-          width: 1,
-        ),
+        border: Border.all(color: theme.colorScheme.error, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

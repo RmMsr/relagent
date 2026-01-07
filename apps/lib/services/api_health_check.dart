@@ -143,7 +143,7 @@ class ApiHealthCheckService {
         {'role': 'user', 'content': 'test'}
       ],
       'model': model,
-      'max_completion_tokens': 100,
+      'max_completion_tokens': 10,
     };
 
     // Build headers with authentication
