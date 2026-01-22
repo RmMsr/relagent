@@ -2,12 +2,11 @@ import configparser
 import os
 from typing import Any
 
-CONFIG_PATH = os.path.join(
-    os.getenv("HOME"), ".config", "relagent", "settings.ini"
-)
+CONFIG_PATH = os.path.join(os.getenv("HOME"), ".config", "relagent", "settings.ini")
 
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
+
 
 def get_setting(section: str, name: str, *, default: Any = None) -> Any:
     try:

@@ -106,6 +106,7 @@ This project prioritizes:
 ```
 relagent/
 ├── apps/                    # Flutter application (see apps/AGENTS.md for details)
+├── engine/                  # Python backend engine (see engine/CLAUDE.md for details)
 ├── docs/                   # Project documentation
 │   ├── development.md     # Development values and priorities
 │   ├── vision.md          # Project vision and use cases

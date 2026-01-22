@@ -1,17 +1,23 @@
 FROM ghcr.io/astral-sh/uv:debian-slim
 
+RUN useradd --home-dir=/app --no-create-home --shell=/usr/bin/sh app
+
+RUN apt-get update && apt-get install -y && apt-get clean
+
+RUN mkdir /app && chown app:app /app
+
 WORKDIR /app
 
-EXPOSE 7860
+EXPOSE 8000
 
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y
-
 ADD ./pyproject.toml ./uv.lock /app/
 
-RUN uv sync --frozen --no-dev
+USER app
 
-ADD ./experiments /app/experiments
+RUN uv sync --locked --no-dev --no-cache
 
-CMD [ "experiments/gradio-standalone.py" ]
+ADD ./engine /app/engine
+
+CMD [ "python", "-m", "engine.run" ]

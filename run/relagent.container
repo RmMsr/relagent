@@ -1,11 +1,14 @@
 [Unit]
-Description=Relagent chat server
+Description=Relagent engine
 
 [Container]
 Image=registry.gitlab.com/rmmsr/relagent
 AutoUpdate=registry
-PublishPort=3000:7860
-Volume=%h/.config/relagent/settings.ini:/root/.config/relagent/settings.ini:ro
+PublishPort=8000:8000
+ReadOnly=true
+UserNS=keep-id:uid=1000,gid=1000
+Volume=%h/.local/share/relagent/settings.ini:/app/.local/share/relagent/settings.ini:ro
+Volume=%h/.local/share/relagent/data:/app/.local/share/relagent/data:rw
 
 [Service]
 Restart=always

@@ -1,9 +1,18 @@
 [server]
 # address = 0.0.0.0
-# port = 7860
+# port = 8000
+# workers = 3
 
 [provider]
-# See: https://docs.litellm.ai/docs/providers
-# model = 
-# api_base = 
-# api_key = 
+# Configuration for an OpenAI chat compatible endpoint
+# api_base = http://localhost:11434
+# api_key =
+# default_model = olmo-3
+
+[persistence]
+# data_dir = $HOME/.local/share/relagent/data
+
+[instrumentation]
+# service_name = relagent-engine
+# otlp_endpoint = http://localhost:4318
+# gen_ai_collector_enabled = true

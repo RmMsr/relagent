@@ -5,27 +5,32 @@ import subprocess
 import sys
 from pathlib import Path
 
-from _util import find_container_framework
+from _util import find_container_framework, run_subprocess
 from server_build import build_with_framework
 
 
 def run_with_framework(framework: str) -> None:
+    command = [
+        framework,
+        "run",
+        "--name=relagent",
+        "--replace",
+        "--read-only",
+        f"--volume={Path.home()}/.local/share/relagent/settings.ini:/app/.local/share/relagent/settings.ini:ro",
+        f"--volume={Path.home()}/.local/share/relagent/data:/app/.local/share/relagent/data:rw",
+        "--publish=8000:8000",
+        "--userns=keep-id:uid=1000,gid=1000",
+        "registry.gitlab.com/rmmsr/relagent",
+    ]
+    print(f"Running command: {' '.join(command)}")
     try:
-        command = [
-            f"{framework} run",
-            "--name=relagent",
-            "--replace",
-            f"--volume={Path.home()}/.config/relagent/settings.ini:/root/.config/relagent/settings.ini:ro",
-            "gitlab.com/rmmsr/relagent",
-        ]
-        print(f"Running command: {' '.join(command)}")
-        subprocess.run(
+        run_subprocess(
             command,
             cwd=os.path.dirname(os.path.dirname(__file__)),
+            raise_error=True,
         )
     except subprocess.CalledProcessError as e:
         print(f"{framework} run failed with exit code {e.returncode}.", file=sys.stderr)
-        print(f"Command: {' '.join(e.cmd)}", file=sys.stderr)
         sys.exit(1)
 
 

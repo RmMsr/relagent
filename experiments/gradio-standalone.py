@@ -30,8 +30,8 @@ interface = gr.ChatInterface(
 )
 
 if __name__ == "__main__":
-    address = get_setting('server', 'address')
-    port = get_setting_int('server', 'port', default=7860)
+    address = get_setting("server", "address")
+    port = get_setting_int("server", "port", default=7860)
     print(
         f"Starting server on {address if address else '<default>'}:{port if port else '<default>'}..."
     )
