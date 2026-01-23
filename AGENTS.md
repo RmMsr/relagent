@@ -105,14 +105,13 @@ This project prioritizes:
 
 ```
 relagent/
-├── apps/                    # Flutter application (see apps/AGENTS.md for details)
-├── engine/                  # Python backend engine (see engine/CLAUDE.md for details)
-├── docs/                   # Project documentation
+├── apps/                  # Flutter application (see apps/AGENTS.md for details)
+├── engine/                # Python backend engine (see engine/CLAUDE.md for details)
+├── docs/                  # Project documentation
 │   ├── development.md     # Development values and priorities
 │   ├── vision.md          # Project vision and use cases
 │   └── goals.md           # Project goals and principles
-├── bin/                    # Backend scripts (obsolete)
-├── experiments/            # Python experiments and prototypes
+├── bin/                   # Backend scripts (obsolete)
 └── README.md              # Main project readme
 ```
 
