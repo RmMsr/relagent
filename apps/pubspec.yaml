@@ -1,7 +1,7 @@
 name: relagent
 description: "Relatable Agentic Minion - Privacy focused and open AI agent"
 publish_to: "none"
-version: 0.1.0
+version: 0.1.1
 
 environment:
   sdk: ^3.9.2
@@ -41,6 +41,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/icon/app_icon.png
     - assets/config.json
     - assets/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06/
     - assets/kokoro-en-v0_19/

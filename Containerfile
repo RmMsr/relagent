@@ -19,5 +19,6 @@ USER app
 RUN uv sync --locked --no-dev --no-cache
 
 ADD ./engine /app/engine
+ADD ./VERSION /app/VERSION
 
 CMD [ "python", "-m", "engine.run" ]
