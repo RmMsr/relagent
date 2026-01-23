@@ -59,11 +59,6 @@ def _get_version() -> str:
     return "unknown"
 
 
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
 @app.get("/status")
 async def status() -> dict[str, str]:
     """Return service status including version information."""

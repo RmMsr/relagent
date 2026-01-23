@@ -59,7 +59,7 @@ bin/server_install.py
 
 Data is by default stored in `~/.local/share/relagent/`. Please review the `settings.ini` file there.
 
-After installation the API should be running. You can check by browsing to `http://localhost:8000/health`. If everything worked you will get an `OK` message.
+After installation the API should be running. You can check by browsing to `http://localhost:8000/status`. If everything worked you will get an `OK` message.
 
 For troubleshooting those commands could be helpful:
 

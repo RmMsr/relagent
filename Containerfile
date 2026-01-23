@@ -12,13 +12,12 @@ ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get upgrade -y && apt-get clean
 
-ADD ./pyproject.toml ./uv.lock /app/
+ADD ./pyproject.toml ./uv.lock ./VERSION /app/
 
 USER app
 
 RUN uv sync --locked --no-dev --no-cache
 
 ADD ./engine /app/engine
-ADD ./VERSION /app/VERSION
 
 CMD [ "python", "-m", "engine.run" ]
