@@ -57,15 +57,15 @@ REPO_NAME=$(basename "$(git rev-parse --show-toplevel)")
 if [ -z "$WORKTREE_NAME" ]; then
   # Generate random seed for variety
   if [ -r /dev/urandom ]; then
-    seed=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1)
+    seed=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 16 | head -n 1)
   else
-    seed=$(date +%s | tail -c 7 | tr -dc '0-9' | head -c 6)
+    seed=$(date +%N | tail -c 24 | tr -dc '0-9' | head -c 16)
   fi
 
   # Try to generate a human-friendly suffix using opencode with seed
   suffix=""
   if command -v opencode >/dev/null 2>&1; then
-    suffix=$(opencode run "Generate a short random name made of 2-3 words (seed $seed). Lower case. No tool usage." 2>/dev/null | head -n 3 | tr -dc 'a-zA-Z0-9-')
+    suffix=$(opencode run "Generate a brief friendly and inpiring phrase made of 2-3 words [ref $seed]. Lower case. No tool usage. No thinking." 2>/dev/null | head -n 3 | tr -dc 'a-zA-Z0-9-')
     if [ -z "$suffix" ] || [ ${#suffix} -gt 20 ]; then
       suffix=""
     fi

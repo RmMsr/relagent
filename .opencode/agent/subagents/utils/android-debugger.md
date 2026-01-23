@@ -1,4 +1,5 @@
 ---
+name: Android debugger
 description:
   A specialist in accessing and debugging android device errors, performance
   and ANR

@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-@app.post("/message")
+@app.post("/api/v1/message")
 async def chat(body: ChatRequest | str) -> ChatResponse | str:
     plain_body = not isinstance(body, ChatRequest)
 

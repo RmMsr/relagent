@@ -23,12 +23,9 @@ def main() -> None:
 
     # Copy settings file
     copy_file(project_root / "settings.ini.template", APP_DIR / "settings.ini")
-    print(f"Please check {APP_DIR / 'settings.ini'} and adjust to your needs.")
 
     # Ensure default data_dir exists
     (APP_DIR / "data").mkdir(exist_ok=True)
-
-    ensure_registry_login()
 
     # Enable and setup podman auto update
     enable_systemd_user_unit(unit_name=AUTO_UPDATE_TIMER)
@@ -41,6 +38,11 @@ def main() -> None:
     # Reload and start service
     reload_systemd()
     start_service(SERVICE_NAME)
+
+    print(
+        "Installation complete. Please review the settings file: %s"
+        % (APP_DIR / "settings.ini")
+    )
 
 
 def copy_file(src: Path, dst: Path):

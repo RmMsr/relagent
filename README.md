@@ -65,7 +65,7 @@ For troubleshooting those commands could be helpful:
 
 ```
 systemctl --user status relagent.service
-journalctl --user -u relagent.service -f
+journalctl --user --unit=relagent.service --lines=30 --follow
 ```
 
 If the `relagent.service` is missing or outdated, a problem with the podman generator is likely. Check:
