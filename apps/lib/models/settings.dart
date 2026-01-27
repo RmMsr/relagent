@@ -1,8 +1,8 @@
 enum VoiceMode {
-  silent, // One-shot recording, no auto-playback
+  silent, // Dictation mode, no auto-playback
   listening, // Continuous recording, no auto-playback
   conversation, // Continuous recording + auto-playback
-  reading, // One-shot recording + auto-playback
+  reading, // Dictation mode + auto-playback
 }
 
 enum AuthType {

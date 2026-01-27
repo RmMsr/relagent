@@ -79,15 +79,15 @@ class ASR {
         _recognizer = await createOnlineRecognizer();
         developer.Timeline.finishSync();
 
-        developer.Timeline.startSync('ASR_CreateStream');
-        _stream = _recognizer?.createStream();
-        developer.Timeline.finishSync();
-
         _isInitialized = true;
       } finally {
         developer.Timeline.finishSync();
       }
     }
+
+    // Create a fresh stream for each recording session
+    // (stream is freed in stop(), so must recreate here)
+    _stream = _recognizer?.createStream();
 
     try {
       if (await _audioRecorder!.hasPermission()) {

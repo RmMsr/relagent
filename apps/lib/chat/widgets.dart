@@ -1,34 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 import 'package:relagent/chat/models.dart';
 
 import '/models/app_info.dart';
 import '/providers/chat_provider.dart';
+import '/providers/recording_provider.dart';
 import '/providers/tts_provider.dart';
+import '/speech_recognition/recording_target.dart';
 import '/speech_recognition/widgets.dart';
+import '/utils/logger.dart';
 import '/widgets/version_info_widget.dart';
 
-class ChatInput extends StatefulWidget {
+class ChatInput extends ConsumerStatefulWidget {
   final ValueChanged<String> onSubmitted;
 
   const ChatInput({super.key, required this.onSubmitted});
 
   @override
-  State<StatefulWidget> createState() {
+  ConsumerState<ChatInput> createState() {
     return ChatInputState();
   }
 }
 
-class ChatInputState extends State<ChatInput> {
+class ChatInputState extends ConsumerState<ChatInput>
+    implements RecordingTarget {
   final TextEditingController _controller = TextEditingController();
-
-  void _setText(String text) {
-    setState(() {
-      _controller.text = text;
-    });
-  }
+  final FocusNode _focusNode = FocusNode();
+  String _textBeforeRecording = '';
+  // Cache notifier reference for use in dispose (ref is already disposed there)
+  RecordingNotifier? _recordingNotifier;
 
   void _submitText() {
     final text = _controller.text;
@@ -36,10 +38,111 @@ class ChatInputState extends State<ChatInput> {
       return;
     }
 
+    // Stop dictation mode when submitting text (per spec requirement)
+    final recordingState = ref.read(recordingProvider);
+    if (recordingState.isRecording && !recordingState.isContinuous) {
+      ref.read(recordingProvider.notifier).stopDictation();
+    }
+
     widget.onSubmitted(_controller.text);
     setState(() {
       _controller.clear();
+      _textBeforeRecording = ''; // Reset baseline to prevent stale text
     });
+    // Keep keyboard open by maintaining focus
+    _focusNode.requestFocus();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Register as recording target after widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recordingNotifier = ref.read(recordingProvider.notifier);
+      _recordingNotifier!.registerTarget(this);
+    });
+  }
+
+  @override
+  void dispose() {
+    // Unregister using cached notifier (ref is already disposed here)
+    _recordingNotifier?.unregisterTarget(this);
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  // RecordingTarget implementation
+  @override
+  void onTextRecognized(String text) {
+    if (text.isEmpty) return;
+
+    setState(() {
+      // In dictation mode: append each utterance to baseline
+      // In continuous mode: just show the current utterance
+      final recordingState = ref.read(recordingProvider);
+      final newText = _textBeforeRecording + text;
+
+      Logger.debug(
+        '[ChatInput] onTextRecognized: baseline="$_textBeforeRecording", text="$text", result="$newText"',
+      );
+
+      if (recordingState.isContinuous) {
+        // Continuous mode: show current utterance only
+        _controller.text = newText;
+      } else {
+        // Dictation mode: accumulate all utterances
+        // The baseline includes all previous utterances
+        _controller.text = newText;
+      }
+      // Move cursor to end
+      _controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: _controller.text.length),
+      );
+    });
+  }
+
+  @override
+  void onTextFinished() {
+    final recordingState = ref.read(recordingProvider);
+    Logger.debug(
+      '[ChatInput] onTextFinished: continuous=${recordingState.isContinuous}, controller="${_controller.text}", baseline="$_textBeforeRecording"',
+    );
+
+    if (recordingState.isContinuous) {
+      // Continuous mode: submit and clear for next utterance
+      _submitText();
+    } else {
+      // Dictation mode: commit this utterance to the baseline
+      // so next utterance appends to it
+      setState(() {
+        _textBeforeRecording = _controller.text;
+      });
+      Logger.debug(
+        '[ChatInput] onTextFinished: updated baseline to "$_textBeforeRecording"',
+      );
+    }
+  }
+
+  @override
+  void onRecordingStarted() {
+    // Save current text for appending
+    _textBeforeRecording = _controller.text;
+  }
+
+  @override
+  void onRecordingStopped() {
+    // Don't clear _textBeforeRecording here - it will be updated on next start
+  }
+
+  @override
+  void onError(String error) {
+    // Show error to user via snackbar
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+    }
   }
 
   @override
@@ -50,39 +153,30 @@ class ChatInputState extends State<ChatInput> {
       child: Row(
         children: [
           Expanded(
-            child: Focus(
-              onKeyEvent: _inputNewlineOrSubmit,
-              child: TextField(
-                controller: _controller,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  hintText: 'Type a message...',
-                ),
-                minLines: 1,
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-                textInputAction: TextInputAction.newline,
+            child: TextField(
+              autofocus: true,
+              controller: _controller,
+              focusNode: _focusNode,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: 'Type a message...',
               ),
+              minLines: 1,
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _submitText(),
             ),
           ),
-          RecorderButton(
-            onTextRecognized: _setText,
-            onTextFinished: _submitText,
+          IconButton(
+            icon: const Icon(Icons.send),
+            onPressed: _submitText,
+            tooltip: 'Send message',
           ),
+          RecorderButton(),
         ],
       ),
     );
-  }
-
-  // Enable submitting with Enter while allowing newline with Shift+Enter
-  KeyEventResult _inputNewlineOrSubmit(FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.enter &&
-        !HardwareKeyboard.instance.isShiftPressed) {
-      _submitText();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
   }
 }
 

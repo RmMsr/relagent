@@ -1,8 +1,5 @@
-# chat-input Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change fix-chat-input-clearing-after-voice-submit. Update Purpose after archive.
-## Requirements
 ### Requirement: Input Clearing After Successful Submission
 The system SHALL clear the chat input field immediately after a successful message submission.
 
@@ -25,6 +22,8 @@ The system SHALL clear the chat input field immediately after a successful messa
 - **WHEN** the submission is initiated
 - **THEN** input clearing SHALL happen synchronously
 - **AND** SHALL NOT wait for server response
+
+## ADDED Requirements
 
 ### Requirement: RecordingTarget Implementation
 The ChatInput widget SHALL implement the RecordingTarget interface to receive speech recognition events directly.
@@ -109,4 +108,3 @@ The ChatInput SHALL stop dictation mode when the user submits text, allowing sea
 - **THEN** continuous listening SHALL NOT be stopped
 - **AND** only the current text SHALL be submitted
 - **AND** listening SHALL continue for next input
-

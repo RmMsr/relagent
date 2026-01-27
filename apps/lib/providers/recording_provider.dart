@@ -7,6 +7,7 @@ import 'package:record/record.dart';
 import '/models/settings.dart';
 import '/providers/audio_coordinator_provider.dart';
 import '/providers/settings_provider.dart';
+import '/speech_recognition/recording_target.dart';
 import '/speech_recognition/services.dart';
 import '../utils/logger.dart';
 
@@ -77,6 +78,12 @@ class RecordingNotifier extends Notifier<RecordingState> {
   static const _platform = MethodChannel('com.relagent.background_service');
 
   ASR? _asr;
+
+  // Target management
+  RecordingTarget? _activeTarget;
+
+  // Track intentional stops to avoid false "unexpected closure" errors
+  bool _stoppingIntentionally = false;
 
   // Health monitoring fields
   Timer? _healthCheckTimer;
@@ -175,8 +182,20 @@ class RecordingNotifier extends Notifier<RecordingState> {
         newMode == VoiceMode.listening || newMode == VoiceMode.conversation;
 
     if (!wasContinuous && isContinuous) {
-      Logger.debug('RecordingProvider: Switching to continuous mode');
-      _startContinuous();
+      // Switching TO continuous mode
+      if (state.isRecording && !state.isContinuous) {
+        // Already recording in dictation mode - just update the flag
+        Logger.debug(
+          'RecordingProvider: Upgrading dictation to continuous mode (keeping recording active)',
+        );
+        state = state.copyWith(isContinuous: true);
+        _startHealthMonitoring();
+        _startDurationTimer();
+      } else {
+        // Not recording yet - start fresh
+        Logger.debug('RecordingProvider: Switching to continuous mode');
+        _startContinuous();
+      }
     } else if (wasContinuous && !isContinuous) {
       Logger.debug(
         'RecordingProvider: Switching from continuous mode (stopping)',
@@ -218,6 +237,8 @@ class RecordingNotifier extends Notifier<RecordingState> {
       _startHealthMonitoring();
       _startDurationTimer();
       Logger.debug('RecordingProvider: Continuous recording started');
+      // Notify target that recording started
+      _activeTarget?.onRecordingStarted();
     } catch (e) {
       Logger.debug(
         'RecordingProvider: Failed to start continuous recording: $e',
@@ -238,11 +259,13 @@ class RecordingNotifier extends Notifier<RecordingState> {
     Logger.debug('RecordingProvider: Stopping continuous recording');
     _stopHealthMonitoring();
     _stopDurationTimer();
+    _stoppingIntentionally = true;
     try {
       await _asr?.stop();
     } catch (e) {
       Logger.debug('RecordingProvider: Error during stop: $e');
     } finally {
+      _stoppingIntentionally = false;
       // Always update state and release lock, even if stop fails
       state = state.copyWith(
         isRecording: false,
@@ -253,13 +276,22 @@ class RecordingNotifier extends Notifier<RecordingState> {
       Logger.debug(
         'RecordingProvider: Continuous recording stopped (state reset)',
       );
+      // Notify target that recording stopped
+      _activeTarget?.onRecordingStopped();
     }
   }
 
-  Future<void> startOneShot() async {
+  Future<void> startDictation() async {
     if (state.isRecording) return;
 
-    Logger.debug('RecordingProvider: Starting single recording');
+    // Defensive check: warn if no target registered
+    if (_activeTarget == null) {
+      Logger.debug(
+        'RecordingProvider: WARNING - Starting dictation without active target',
+      );
+    }
+
+    Logger.debug('RecordingProvider: Starting dictation mode');
 
     // Reset baseline for new recording session
     _resetAudioLevelTracking();
@@ -292,31 +324,37 @@ class RecordingNotifier extends Notifier<RecordingState> {
       if (_asr != null) _asr!.init();
       await _asr!.start();
       state = state.copyWith(isInitializing: false);
-      Logger.debug('RecordingProvider: Single recording started');
+      Logger.debug('RecordingProvider: Dictation mode started');
+      // Notify target that recording started
+      _activeTarget?.onRecordingStarted();
     } catch (e) {
-      Logger.debug('RecordingProvider: Failed to start single recording: $e');
-      state = state.copyWith(
-        isRecording: false,
-        error: 'Failed to start recording: $e',
-      );
+      Logger.debug('RecordingProvider: Failed to start dictation mode: $e');
+      final errorMsg = 'Failed to start recording: $e';
+      state = state.copyWith(isRecording: false, error: errorMsg);
+      // Notify target of error
+      _activeTarget?.onError(errorMsg);
       // Release coordinator lock on failure
       await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
     }
   }
 
-  Future<void> stopOneShot() async {
+  Future<void> stopDictation() async {
     if (!state.isRecording || state.isContinuous) return;
 
-    Logger.debug('RecordingProvider: Stopping single recording');
+    Logger.debug('RecordingProvider: Stopping dictation mode');
+    _stoppingIntentionally = true;
     try {
       await _asr?.stop();
     } catch (e) {
       Logger.debug('RecordingProvider: Error during stop: $e');
     } finally {
+      _stoppingIntentionally = false;
       // Always update state and release lock, even if stop fails
       state = state.copyWith(isRecording: false, amplitudeHistory: []);
       await ref.read(audioCoordinatorProvider.notifier).releaseRecording();
-      Logger.debug('RecordingProvider: Single recording stopped (state reset)');
+      Logger.debug('RecordingProvider: Dictation mode stopped (state reset)');
+      // Notify target that recording stopped
+      _activeTarget?.onRecordingStopped();
     }
   }
 
@@ -326,6 +364,31 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
   void clearTextToSubmit() {
     state = state.copyWith(textToSubmit: () => null);
+  }
+
+  /// Register a target to receive speech recognition events.
+  ///
+  /// Only one target can be active at a time. If a target is already registered,
+  /// this method will log a debug message and replace it with the new target.
+  void registerTarget(RecordingTarget target) {
+    if (_activeTarget != null) {
+      Logger.debug(
+        'RecordingProvider: Replacing existing target with new target',
+      );
+    }
+    _activeTarget = target;
+    Logger.debug('RecordingProvider: Target registered');
+  }
+
+  /// Unregister the active recording target.
+  ///
+  /// If the provided target is not the active target, this is a no-op.
+  /// This prevents stale references when widgets are disposed.
+  void unregisterTarget(RecordingTarget target) {
+    if (_activeTarget == target) {
+      _activeTarget = null;
+      Logger.debug('RecordingProvider: Target unregistered');
+    }
   }
 
   void _updateAmplitude(double amplitudeDbFS) {
@@ -423,11 +486,13 @@ class RecordingNotifier extends Notifier<RecordingState> {
     Logger.debug('RecordingProvider: internalStop() called by coordinator');
     _stopHealthMonitoring();
     _stopDurationTimer();
+    _stoppingIntentionally = true;
     try {
       await _asr?.stop();
     } catch (e) {
       Logger.debug('RecordingProvider: Error during internal stop: $e');
     } finally {
+      _stoppingIntentionally = false;
       // Always update state, even if stop fails
       state = state.copyWith(
         isRecording: false,
@@ -473,19 +538,41 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
     _asr = ASR(
       textRecognized: (text) {
-        Logger.debug('Text recognized: $text');
+        Logger.debug(
+          'RecordingProvider: textRecognized - "$text" (continuous: ${state.isContinuous}, target: ${_activeTarget != null})',
+        );
         state = state.copyWith(recognizedText: text);
+        // Route to active target
+        if (_activeTarget != null) {
+          _activeTarget!.onTextRecognized(text);
+        } else {
+          Logger.debug('RecordingProvider: No active target to receive text');
+        }
       },
       textFinished: () {
+        Logger.debug(
+          'RecordingProvider: textFinished - recognizedText: "${state.recognizedText}" (continuous: ${state.isContinuous})',
+        );
         // Endpoint detected (pause in speech)
-        // In continuous mode: save text for submission and clear for next utterance
-        // In single-recording mode: text stays for user to edit/submit
+        // In continuous mode: submit text automatically
+        // In dictation mode: target decides when to submit (e.g., user presses Enter)
         if (state.isContinuous && state.recognizedText.isNotEmpty) {
           final textToSend = state.recognizedText;
+          Logger.debug(
+            'RecordingProvider: Submitting text in continuous mode: "$textToSend"',
+          );
           state = state.copyWith(
             recognizedText: '',
             textToSubmit: () => textToSend,
           );
+          // Notify target that text is finished
+          if (_activeTarget != null) {
+            _activeTarget!.onTextFinished();
+          } else {
+            Logger.debug(
+              'RecordingProvider: No active target for textFinished',
+            );
+          }
         }
       },
       onRecordStateChanged: (recordState) {
@@ -498,14 +585,27 @@ class RecordingNotifier extends Notifier<RecordingState> {
       onAmplitudeChanged: (amplitudeDbFS) {
         _updateAmplitude(amplitudeDbFS);
       },
-      onStreamError: (error) {
+      onStreamError: (Object error) {
         Logger.debug('RecordingProvider: Audio stream error: $error');
-        state = state.copyWith(error: 'Audio stream error: $error');
+        final errorMsg = 'Audio stream error: $error';
+        state = state.copyWith(error: errorMsg);
+        // Notify target of error
+        _activeTarget?.onError(errorMsg);
       },
       onStreamDone: () {
-        Logger.debug('RecordingProvider: Audio stream closed unexpectedly');
-        if (state.isRecording) {
-          state = state.copyWith(error: 'Audio stream closed unexpectedly');
+        // Only log error if this wasn't an intentional stop
+        if (!_stoppingIntentionally) {
+          Logger.debug('RecordingProvider: Audio stream closed unexpectedly');
+          if (state.isRecording) {
+            const errorMsg = 'Audio stream closed unexpectedly';
+            state = state.copyWith(error: errorMsg);
+            // Notify target of error
+            _activeTarget?.onError(errorMsg);
+          }
+        } else {
+          Logger.debug(
+            'RecordingProvider: Audio stream closed (intentional stop)',
+          );
         }
       },
     );

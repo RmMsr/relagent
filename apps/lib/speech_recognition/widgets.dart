@@ -5,7 +5,6 @@ import 'package:record/record.dart';
 import '/models/settings.dart';
 import '/providers/recording_provider.dart';
 import '/providers/settings_provider.dart';
-import '../../utils/logger.dart';
 
 class RecordingStateIndicator extends StatelessWidget {
   final RecordingState recordingState;
@@ -254,23 +253,20 @@ class _VolumeBarVisualizerState extends State<VolumeBarVisualizer>
   }
 }
 
-class RecorderButton extends ConsumerStatefulWidget {
-  final ValueChanged<String> onTextRecognized;
-  final VoidCallback onTextFinished;
-
-  const RecorderButton({
-    super.key,
-    required this.onTextRecognized,
-    required this.onTextFinished,
-  });
+/// Recording button widget that controls speech recognition.
+///
+/// This is a simple UI widget that:
+/// - Displays recording state visually (mic icon, amplitude visualizer)
+/// - Triggers start/stop recording actions via RecordingProvider
+/// - Handles voice mode transitions (listening/conversation modes)
+///
+/// The button does NOT handle text routing - that's managed by RecordingProvider
+/// routing events to the active RecordingTarget (typically ChatInput).
+class RecorderButton extends ConsumerWidget {
+  const RecorderButton({super.key});
 
   @override
-  ConsumerState<RecorderButton> createState() => RecorderButtonState();
-}
-
-class RecorderButtonState extends ConsumerState<RecorderButton> {
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final voiceMode = ref.watch(settingsProvider).voiceMode;
     final recordingState = ref.watch(recordingProvider);
 
@@ -284,20 +280,6 @@ class RecorderButtonState extends ConsumerState<RecorderButton> {
       tooltip = 'Start recording';
     }
 
-    // Listen for text updates
-    ref.listen<RecordingState>(recordingProvider, (previous, next) {
-      if (previous?.recognizedText != next.recognizedText) {
-        widget.onTextRecognized(next.recognizedText);
-      }
-      if (next.textToSubmit != null &&
-          previous?.textToSubmit != next.textToSubmit) {
-        Logger.debug('RecorderButton: textToSubmit: "${next.textToSubmit}"');
-        widget.onTextRecognized(next.textToSubmit!);
-        widget.onTextFinished();
-        ref.read(recordingProvider.notifier).clearTextToSubmit();
-      }
-    });
-
     return IconButton(
       onPressed: () {
         final voiceMode = ref.read(settingsProvider).voiceMode;
@@ -309,13 +291,13 @@ class RecorderButtonState extends ConsumerState<RecorderButton> {
               ? VoiceMode.silent
               : VoiceMode.reading;
           ref.read(settingsProvider.notifier).updateVoiceMode(newMode);
-          return; // Fix: Return early after voice mode change to prevent falling through to one-shot logic
+          return; // Fix: Return early after voice mode change to prevent falling through to dictation logic
         }
 
         if (recordingState.isRecording) {
-          ref.read(recordingProvider.notifier).stopOneShot();
+          ref.read(recordingProvider.notifier).stopDictation();
         } else {
-          ref.read(recordingProvider.notifier).startOneShot();
+          ref.read(recordingProvider.notifier).startDictation();
         }
       },
       icon: SizedBox(
