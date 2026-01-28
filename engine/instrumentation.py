@@ -34,23 +34,19 @@ def init_instrumentation(app: FastAPI):
     tracer_provider = TracerProvider(resource=resource)
     trace.set_tracer_provider(tracer_provider)
 
-    endpoint: str | None = None
+    endpoint = get_setting("instrumentation", "otlp_endpoint")
 
-    if get_setting("instrumentation", "gen_ai_collector_enabled", default=False):
+    if endpoint and get_setting(
+        "instrumentation", "gen_ai_collector_enabled", default=False
+    ):
         # Add the OpenInference span processor for Phoenix to capture pydantic_ai traces
-        endpoint = get_setting("instrumentation", "otlp_endpoint")
+        logger.info("Adding OpenInference span processor for Pydantic AI")
 
-        if endpoint:
-            logger.info("Adding OpenInference span processor for Pydantic AI")
+        from openinference.instrumentation.pydantic_ai import (
+            OpenInferenceSpanProcessor,
+        )
 
-            from openinference.instrumentation.pydantic_ai import (
-                OpenInferenceSpanProcessor,
-            )
-
-            tracer_provider.add_span_processor(OpenInferenceSpanProcessor())
-
-    else:
-        endpoint = get_setting("instrumentation", "otlp_endpoint")
+        tracer_provider.add_span_processor(OpenInferenceSpanProcessor())
 
     if endpoint:
         exporter = OTLPSpanExporter(endpoint=endpoint)

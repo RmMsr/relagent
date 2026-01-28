@@ -1,76 +1,35 @@
 from contextlib import asynccontextmanager
-from importlib.metadata import version as get_package_version
-from pathlib import Path
 
 from fastapi import FastAPI
 
+from engine.api import api_router
+from engine.constants import VERSION
 from engine.instrumentation import init_instrumentation
-from engine.models import ChatRequest, ChatResponse
-from engine.services import user_input
 from engine.settings import get_setting, get_setting_int, reset_env
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def _lifespan(app: FastAPI):
     reset_env()
-    init_instrumentation(app=app)
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=_lifespan, version=VERSION)
+init_instrumentation(app=app)
 
-
-@app.post("/api/v1/message")
-async def chat(body: ChatRequest | str) -> ChatResponse | str:
-    plain_body = not isinstance(body, ChatRequest)
-
-    request: ChatRequest | None = None
-
-    if not plain_body:
-        request = body
-    else:
-        request = ChatRequest(content=body)
-
-    response = await user_input(request=request)
-
-    if plain_body:
-        return response.content
-    else:
-        return response
-
-
-def _get_version() -> str:
-    """Get package version from installed metadata or VERSION file."""
-    # Try installed package metadata first
-    try:
-        return get_package_version("relagent-engine")
-    except Exception:
-        pass
-
-    # Fall back to VERSION file (for development or container without editable install)
-    try:
-        # VERSION file is at repo root, engine/ is one level down
-        version_file = Path(__file__).parent.parent / "VERSION"
-        if version_file.exists():
-            return version_file.read_text().strip()
-    except Exception:
-        pass
-
-    return "unknown"
+app.include_router(api_router, prefix="/api/v1")
 
 
 @app.get("/status")
 async def status() -> dict[str, str]:
-    """Return service status including version information."""
     return {
         "name": "relagent-engine",
-        "version": _get_version(),
+        "version": VERSION,
         "status": "ok",
     }
 
 
 def _print_banner() -> None:
-    """Print startup banner with ASCII art."""
     banner = r"""
   ____      _                        _
  |  _ \ ___| | __ _  __ _  ___ _ __ | |_
@@ -80,7 +39,7 @@ def _print_banner() -> None:
                     |___/
 """
     print(banner)
-    print(f"  Engine v{_get_version()}")
+    print(f"  Engine v{VERSION}")
     print()
 
 

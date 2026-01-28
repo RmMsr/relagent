@@ -23,8 +23,9 @@ class SessionInfo(BaseModel):
         default_factory=uuid.uuid4,
         examples=["151a0cfb-74bb-4978-8881-3d15e4017a5e"],
     )
-    title: str | None
+    title: str | None = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
     def save_as_yaml(self) -> None:
         """Save session info to YAML file."""
@@ -36,6 +37,8 @@ class SessionInfo(BaseModel):
         )
         logger.info("Saving session info to: %s", file_path)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        if os.path.exists(file_path):
+            os.remove(file_path)
         with portalocker.open_atomic(filename=file_path, binary=False) as f:
             f.write(to_yaml_str(model=self))  # type: ignore[reportUnknownVariableType]
             f.flush()
@@ -57,15 +60,26 @@ class SessionInfo(BaseModel):
             raise SessionCorrupted(session_id=session_id) from exp
 
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
 class ChatRequest(BaseModel):
     session_id: UUID | None = Field(
         description="Unique ID referencing the session",
         default=None,
         examples=["151a0cfb-74bb-4978-8881-3d15e4017a5e"],
     )
-    content: str = Field(
+    messages: list[ChatMessage] = Field(
         description="Input from the app",
-        examples=["Hi, how long until peaceful coexistence day?"],
+        examples=[
+            [
+                ChatMessage(
+                    role="user", content="Hi, how long until peaceful coexistence day?"
+                )
+            ]
+        ],
     )
 
 
