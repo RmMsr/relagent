@@ -12,7 +12,6 @@ wheels/
 
 # Temporary files
 data
-.gradio
 
 # Development tools
 .aider*

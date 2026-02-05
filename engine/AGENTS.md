@@ -20,10 +20,10 @@ This is the Relagent engine, an agentic service for the Relagent apps. It provid
 Uses `uv` for dependency management with dependencies in `pyproject.toml`.
 
 ```bash
-uv sync --group dev    # Install dependencies
-uv run pytest          # Run tests
-uv run ruff check engine/ tests/   # Lint
-uv run pyright engine/ # Type check
+uv sync --group dev          # Install dependencies
+uv run pytest engine/tests/  # Run tests
+uv run ruff check engine/    # Lint
+uv run pyright engine/       # Type check
 ```
 
 ## Key Modules

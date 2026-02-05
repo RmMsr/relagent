@@ -1,12 +1,13 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from engine.adapters.pydantic_ai_execution import PydanticAgentAdapter
 from engine.adapters.yaml_persistence import YamlPersistenceAdapter
 from engine.constants import DATA_DIR, DEBUG_DUMPS
-from engine.domain.models import ChatMessage, ChatRequest, ChatResponse, MessagesResponse
+from engine.domain.exceptions import ChatContextNotFound
+from engine.domain.models import ChatRequest, ChatResponse, MessagesResponse, UserMessage
 from engine.domain.services import ChatService
 
 api_router = APIRouter()
@@ -30,7 +31,7 @@ async def messages(
 
     # Wrap request text into ChatRequest if needed
     request: ChatRequest = (
-        ChatRequest(messages=[ChatMessage(role="user", content=body)])
+        ChatRequest(messages=[UserMessage(content=body)])
         if plain_body
         else body
     )
@@ -38,11 +39,14 @@ async def messages(
     response: ChatResponse = await service.perform_user_input(request=request)
 
     if plain_body:
-        return response.content
+        return response.message.content
     else:
         return response
 
 
 @api_router.get("/messages/{session_id}")
 def get_messages(session_id: UUID, service: ChatServiceDepends) -> MessagesResponse:
-    return service.get_messages(session_id=session_id)
+    try:
+        return service.get_messages(session_id=session_id)
+    except ChatContextNotFound:
+        raise HTTPException(status_code=404, detail="Session not found")
