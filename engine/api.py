@@ -1,11 +1,12 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
 from engine.adapters.pydantic_ai_execution import PydanticAgentAdapter
 from engine.adapters.yaml_persistence import YamlPersistenceAdapter
 from engine.constants import DATA_DIR, DEBUG_DUMPS
-from engine.domain.models import ChatMessage, ChatRequest, ChatResponse
+from engine.domain.models import ChatMessage, ChatRequest, ChatResponse, MessagesResponse
 from engine.domain.services import ChatService
 
 api_router = APIRouter()
@@ -40,3 +41,8 @@ async def messages(
         return response.content
     else:
         return response
+
+
+@api_router.get("/messages/{session_id}")
+def get_messages(session_id: UUID, service: ChatServiceDepends) -> MessagesResponse:
+    return service.get_messages(session_id=session_id)

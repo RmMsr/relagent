@@ -5,7 +5,6 @@ from pydantic_ai import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
-    SystemPromptPart,
     TextPart,
     UserPromptPart,
 )
@@ -14,7 +13,7 @@ from engine.adapters.pydantic_ai_execution.agent_definitions import (
     discussion_agent,
     title_summarizer_agent,
 )
-from engine.domain.models import ChatContext, ChatMessage
+from engine.domain.models import AssistantMessage, ChatContext, ChatMessage
 from engine.domain.ports import AgentExecution
 
 
@@ -23,12 +22,14 @@ class PydanticAgentAdapter(AgentExecution):
         super().__init__()
         self.debug_dumps = debug_dumps
 
-    async def run_basic_query(self, context: ChatContext, query: str) -> ChatMessage:
+    async def run_basic_query(
+        self, context: ChatContext, query: str
+    ) -> AssistantMessage:
         history = self._get_history_from_messages(context.messages)
         ai_response = await discussion_agent.run(query, message_history=history)
         if self.debug_dumps:
             self._dump_raw_messages(ai_response, "basic_query")
-        return ChatMessage(role="assistant", content=ai_response.output)
+        return AssistantMessage(role="assistant", content=ai_response.output)
 
     async def generate_title(self, query: str) -> str:
         ai_response = await title_summarizer_agent.run(query)
@@ -48,12 +49,6 @@ class PydanticAgentAdapter(AgentExecution):
                     )
                 case "assistant":
                     results.append(ModelResponse(parts=[TextPart(content=msg.content)]))
-                case "system":
-                    results.append(
-                        ModelRequest(parts=[SystemPromptPart(content=msg.content)])
-                    )
-                case _:
-                    raise ValueError(f"Unknown role: {msg.role}")
         return results
 
     def _dump_raw_messages(self, result: AgentRunResult, prefix: str = "") -> None:

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from engine.domain.models import ChatContext, ChatMessage, SessionInfo
+from engine.domain.models import AssistantMessage, ChatContext, SessionInfo
 
 
 class Persistence(ABC):
@@ -40,7 +40,9 @@ class Persistence(ABC):
 
 class AgentExecution(ABC):
     @abstractmethod
-    async def run_basic_query(self, context: ChatContext, query: str) -> ChatMessage:
+    async def run_basic_query(
+        self, context: ChatContext, query: str
+    ) -> AssistantMessage:
         """
         Executes basic agentic query within context
         """

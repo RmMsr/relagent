@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -22,9 +23,19 @@ class SessionInfo(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class ChatMessage(BaseModel):
-    role: str
+class UserMessage(BaseModel):
+    role: Literal["user"] = "user"
     content: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AssistantMessage(BaseModel):
+    role: Literal["assistant"] = "assistant"
+    content: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+ChatMessage = UserMessage | AssistantMessage
 
 
 class ChatContext(BaseModel):
@@ -37,12 +48,12 @@ class ChatRequest(BaseModel):
         default=None,
         examples=["151a0cfb-74bb-4978-8881-3d15e4017a5e"],
     )
-    messages: list[ChatMessage] = Field(
+    messages: list[UserMessage] = Field(
         description="Input from the app",
         default_factory=list,
         examples=[
             [
-                ChatMessage(
+                UserMessage(
                     role="user", content="Hi, how long until peaceful coexistence day?"
                 )
             ]
@@ -55,4 +66,15 @@ class ChatResponse(BaseModel):
         description="Unique ID referencing the session",
         examples=["151a0cfb-74bb-4978-8881-3d15e4017a5e"],
     )
-    content: str
+    message: AssistantMessage
+
+
+class MessagesResponse(BaseModel):
+    session_id: UUID = Field(
+        description="Unique ID referencing the session",
+        examples=["151a0cfb-74bb-4978-8881-3d15e4017a5e"],
+    )
+    messages: list[ChatMessage] = Field(
+        description="All messages in the session",
+        default_factory=list,
+    )

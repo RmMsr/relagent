@@ -6,6 +6,7 @@ from engine.domain.models import (
     ChatContext,
     ChatRequest,
     ChatResponse,
+    MessagesResponse,
     SessionInfo,
 )
 from engine.domain.ports import AgentExecution, Persistence
@@ -34,8 +35,6 @@ class ChatService:
             context, request.messages[-1].content
         )
 
-        # Todo: dump raw messages for debugging
-
         context.messages.extend(request.messages)
         context.messages.append(ai_response)
 
@@ -43,7 +42,7 @@ class ChatService:
 
         self.persistence_repository.save_context(session=session, context=context)
         self.persistence_repository.save_session(session=session)
-        return ChatResponse(session_id=session.session_id, content=ai_response.content)
+        return ChatResponse(session_id=session.session_id, message=ai_response)
 
     def ensure_session(self, session_id: UUID | None) -> SessionInfo:
         if session_id is None:
@@ -68,6 +67,12 @@ class ChatService:
             return self.persistence_repository.load_context(session_id=session_id)
         except ChatContextNotFound:
             return ChatContext()
+
+    def get_messages(self, session_id: UUID) -> MessagesResponse:
+        context: ChatContext = self.persistence_repository.load_context(
+            session_id=session_id
+        )
+        return MessagesResponse(session_id=session_id, messages=context.messages)
 
     async def ensure_session_title(
         self, session: SessionInfo, context: ChatContext

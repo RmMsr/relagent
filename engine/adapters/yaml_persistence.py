@@ -14,7 +14,14 @@ from engine.domain.exceptions import (
     PersistenceError,
     SessionNotFound,
 )
-from engine.domain.models import ChatContext, ChatMessage, Metadata, SessionInfo
+from engine.domain.models import (
+    AssistantMessage,
+    ChatContext,
+    ChatMessage,
+    Metadata,
+    SessionInfo,
+    UserMessage,
+)
 from engine.domain.ports import Persistence
 
 logger = logging.getLogger(__name__)
@@ -81,7 +88,18 @@ class YamlPersistenceAdapter(Persistence):
         messages: list[ChatMessage] = []
         for num, doc in enumerate(docs[1:], start=1):
             try:
-                messages.append(ChatMessage.model_validate(doc))
+                match doc.get("role"):
+                    case "user":
+                        messages.append(UserMessage.model_validate(doc))
+                    case "assistant":
+                        messages.append(AssistantMessage.model_validate(doc))
+                    case _:
+                        logger.error(
+                            "Failed to load chat message (#%d). See file: %s",
+                            num,
+                            file_path,
+                        )
+                        raise ChatContextNotFound(session_id=session_id)
             except ValidationError as exc:
                 logger.error(
                     "Failed to load chat message (#%d). See file: %s", num, file_path
