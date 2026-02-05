@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -26,7 +25,7 @@ def run_with_framework(framework: str) -> None:
     try:
         run_subprocess(
             command,
-            cwd=os.path.dirname(os.path.dirname(__file__)),
+            cwd=Path(__file__).parent,
             raise_error=True,
         )
     except subprocess.CalledProcessError as e:

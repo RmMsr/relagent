@@ -1,23 +1,40 @@
-from fastapi import APIRouter
+from typing import Annotated
 
-from engine.models import ChatMessage, ChatRequest, ChatResponse
-from engine.services import user_input
+from fastapi import APIRouter, Depends
+
+from engine.adapters.pydantic_ai_execution import PydanticAgentAdapter
+from engine.adapters.yaml_persistence import YamlPersistenceAdapter
+from engine.constants import DATA_DIR, DEBUG_DUMPS
+from engine.domain.models import ChatMessage, ChatRequest, ChatResponse
+from engine.domain.services import ChatService
 
 api_router = APIRouter()
 
 
+def dependency_chat_service() -> ChatService:
+    return ChatService(
+        persistence_repository=YamlPersistenceAdapter(data_dir=DATA_DIR),
+        agent_execution=PydanticAgentAdapter(debug_dumps=DEBUG_DUMPS),
+    )
+
+
+ChatServiceDepends = Annotated[ChatService, Depends(dependency_chat_service)]
+
+
 @api_router.post("/messages")
-async def messages(body: ChatRequest | str) -> ChatResponse | str:
+async def messages(
+    body: ChatRequest | str, service: ChatServiceDepends
+) -> ChatResponse | str:
     plain_body = not isinstance(body, ChatRequest)
 
-    request: ChatRequest | None = None
+    # Wrap request text into ChatRequest if needed
+    request: ChatRequest = (
+        ChatRequest(messages=[ChatMessage(role="user", content=body)])
+        if plain_body
+        else body
+    )
 
-    if not plain_body:
-        request = body
-    else:
-        request = ChatRequest(messages=[ChatMessage(role="user", content=body)])
-
-    response = await user_input(request=request)
+    response: ChatResponse = await service.perform_user_input(request=request)
 
     if plain_body:
         return response.content

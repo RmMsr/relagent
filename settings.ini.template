@@ -17,9 +17,12 @@
 # default_model = olmo-3
 
 [persistence]
-# data_dir = $HOME/.local/share/relagent/data
+# data_dir = ~/.local/share/relagent/data
 
 [instrumentation]
 # service_name = relagent-engine
 # otlp_endpoint = http://localhost:4318
 # gen_ai_collector_enabled = true
+
+[debug]
+# raw_data_dump = true

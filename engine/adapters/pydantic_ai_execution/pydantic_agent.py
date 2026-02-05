@@ -1,0 +1,76 @@
+from typing import Sequence
+
+from pydantic_ai import (
+    AgentRunResult,
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    SystemPromptPart,
+    TextPart,
+    UserPromptPart,
+)
+
+from engine.adapters.pydantic_ai_execution.agent_definitions import (
+    discussion_agent,
+    title_summarizer_agent,
+)
+from engine.domain.models import ChatContext, ChatMessage
+from engine.domain.ports import AgentExecution
+
+
+class PydanticAgentAdapter(AgentExecution):
+    def __init__(self, debug_dumps: bool = False) -> None:
+        super().__init__()
+        self.debug_dumps = debug_dumps
+
+    async def run_basic_query(self, context: ChatContext, query: str) -> ChatMessage:
+        history = self._get_history_from_messages(context.messages)
+        ai_response = await discussion_agent.run(query, message_history=history)
+        if self.debug_dumps:
+            self._dump_raw_messages(ai_response, "basic_query")
+        return ChatMessage(role="assistant", content=ai_response.output)
+
+    async def generate_title(self, query: str) -> str:
+        ai_response = await title_summarizer_agent.run(query)
+        if self.debug_dumps:
+            self._dump_raw_messages(ai_response, "title_summarizer")
+        return ai_response.output
+
+    def _get_history_from_messages(
+        self, messages: Sequence[ChatMessage]
+    ) -> Sequence[ModelMessage]:
+        results: list[ModelMessage] = []
+        for msg in messages:
+            match msg.role:
+                case "user":
+                    results.append(
+                        ModelRequest(parts=[UserPromptPart(content=msg.content)])
+                    )
+                case "assistant":
+                    results.append(ModelResponse(parts=[TextPart(content=msg.content)]))
+                case "system":
+                    results.append(
+                        ModelRequest(parts=[SystemPromptPart(content=msg.content)])
+                    )
+                case _:
+                    raise ValueError(f"Unknown role: {msg.role}")
+        return results
+
+    def _dump_raw_messages(self, result: AgentRunResult, prefix: str = "") -> None:
+        """
+        Helps debugging by dumping raw messages to a YAML file
+        """
+
+        import json
+        from pathlib import Path
+
+        import yaml
+
+        from engine.constants import DATA_DIR
+
+        file_prefix = prefix + "_" if prefix else ""
+
+        file_path = Path(DATA_DIR) / "debug" / (file_prefix + "last_messages_raw.yaml")
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(file=file_path, mode="w") as fh:
+            yaml.safe_dump(json.loads(result.all_messages_json()), fh)

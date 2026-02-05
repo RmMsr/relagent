@@ -1,6 +1,7 @@
 import shutil
 import subprocess
 import sys
+from os import PathLike
 
 
 def find_container_framework() -> str:
@@ -15,7 +16,7 @@ def find_container_framework() -> str:
 def run_subprocess(
     args: list[str],
     *,
-    cwd: str | None = None,
+    cwd: PathLike[str] | None = None,
     input: bytes | None = None,
     quiet: bool = False,
     raise_error: bool = False,

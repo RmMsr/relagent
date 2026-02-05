@@ -10,5 +10,8 @@ UserNS=keep-id:uid=1000,gid=1000
 Volume=%h/.local/share/relagent/settings.ini:/app/.local/share/relagent/settings.ini:ro
 Volume=%h/.local/share/relagent/data:/app/.local/share/relagent/data:rw
 
+[Install]
+WantedBy=default.target
+
 [Service]
 Restart=always

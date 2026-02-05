@@ -2,13 +2,15 @@ import configparser
 import logging
 import os
 from configparser import ConfigParser
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_SETTINGS_FILE = os.path.join(
-    os.environ.get("HOME", "~"), ".local", "share", "relagent", "settings.ini"
-)
+_SETTINGS_FILE: Path = (
+    Path("~") / ".local" / "share" / "relagent" / "settings.ini"
+).expanduser()
+
 
 config: ConfigParser = configparser.ConfigParser()
 config.read(_SETTINGS_FILE)
@@ -42,13 +44,27 @@ def get_setting_int(
     return value
 
 
+def get_setting_bool(
+    section: str, name: str, *, default: bool = False, write_log: bool = True
+) -> bool:
+    value: bool = default
+    try:
+        value = config.getboolean(section, name, fallback=default)
+    except (configparser.NoSectionError, ValueError):
+        pass
+    finally:
+        if write_log:
+            logger.info("Setting '%s.%s' is %s", section, name, repr(value))
+    return value
+
+
 def reset_env():
     """
     Ensure no unintended configuration affects runtime behaviour
     """
 
     backup = dict[str, str]()
-    keep = ["PWD", "HOME"]
+    keep = ["PWD"]
 
     for k in keep:
         if k in os.environ:

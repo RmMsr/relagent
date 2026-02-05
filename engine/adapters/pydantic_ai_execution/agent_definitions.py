@@ -13,7 +13,29 @@ default_model = OpenAIChatModel(
 
 Agent.instrument_all(True)
 
-simple_chat_agent = Agent(
+simple_question_agent = Agent(
+    model=default_model,
+    instructions="""
+        You are a knowledge agent.
+
+        Please answer questions short and precise. Use all information available.
+        If in doubt don't guess, but be transparent about your uncertainty.
+        Use the tools available if they are likely to improve quality of ans answer.
+    """,
+    tools=[user_name_tool, current_date_and_time_tool, web_search_tool],
+)
+
+title_summarizer_agent = Agent(
+    model=default_model,
+    instructions="""
+        You are an summarizer of questions.
+
+        Based on the given input you respond quickly with just a few word that
+        summarize the nature and topic of the beginning of the conversation.
+    """,
+)
+
+discussion_agent = Agent(
     model=default_model,
     instructions="""
         You are a helpful assistant.
@@ -27,14 +49,4 @@ simple_chat_agent = Agent(
         Be transparent about unclear data or low confidence levels.
     """,
     tools=[user_name_tool, current_date_and_time_tool, web_search_tool],
-)
-
-title_summarizer_agent = Agent(
-    model=default_model,
-    instructions="""
-        You are an summarizer of questions.
-
-        Based on the given input you respond quickly with just a few word that
-        summarize the nature and topic of the beginning of the conversation.
-    """,
 )
