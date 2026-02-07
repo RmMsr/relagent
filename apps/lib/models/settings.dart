@@ -1,3 +1,6 @@
+// Sentinel value for copyWith to distinguish "not provided" from "explicitly null"
+const Object _unset = Object();
+
 enum VoiceMode {
   silent, // Dictation mode, no auto-playback
   listening, // Continuous recording, no auto-playback
@@ -8,6 +11,11 @@ enum VoiceMode {
 enum AuthType {
   none, // No authentication required
   basic, // HTTP Basic authentication
+}
+
+enum ChatBackendType {
+  openAiCompatible, // Any OpenAI-compatible API server
+  relagentEngine, // Full-featured Relagent backend
 }
 
 enum BackgroundListeningDuration {
@@ -100,12 +108,21 @@ class Settings {
   // Background listening duration limit
   final BackgroundListeningDuration backgroundListeningDuration;
 
-  // Authentication settings
+  // Authentication settings (for simple chat)
   final AuthType authType;
   final String? username; // For Basic Auth only
 
   // History of previously used URL/model combinations for autocomplete
   final List<SettingsHistoryEntry> history;
+
+  // Engine settings (for agentic chat)
+  final String engineBaseUrl;
+  final AuthType engineAuthType;
+  final String? engineUsername;
+  final String? agenticSessionId;
+
+  // Selected chat backend type
+  final ChatBackendType selectedBackend;
 
   const Settings({
     required this.simpleChatBaseUrl,
@@ -118,6 +135,11 @@ class Settings {
     required this.authType,
     this.username,
     this.history = const [],
+    required this.engineBaseUrl,
+    required this.engineAuthType,
+    this.engineUsername,
+    this.agenticSessionId,
+    required this.selectedBackend,
   });
 
   factory Settings.defaults() {
@@ -131,6 +153,11 @@ class Settings {
       backgroundListeningDuration: BackgroundListeningDuration.oneHour,
       authType: AuthType.none,
       username: null,
+      engineBaseUrl: 'http://localhost:8000',
+      engineAuthType: AuthType.none,
+      engineUsername: null,
+      agenticSessionId: null,
+      selectedBackend: ChatBackendType.relagentEngine,
     );
   }
 
@@ -145,6 +172,11 @@ class Settings {
     AuthType? authType,
     String? username,
     List<SettingsHistoryEntry>? history,
+    String? engineBaseUrl,
+    AuthType? engineAuthType,
+    String? engineUsername,
+    Object? agenticSessionId = _unset,
+    ChatBackendType? selectedBackend,
   }) {
     return Settings(
       simpleChatBaseUrl: simpleChatBaseUrl ?? this.simpleChatBaseUrl,
@@ -158,6 +190,13 @@ class Settings {
       authType: authType ?? this.authType,
       username: username ?? this.username,
       history: history ?? this.history,
+      engineBaseUrl: engineBaseUrl ?? this.engineBaseUrl,
+      engineAuthType: engineAuthType ?? this.engineAuthType,
+      engineUsername: engineUsername ?? this.engineUsername,
+      agenticSessionId: agenticSessionId == _unset
+          ? this.agenticSessionId
+          : agenticSessionId as String?,
+      selectedBackend: selectedBackend ?? this.selectedBackend,
     );
   }
 
@@ -180,6 +219,11 @@ class Settings {
       'authType': authType.name,
       'username': username,
       'history': history.map((entry) => entry.toJson()).toList(),
+      'engineBaseUrl': engineBaseUrl,
+      'engineAuthType': engineAuthType.name,
+      'engineUsername': engineUsername,
+      'agenticSessionId': agenticSessionId,
+      'selectedBackend': selectedBackend.name,
     };
   }
 
@@ -236,6 +280,30 @@ class Settings {
           .toList();
     }
 
+    // Parse engine auth type (defaults to none for existing settings)
+    AuthType engineAuthType;
+    if (json.containsKey('engineAuthType')) {
+      final engineAuthTypeStr = json['engineAuthType'] as String;
+      engineAuthType = AuthType.values.firstWhere(
+        (e) => e.name == engineAuthTypeStr,
+        orElse: () => AuthType.none,
+      );
+    } else {
+      engineAuthType = AuthType.none;
+    }
+
+    // Parse selectedBackend (defaults to relagentEngine for new installs)
+    ChatBackendType selectedBackend;
+    if (json.containsKey('selectedBackend')) {
+      final backendStr = json['selectedBackend'] as String;
+      selectedBackend = ChatBackendType.values.firstWhere(
+        (e) => e.name == backendStr,
+        orElse: () => ChatBackendType.relagentEngine,
+      );
+    } else {
+      selectedBackend = ChatBackendType.relagentEngine;
+    }
+
     return Settings(
       simpleChatBaseUrl: json['simpleChatBaseUrl'] as String,
       simpleChatModel: json['simpleChatModel'] as String,
@@ -247,6 +315,12 @@ class Settings {
       authType: authType,
       username: json['username'] as String?,
       history: history,
+      engineBaseUrl: (json['engineBaseUrl'] as String?) ??
+          'http://localhost:8000',
+      engineAuthType: engineAuthType,
+      engineUsername: json['engineUsername'] as String?,
+      agenticSessionId: json['agenticSessionId'] as String?,
+      selectedBackend: selectedBackend,
     );
   }
 
@@ -263,7 +337,12 @@ class Settings {
         other.backgroundListeningDuration == backgroundListeningDuration &&
         other.authType == authType &&
         other.username == username &&
-        _listEquals(other.history, history);
+        _listEquals(other.history, history) &&
+        other.engineBaseUrl == engineBaseUrl &&
+        other.engineAuthType == engineAuthType &&
+        other.engineUsername == engineUsername &&
+        other.agenticSessionId == agenticSessionId &&
+        other.selectedBackend == selectedBackend;
   }
 
   @override
@@ -278,6 +357,11 @@ class Settings {
     authType,
     username,
     Object.hashAll(history),
+    engineBaseUrl,
+    engineAuthType,
+    engineUsername,
+    agenticSessionId,
+    selectedBackend,
   );
 
   // Helper for list equality

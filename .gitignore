@@ -12,6 +12,7 @@ wheels/
 
 # Temporary files
 data
+schema.json
 
 # Development tools
 .aider*

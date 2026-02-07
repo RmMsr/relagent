@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '/agentic/health_check.dart';
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
 import '/services/api_health_check.dart';
@@ -26,8 +27,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   HealthCheckResult? _healthCheckResult;
   bool _isHealthCheckRunning = false;
   bool _obscurePassword = true;
-  bool _authenticationExpanded =
-      true; // Authentication section expanded by default
+  bool _authenticationExpanded = false;
+
+  // Engine settings controllers
+  late TextEditingController _engineUrlController;
+  late TextEditingController _engineUsernameController;
+  late TextEditingController _enginePasswordController;
+  bool _obscureEnginePassword = true;
+  EngineHealthResult? _engineHealthCheckResult;
+  bool _isEngineHealthCheckRunning = false;
+  late bool _engineBasicAuthEnabled;
 
   @override
   void initState() {
@@ -48,14 +57,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _ttsSpeed = settings.ttsSpeed;
     _backgroundListeningDuration = settings.backgroundListeningDuration;
 
-    // Load saved password asynchronously
+    // Engine settings
+    _engineUrlController = TextEditingController(text: settings.engineBaseUrl);
+    _engineUsernameController = TextEditingController(
+      text: settings.engineUsername ?? '',
+    );
+    _enginePasswordController = TextEditingController();
+    _engineBasicAuthEnabled = settings.engineAuthType == AuthType.basic;
+
+    // Expand auth section if username is already set
+    _authenticationExpanded = settings.username?.isNotEmpty ?? false;
+
+    // Load saved passwords asynchronously (may also expand sections)
     _loadPassword();
+    _loadEnginePassword();
+  }
+
+  Future<void> _loadEnginePassword() async {
+    final password =
+        await ref.read(settingsProvider.notifier).getEnginePassword();
+    if (password != null && mounted) {
+      _enginePasswordController.text = password;
+    }
   }
 
   Future<void> _loadPassword() async {
     final password = await ref.read(settingsProvider.notifier).getPassword();
     if (password != null && mounted) {
       _passwordController.text = password;
+      setState(() {
+        _authenticationExpanded = true;
+      });
     }
   }
 
@@ -67,6 +99,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _ttsSpeakerIdController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _engineUrlController.dispose();
+    _engineUsernameController.dispose();
+    _enginePasswordController.dispose();
     super.dispose();
   }
 
@@ -110,6 +145,43 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       setState(() {
         _healthCheckResult = HealthCheckResult.connectionFailed(e.toString());
         _isHealthCheckRunning = false;
+      });
+    }
+  }
+
+  Future<void> _testEngineConnection() async {
+    if (_isEngineHealthCheckRunning) return;
+
+    setState(() {
+      _isEngineHealthCheckRunning = true;
+      _engineHealthCheckResult = null;
+    });
+
+    final baseUrl = _engineUrlController.text.trim();
+    final authType = _engineBasicAuthEnabled ? AuthType.basic : AuthType.none;
+
+    try {
+      final service = EngineHealthCheckService();
+
+      final result = await service.checkStatus(
+        baseUrl: baseUrl,
+        authType: authType,
+        username: _engineUsernameController.text.trim(),
+        password: _enginePasswordController.text.trim().isNotEmpty
+            ? _enginePasswordController.text.trim()
+            : null,
+      );
+
+      setState(() {
+        _engineHealthCheckResult = result;
+        _isEngineHealthCheckRunning = false;
+      });
+    } catch (e) {
+      setState(() {
+        _engineHealthCheckResult = EngineHealthResult.connectionFailed(
+          e.toString(),
+        );
+        _isEngineHealthCheckRunning = false;
       });
     }
   }
@@ -187,14 +259,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final settings = ref.read(settingsProvider);
 
-    // Save authentication credentials if changed
+    // Save simple chat authentication credentials if changed
     if (_usernameController.text.trim() != (settings.username ?? '')) {
       await settingsNotifier.updateUsername(_usernameController.text.trim());
     }
 
     if (_passwordController.text.isNotEmpty) {
       await settingsNotifier.setPassword(_passwordController.text);
-      // Keep password in field (already there from secure storage or user entry)
+    }
+
+    // Save engine settings
+    await settingsNotifier.updateEngineBaseUrl(_engineUrlController.text.trim());
+    final engineAuthType = _engineBasicAuthEnabled ? AuthType.basic : AuthType.none;
+    if (engineAuthType != settings.engineAuthType) {
+      await settingsNotifier.updateEngineAuthType(engineAuthType);
+    }
+    if (_engineUsernameController.text.trim() !=
+        (settings.engineUsername ?? '')) {
+      await settingsNotifier
+          .updateEngineUsername(_engineUsernameController.text.trim());
+    }
+    if (_enginePasswordController.text.isNotEmpty) {
+      await settingsNotifier.setEnginePassword(_enginePasswordController.text);
     }
 
     final success = await settingsNotifier.updateSettings(
@@ -234,32 +320,52 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       return;
     }
 
-    // Settings saved successfully - run health check
-    final baseUrl = _baseUrlController.text.trim();
-    final model = _modelController.text.trim();
+    // Settings saved successfully - run health check for selected backend
     final updatedSettings = ref.read(settingsProvider);
 
     try {
-      final service = ApiHealthCheckService();
+      bool isSuccess;
+      String failureMessage;
 
-      final healthResult = await service.performHealthCheck(
-        baseUrl: baseUrl,
-        model: model,
-        authType: updatedSettings.authType,
-        username: _usernameController.text.trim(),
-        password: _passwordController.text.trim().isNotEmpty
-            ? _passwordController.text.trim()
-            : null,
-      );
+      if (updatedSettings.selectedBackend == ChatBackendType.relagentEngine) {
+        // Engine health check
+        final service = EngineHealthCheckService();
+        final engineAuthType =
+            _engineBasicAuthEnabled ? AuthType.basic : AuthType.none;
+        final result = await service.checkStatus(
+          baseUrl: _engineUrlController.text.trim(),
+          authType: engineAuthType,
+          username: _engineUsernameController.text.trim(),
+          password: _enginePasswordController.text.trim().isNotEmpty
+              ? _enginePasswordController.text.trim()
+              : null,
+        );
+        isSuccess = result.isSuccess;
+        failureMessage = result.message;
+      } else {
+        // OpenAI-compatible health check
+        final service = ApiHealthCheckService();
+        final result = await service.performHealthCheck(
+          baseUrl: _baseUrlController.text.trim(),
+          model: _modelController.text.trim(),
+          authType: updatedSettings.authType,
+          username: _usernameController.text.trim(),
+          password: _passwordController.text.trim().isNotEmpty
+              ? _passwordController.text.trim()
+              : null,
+        );
+        isSuccess = result.isSuccess;
+        failureMessage = result.message;
+      }
 
       if (mounted) {
-        if (healthResult.isSuccess) {
+        if (isSuccess) {
           // Success - close immediately and show message on previous page
           context.pop('Settings saved and connection verified successfully');
         } else {
           // Health check failed - show warning dialog with option to close anyway
           await _showHealthCheckFailureDialog(
-            'Connection test failed: ${healthResult.message}',
+            'Connection test failed: $failureMessage',
           );
         }
       }
@@ -308,9 +414,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _modelController.text = settings.simpleChatModel;
     _primeMessageController.text = settings.primeMessage;
     _ttsSpeakerIdController.text = settings.ttsSpeakerId.toString();
+    _engineUrlController.text = settings.engineBaseUrl;
+    _engineUsernameController.text = settings.engineUsername ?? '';
+    _enginePasswordController.clear();
     setState(() {
       _ttsSpeed = settings.ttsSpeed;
       _backgroundListeningDuration = settings.backgroundListeningDuration;
+      _engineBasicAuthEnabled = settings.engineAuthType == AuthType.basic;
     });
 
     if (mounted) {
@@ -387,11 +497,53 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           padding: const EdgeInsets.all(16.0),
           children: [
             const Text(
-              'Chat API Configuration',
+              'Chat Backend',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
+            const SizedBox(height: 8),
+            Text(
+              'Select which backend to use for chat',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             const SizedBox(height: 16),
-            Autocomplete<String>(
+            SegmentedButton<ChatBackendType>(
+              segments: const [
+                ButtonSegment<ChatBackendType>(
+                  value: ChatBackendType.relagentEngine,
+                  label: Text('Relagent Engine'),
+                  icon: Icon(Icons.smart_toy_outlined),
+                ),
+                ButtonSegment<ChatBackendType>(
+                  value: ChatBackendType.openAiCompatible,
+                  label: Text('OpenAI-compatible'),
+                  icon: Icon(Icons.cloud_outlined),
+                ),
+              ],
+              selected: {settings.selectedBackend},
+              onSelectionChanged: (Set<ChatBackendType> newSelection) {
+                ref
+                    .read(settingsProvider.notifier)
+                    .updateSelectedBackend(newSelection.first);
+              },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              settings.selectedBackend == ChatBackendType.openAiCompatible
+                  ? 'Connect to any OpenAI-compatible API server (LM Studio, Ollama, vLLM, etc.)'
+                  : 'Connect to the full-featured Relagent engine with persistence and agentic capabilities',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            if (settings.selectedBackend ==
+                ChatBackendType.openAiCompatible) ...[
+              const SizedBox(height: 32),
+              const Text(
+                'Chat API Configuration',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              Autocomplete<String>(
               optionsBuilder: (TextEditingValue textEditingValue) {
                 // Always show all URL suggestions, but prioritize matches
                 final matches = urlSuggestions.where((String option) {
@@ -709,9 +861,146 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ],
               ),
             ),
+            ],
+            if (settings.selectedBackend ==
+                ChatBackendType.relagentEngine) ...[
+              const SizedBox(height: 32),
+              const Text(
+                'Engine Configuration',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Agentic chat backend (Relagent engine)',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _engineUrlController,
+              decoration: const InputDecoration(
+                labelText: 'Engine URL',
+                hintText: 'http://localhost:8000',
+                border: OutlineInputBorder(),
+                helperText: 'Relagent engine base URL',
+              ),
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter an engine URL';
+                }
+                if (!value.startsWith('http://') &&
+                    !value.startsWith('https://')) {
+                  return 'URL must start with http:// or https://';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('Basic Authentication'),
+              subtitle: const Text('Enable HTTP Basic Auth'),
+              value: _engineBasicAuthEnabled,
+              onChanged: (bool value) {
+                setState(() {
+                  _engineBasicAuthEnabled = value;
+                });
+              },
+              contentPadding: EdgeInsets.zero,
+            ),
+            if (_engineBasicAuthEnabled) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _engineUsernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Username',
+                  border: OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _enginePasswordController,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureEnginePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureEnginePassword = !_obscureEnginePassword;
+                      });
+                    },
+                  ),
+                ),
+                obscureText: _obscureEnginePassword,
+                textInputAction: TextInputAction.done,
+              ),
+            ],
+            if (_engineHealthCheckResult != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _engineHealthCheckResult!.isSuccess
+                      ? Colors.green.withValues(alpha: 0.1)
+                      : Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _engineHealthCheckResult!.isSuccess
+                        ? Colors.green
+                        : Colors.red,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _engineHealthCheckResult!.isSuccess
+                          ? Icons.check_circle
+                          : Icons.error,
+                      color: _engineHealthCheckResult!.isSuccess
+                          ? Colors.green
+                          : Colors.red,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _engineHealthCheckResult!.message,
+                        style: TextStyle(
+                          color: _engineHealthCheckResult!.isSuccess
+                              ? Colors.green
+                              : Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed:
+                  _isEngineHealthCheckRunning ? null : _testEngineConnection,
+              icon: _isEngineHealthCheckRunning
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.health_and_safety),
+              label: Text(
+                _isEngineHealthCheckRunning ? 'Testing...' : 'Test Connection',
+              ),
+            ),
+            ],
             const SizedBox(height: 32),
             const Text(
-              'TTS Settings',
+              'Voice Settings',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
@@ -761,11 +1050,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 32),
-            const Text(
-              'Background Listening',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
             const SizedBox(height: 16),
             DropdownButtonFormField<BackgroundListeningDuration>(
               initialValue: _backgroundListeningDuration,
@@ -805,12 +1089,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            TextButton.icon(
-              onPressed: () => context.push('/info'),
-              icon: const Icon(Icons.info_outline),
-              label: const Text('App Info'),
             ),
           ],
         ),

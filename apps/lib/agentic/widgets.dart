@@ -1,0 +1,642 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
+import 'package:intl/intl.dart';
+
+import '/agentic/health_check.dart';
+import '/agentic/models.dart';
+import '/models/app_info.dart';
+import '/providers/recording_provider.dart';
+import '/providers/tts_provider.dart';
+import '/speech_recognition/recording_target.dart';
+import '/speech_recognition/widgets.dart';
+import '/utils/logger.dart';
+import '/widgets/version_info_widget.dart';
+
+class AgenticChatInput extends ConsumerStatefulWidget {
+  final ValueChanged<String> onSubmitted;
+
+  const AgenticChatInput({super.key, required this.onSubmitted});
+
+  @override
+  ConsumerState<AgenticChatInput> createState() => _AgenticChatInputState();
+}
+
+class _AgenticChatInputState extends ConsumerState<AgenticChatInput>
+    implements RecordingTarget {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  String _textBeforeRecording = '';
+  RecordingNotifier? _recordingNotifier;
+
+  void _submitText() {
+    final text = _controller.text;
+    if (text == '') return;
+
+    final recordingState = ref.read(recordingProvider);
+    if (recordingState.isRecording && !recordingState.isContinuous) {
+      ref.read(recordingProvider.notifier).stopDictation();
+    }
+
+    widget.onSubmitted(_controller.text);
+    setState(() {
+      _controller.clear();
+      _textBeforeRecording = '';
+    });
+    _focusNode.requestFocus();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recordingNotifier = ref.read(recordingProvider.notifier);
+      _recordingNotifier!.registerTarget(this);
+    });
+  }
+
+  @override
+  void dispose() {
+    _recordingNotifier?.unregisterTarget(this);
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  void onTextRecognized(String text) {
+    if (text.isEmpty) return;
+
+    setState(() {
+      final recordingState = ref.read(recordingProvider);
+      final newText = _textBeforeRecording + text;
+
+      Logger.debug(
+        '[AgenticChatInput] onTextRecognized: baseline="$_textBeforeRecording", text="$text", result="$newText"',
+      );
+
+      if (recordingState.isContinuous) {
+        _controller.text = newText;
+      } else {
+        _controller.text = newText;
+      }
+      _controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: _controller.text.length),
+      );
+    });
+  }
+
+  @override
+  void onTextFinished() {
+    final recordingState = ref.read(recordingProvider);
+    Logger.debug(
+      '[AgenticChatInput] onTextFinished: continuous=${recordingState.isContinuous}',
+    );
+
+    if (recordingState.isContinuous) {
+      _submitText();
+    } else {
+      setState(() {
+        _textBeforeRecording = _controller.text;
+      });
+    }
+  }
+
+  @override
+  void onRecordingStarted() {
+    _textBeforeRecording = _controller.text;
+  }
+
+  @override
+  void onRecordingStopped() {}
+
+  @override
+  void onError(String error) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
+      decoration: const BoxDecoration(border: Border(top: BorderSide())),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              autofocus: true,
+              controller: _controller,
+              focusNode: _focusNode,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                hintText: 'Type a message...',
+              ),
+              minLines: 1,
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _submitText(),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.send),
+            onPressed: _submitText,
+            tooltip: 'Send message',
+          ),
+          RecorderButton(),
+        ],
+      ),
+    );
+  }
+}
+
+class _MessageGroup {
+  final AgenticRole sender;
+  final List<AgenticMessage> messages;
+  final DateTime firstMessageTime;
+
+  _MessageGroup({
+    required this.sender,
+    required this.messages,
+    required this.firstMessageTime,
+  });
+
+  bool shouldBreakGroup(AgenticMessage nextMessage) {
+    if (nextMessage.role != sender) return true;
+    final lastMessageTime = messages.last.timestamp;
+    final timeDiff = nextMessage.timestamp.difference(lastMessageTime);
+    return timeDiff.inMinutes > 5;
+  }
+}
+
+List<_MessageGroup> _groupMessages(List<AgenticMessage> messages) {
+  final groups = <_MessageGroup>[];
+  _MessageGroup? currentGroup;
+
+  for (final message in messages) {
+    if (currentGroup == null || currentGroup.shouldBreakGroup(message)) {
+      currentGroup = _MessageGroup(
+        sender: message.role,
+        messages: [message],
+        firstMessageTime: message.timestamp,
+      );
+      groups.add(currentGroup);
+    } else {
+      currentGroup.messages.add(message);
+    }
+  }
+
+  return groups;
+}
+
+class AgenticChatHistory extends StatelessWidget {
+  final List<AgenticMessage> messages;
+  final bool showAssistantPending;
+  final void Function(String, String)? onSpeak;
+  final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
+  final EngineHealthResult? engineHealthResult;
+  final VoidCallback? onRetry;
+
+  const AgenticChatHistory({
+    super.key,
+    required this.messages,
+    this.showAssistantPending = false,
+    this.onSpeak,
+    this.getMessagePlaybackStatus,
+    this.engineHealthResult,
+    this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final chatWidgets = <Widget>[];
+
+    if (messages.isEmpty && !showAssistantPending) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline,
+                size: 80,
+                color: theme.colorScheme.primary.withAlpha((255 * 0.3).round()),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Welcome to ${AppInfo.data.name}',
+                style: theme.textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const VersionInfoWidget(),
+              if (engineHealthResult != null &&
+                  engineHealthResult!.isSuccess) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Connected to ${engineHealthResult!.engineName ?? 'Engine'} v${engineHealthResult!.engineVersion ?? '?'}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 32),
+              Text(
+                'Start a conversation by typing a message or using voice input',
+                style: theme.textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final groups = _groupMessages(messages);
+
+    for (int groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+      final group = groups[groupIndex];
+      final isLastGroup = groupIndex == groups.length - 1;
+
+      for (int msgIndex = 0; msgIndex < group.messages.length; msgIndex++) {
+        final message = group.messages[msgIndex];
+        final isFirstInGroup = msgIndex == 0;
+        final isLastInGroup = msgIndex == group.messages.length - 1;
+
+        chatWidgets.add(
+          _AgenticMessageBubble(
+            message: message,
+            isFirstInGroup: isFirstInGroup,
+            isLastInGroup: isLastInGroup,
+            onSpeak: onSpeak,
+            getMessagePlaybackStatus: getMessagePlaybackStatus,
+            onRetry: onRetry,
+          ),
+        );
+      }
+
+      if (!isLastGroup) {
+        chatWidgets.add(const SizedBox(height: 16));
+      }
+    }
+
+    if (showAssistantPending) {
+      chatWidgets.add(const _AssistantPendingPlaceholder());
+    }
+
+    return SelectionArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: chatWidgets,
+      ),
+    );
+  }
+}
+
+class _AgenticMessageBubble extends StatelessWidget {
+  final AgenticMessage message;
+  final bool isFirstInGroup;
+  final bool isLastInGroup;
+  final void Function(String, String)? onSpeak;
+  final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
+  final VoidCallback? onRetry;
+
+  const _AgenticMessageBubble({
+    required this.message,
+    required this.isFirstInGroup,
+    required this.isLastInGroup,
+    this.onSpeak,
+    this.getMessagePlaybackStatus,
+    this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isUser = message.role == AgenticRole.user;
+    final isError = message.role == AgenticRole.error;
+
+    final timeFormat = DateFormat('HH:mm:ss');
+    final formattedTime = timeFormat.format(message.timestamp);
+
+    return Container(
+      margin: EdgeInsets.only(
+        left: isUser ? 40 : 8,
+        right: isUser ? 8 : 40,
+        top: isFirstInGroup ? 8 : 2,
+        bottom: isLastInGroup ? 8 : 2,
+      ),
+      child: Column(
+        crossAxisAlignment:
+            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (isFirstInGroup)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4, left: 4, right: 4),
+              child: Text(
+                '${isUser ? 'user' : 'assistant'} • $formattedTime',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          if (isError)
+            _ErrorMessageBubble(message: message)
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isUser ? theme.colorScheme.primaryContainer : null,
+                borderRadius: BorderRadius.circular(12),
+                border: !isUser
+                    ? Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                        width: 1,
+                      )
+                    : null,
+              ),
+              child:
+                  isUser ? Text(message.text) : GptMarkdown(message.text),
+            ),
+          if (!isUser && !isError && onSpeak != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 4),
+              child: _SpeakerButton(
+                messageId: message.id,
+                text: message.text,
+                onSpeak: onSpeak!,
+                getStatus: getMessagePlaybackStatus,
+              ),
+            ),
+          if (isError && onRetry != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 4),
+              child: TextButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Retry'),
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorMessageBubble extends StatefulWidget {
+  final AgenticMessage message;
+
+  const _ErrorMessageBubble({required this.message});
+
+  @override
+  State<_ErrorMessageBubble> createState() => _ErrorMessageBubbleState();
+}
+
+class _ErrorMessageBubbleState extends State<_ErrorMessageBubble> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasDetails = widget.message.technicalDetails != null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 18,
+                color: theme.colorScheme.onErrorContainer,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.message.text,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onErrorContainer,
+                  ),
+                ),
+              ),
+              if (hasDetails)
+                IconButton(
+                  icon: Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    color: theme.colorScheme.onErrorContainer,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _expanded = !_expanded;
+                    });
+                  },
+                  tooltip: _expanded ? 'Hide details' : 'Show details',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+          if (_expanded && hasDetails) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                widget.message.technicalDetails!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onErrorContainer,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SpeakerButton extends StatelessWidget {
+  final String messageId;
+  final String text;
+  final void Function(String, String) onSpeak;
+  final MessagePlaybackStatus Function(String)? getStatus;
+
+  const _SpeakerButton({
+    required this.messageId,
+    required this.text,
+    required this.onSpeak,
+    this.getStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final status = getStatus?.call(messageId) ?? MessagePlaybackStatus.idle;
+
+    IconData icon;
+    String tooltip;
+
+    switch (status) {
+      case MessagePlaybackStatus.playing:
+        icon = Icons.pause;
+        tooltip = 'Pause';
+      case MessagePlaybackStatus.paused:
+        icon = Icons.play_arrow;
+        tooltip = 'Resume';
+      case MessagePlaybackStatus.generating:
+        icon = Icons.hourglass_empty;
+        tooltip = 'Generating audio...';
+      default:
+        icon = Icons.volume_up_outlined;
+        tooltip = 'Read aloud';
+    }
+
+    return IconButton(
+      icon: Icon(icon, size: 18),
+      onPressed:
+          status == MessagePlaybackStatus.generating
+              ? null
+              : () => onSpeak(text, messageId),
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      style: IconButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(32, 32),
+      ),
+    );
+  }
+}
+
+class _AssistantPendingPlaceholder extends StatefulWidget {
+  const _AssistantPendingPlaceholder();
+
+  @override
+  State<_AssistantPendingPlaceholder> createState() =>
+      _AssistantPendingPlaceholderState();
+}
+
+class _AssistantPendingPlaceholderState
+    extends State<_AssistantPendingPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _opacityAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.only(left: 8, right: 40, top: 8, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4, left: 4),
+            child: Text(
+              'assistant',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          AnimatedBuilder(
+            animation: _opacityAnimation,
+            builder: (context, child) {
+              return Opacity(
+                opacity: _opacityAnimation.value,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Thinking...',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}

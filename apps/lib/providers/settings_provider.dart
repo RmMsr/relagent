@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '/models/settings.dart';
 import '/services/secure_credential_service.dart';
 
@@ -221,5 +220,65 @@ class SettingsNotifier extends Notifier<Settings> {
     // Also clear auth type and username from settings
     state = state.copyWith(authType: AuthType.none, username: null);
     await _saveSettings();
+  }
+
+  // Engine settings methods
+
+  Future<bool> updateEngineBaseUrl(String url) async {
+    // Clear engine credentials when URL changes
+    if (url != state.engineBaseUrl) {
+      await clearEngineCredentials();
+    }
+
+    state = state.copyWith(engineBaseUrl: url);
+    return await _saveSettings();
+  }
+
+  Future<bool> updateEngineAuthType(AuthType type) async {
+    state = state.copyWith(engineAuthType: type);
+    return await _saveSettings();
+  }
+
+  Future<bool> updateEngineUsername(String? username) async {
+    state = state.copyWith(engineUsername: username);
+    return await _saveSettings();
+  }
+
+  Future<void> setEnginePassword(String password) async {
+    await _credentialService.storePassword(
+      'engine:${state.engineBaseUrl}',
+      password,
+    );
+  }
+
+  Future<String?> getEnginePassword() async {
+    return await _credentialService.getPassword(
+      'engine:${state.engineBaseUrl}',
+    );
+  }
+
+  Future<void> clearEngineCredentials() async {
+    await _credentialService.clearCredentials('engine:${state.engineBaseUrl}');
+    state = state.copyWith(engineAuthType: AuthType.none, engineUsername: null);
+    await _saveSettings();
+  }
+
+  // Session management
+
+  Future<bool> setAgenticSessionId(String sessionId) async {
+    state = state.copyWith(agenticSessionId: sessionId);
+    return await _saveSettings();
+  }
+
+  Future<bool> clearAgenticSessionId() async {
+    state = state.copyWith(agenticSessionId: null);
+    return await _saveSettings();
+  }
+
+  // Backend selection
+
+  Future<bool> updateSelectedBackend(ChatBackendType backend) async {
+    state = state.copyWith(selectedBackend: backend);
+    return await _saveSettings();
   }
 }

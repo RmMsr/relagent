@@ -20,6 +20,7 @@ REPO_ROOT = Path(__file__).parent.parent
 VERSION_FILE = REPO_ROOT / "VERSION"
 PYPROJECT_FILE = REPO_ROOT / "pyproject.toml"
 PUBSPEC_FILE = REPO_ROOT / "apps" / "pubspec.yaml"
+CONTAINER_FILE = REPO_ROOT / "run" / "relagent.container"
 
 # Semver regex: MAJOR.MINOR.PATCH with optional pre-release
 SEMVER_PATTERN = re.compile(
@@ -78,7 +79,9 @@ def update_pyproject(version: str) -> bool:
     content = PYPROJECT_FILE.read_text()
     # Match version = "X.Y.Z" in [project] section
     pattern = r'^(version\s*=\s*")[^"]*(")'
-    new_content, count = re.subn(pattern, rf"\g<1>{version}\g<2>", content, flags=re.MULTILINE)
+    new_content, count = re.subn(
+        pattern, rf"\g<1>{version}\g<2>", content, flags=re.MULTILINE
+    )
 
     if count == 0:
         print(f"Warning: Could not find version in {PYPROJECT_FILE}", file=sys.stderr)
@@ -96,8 +99,8 @@ def update_pubspec(version: str) -> bool:
         return False
 
     content = PUBSPEC_FILE.read_text()
-    # Match version: X.Y.Z or version: X.Y.Z+BUILD
-    pattern = r'^(version:\s*)[\d.]+(?:\+(\d+))?'
+    # Match version: X.Y.Z, X.Y.Z-prerelease, or X.Y.Z+BUILD
+    pattern = r"^(version:\s*)[\d.]+(?:-[a-zA-Z0-9.-]+)?(?:\+(\d+))?"
 
     def replacement(match: re.Match[str]) -> str:
         prefix = match.group(1)
@@ -114,6 +117,34 @@ def update_pubspec(version: str) -> bool:
 
     PUBSPEC_FILE.write_text(new_content)
     print(f"Updated {PUBSPEC_FILE.relative_to(REPO_ROOT)}: {version}")
+    return True
+
+
+def update_container(version: str) -> bool:
+    """Update container image version in relagent.container."""
+    if not CONTAINER_FILE.exists():
+        print(f"Warning: {CONTAINER_FILE} not found, skipping", file=sys.stderr)
+        return False
+
+    content = CONTAINER_FILE.read_text()
+    # Match Image=registry.gitlab.com/rmmsr/relagent:VERSION
+    pattern = (
+        r"^(Image=registry\.gitlab\.com/rmmsr/relagent:)[\d.]+(?:-[a-zA-Z0-9.-]+)?"
+    )
+
+    new_content, count = re.subn(
+        pattern, rf"\g<1>{version}", content, flags=re.MULTILINE
+    )
+
+    if count == 0:
+        print(
+            f"Warning: Could not find Image version in {CONTAINER_FILE}",
+            file=sys.stderr,
+        )
+        return False
+
+    CONTAINER_FILE.write_text(new_content)
+    print(f"Updated {CONTAINER_FILE.relative_to(REPO_ROOT)}: {version}")
     return True
 
 
@@ -147,6 +178,7 @@ def main() -> int:
     print("\nSynchronizing version to artifacts...")
     update_pyproject(version)
     update_pubspec(version)
+    update_container(version)
 
     print("\nVersion synchronization complete.")
     return 0

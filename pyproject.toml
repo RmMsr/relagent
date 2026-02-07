@@ -1,12 +1,12 @@
 [project]
 name = "relagent-engine"
-version = "0.1.3"
+version = "0.1.4"
 description = "Backend for Relagent apps"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "ddgs>=9.10.0",
-    "fastapi>=0.128.0",
+    "fastapi>=0.128.2",
     "openinference-instrumentation-pydantic-ai>=0.1.10",
     "opentelemetry-exporter-otlp>=1.39.1",
     "opentelemetry-instrumentation-fastapi>=0.60b1",

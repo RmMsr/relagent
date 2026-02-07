@@ -83,6 +83,39 @@ flutter run 2>&1 | tee flutter_android.log  # Android debugging
 **Common Debugging Issues**:
 - **Notification not dismissed when switching off continuous listening**: Fixed by calling `stopForeground(STOP_FOREGROUND_REMOVE)` when switching to IDLE mode in AudioBackgroundService
 
+## Engine API Integration
+
+The app connects to the Relagent engine via REST API. The engine exposes an OpenAPI schema that defines the API contract.
+
+### OpenAPI Schema Reference
+
+**Generate/fetch the schema:**
+```bash
+# From running engine
+curl http://localhost:8000/openapi.json > apps/openapi-schema.json
+
+# Or generate from engine source
+cd engine && ./bin/generate_schema.py
+```
+
+**Verify implementation matches schema:**
+When modifying `lib/agentic/services.dart`, always verify against the OpenAPI schema:
+
+1. Fetch current schema: `curl http://localhost:8000/openapi.json | python3 -m json.tool`
+2. Check request/response formats match the schema definitions
+3. Key schemas: `ChatRequest`, `ChatResponse`, `MessagesResponse`, `UserMessage`, `AssistantMessage`
+
+**Current API endpoints:**
+- `GET /status` - Health check, returns `{name, version, status}`
+- `GET /api/v1/messages/{session_id}` - Returns `MessagesResponse`
+- `POST /api/v1/messages` - Accepts `ChatRequest`, returns `ChatResponse`
+
+**Schema locations:**
+- Live: `http://localhost:8000/openapi.json`
+- Generated: `engine/openapi-schema.json` (run `engine/bin/generate_schema.py`)
+
+See `lib/agentic/services.dart` for documented request/response formats.
+
 ## Architecture
 
 The Flutter app is located in the `apps/` directory of the repository and uses **Riverpod** for state management:

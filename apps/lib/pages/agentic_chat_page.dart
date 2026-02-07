@@ -2,34 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '/chat/widgets.dart';
+import '/agentic/health_check.dart';
+import '/agentic/widgets.dart';
+import '/providers/agentic_chat_provider.dart';
 import '/providers/audio_coordinator_provider.dart';
-import '/providers/chat_provider.dart';
-import '/providers/health_check_provider.dart';
+import '/providers/engine_health_check_provider.dart';
 import '/providers/recording_provider.dart';
 import '/providers/tts_provider.dart';
-import '/services/api_health_check.dart';
 import '/widgets/voice_mode_selector.dart';
 
-class ChatPage extends ConsumerStatefulWidget {
-  const ChatPage({super.key});
+class AgenticChatPage extends ConsumerStatefulWidget {
+  const AgenticChatPage({super.key});
 
   @override
-  ConsumerState<ChatPage> createState() => _ChatPageState();
+  ConsumerState<AgenticChatPage> createState() => _AgenticChatPageState();
 }
 
-class _ChatPageState extends ConsumerState<ChatPage> {
+class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
   final ScrollController _scrollController = ScrollController();
   bool _healthCheckBannerDismissed = false;
 
   @override
   void initState() {
     super.initState();
-    // Trigger auto-recording check once the page is ready
-    // This ensures we don't start recording during app initialization
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
+      ref.read(agenticChatProvider.notifier).loadHistory();
       ref.read(recordingProvider.notifier).checkAutoStart();
-      // Pre-initialize TTS in background to minimize wait time on first use
       ref.read(ttsProvider.notifier).initialize();
     });
   }
@@ -42,7 +41,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      // Schedule scroll after the current frame to ensure the UI has been built
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -56,26 +54,24 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<void> _navigateToSettings() async {
-    // Store the current health check result to detect changes
-    final previousResult = ref.read(healthCheckProvider).lastResult;
+    final previousResult = ref.read(engineHealthCheckProvider).lastResult;
 
     final result = await context.push<String>('/settings');
 
     if (!mounted) return;
 
-    // Trigger health check after returning from settings
-    ref.read(healthCheckProvider.notifier).triggerHealthCheck();
+    // Check engine health after settings change
+    ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
+    ref.read(agenticChatProvider.notifier).loadHistory();
 
-    // If health check result changed, reset banner dismissal to show new state
-    final newResult = ref.read(healthCheckProvider).lastResult;
-    if (previousResult?.status != newResult?.status ||
-        previousResult?.isSuccess != newResult?.isSuccess) {
+    // Reset banner if health status changed
+    final newResult = ref.read(engineHealthCheckProvider).lastResult;
+    if (previousResult?.status != newResult?.status) {
       setState(() {
         _healthCheckBannerDismissed = false;
       });
     }
 
-    // Show snackbar if settings returned a message
     if (result != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result), duration: const Duration(seconds: 3)),
@@ -85,19 +81,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final chatState = ref.watch(chatProvider);
+    final chatState = ref.watch(agenticChatProvider);
     final ttsState = ref.watch(ttsProvider);
-    final healthCheckState = ref.watch(healthCheckProvider);
+    final healthCheckState = ref.watch(engineHealthCheckProvider);
 
-    // Scroll to bottom whenever messages or pending state changes
-    ref.listen<ChatState>(chatProvider, (previous, next) {
+    ref.listen<AgenticChatState>(agenticChatProvider, (previous, next) {
       if (previous?.messages.length != next.messages.length ||
           previous?.showAssistantPending != next.showAssistantPending) {
         _scrollToBottom();
       }
     });
 
-    // Show SnackBar when permanent audio focus loss occurs
     ref.listen<AudioCoordinatorState>(audioCoordinatorProvider, (
       previous,
       next,
@@ -113,30 +107,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       }
     });
 
-    // Show status for retry state changes
-    ref.listen<ChatState>(chatProvider, (previous, next) {
-      if (previous?.retryState.status != next.retryState.status) {
-        if (next.retryState.isRetrying && next.retryState.retryCount == 1) {
-          // Only show snackbar on first retry to avoid spam
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Connection issue detected. Retrying...'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-        // No snackbar for final failure - error will be shown in chat
-      }
-    });
-
     return Scaffold(
       appBar: AppBar(
         leading: PopupMenuButton<String>(
           icon: const Icon(Icons.menu),
           tooltip: 'Navigation',
           onSelected: (route) {
-            if (route == '/agentic') {
-              context.go('/agentic');
+            if (route == '/simple') {
+              context.go('/simple');
             } else if (route == '/info') {
               context.push('/info');
             }
@@ -144,24 +122,24 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           itemBuilder: (context) => [
             const PopupMenuItem(
               value: '/agentic',
+              enabled: false,
               child: Row(
                 children: [
                   Icon(Icons.smart_toy),
                   SizedBox(width: 12),
                   Text('Agentic Chat'),
+                  Spacer(),
+                  Icon(Icons.check, size: 18),
                 ],
               ),
             ),
             const PopupMenuItem(
               value: '/simple',
-              enabled: false,
               child: Row(
                 children: [
                   Icon(Icons.chat_bubble_outline),
                   SizedBox(width: 12),
                   Text('Simple Chat'),
-                  Spacer(),
-                  Icon(Icons.check, size: 18),
                 ],
               ),
             ),
@@ -189,7 +167,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             IconButton(
               icon: const Icon(Icons.delete),
               onPressed: () {
-                ref.read(chatProvider.notifier).clearChat();
+                ref.read(agenticChatProvider.notifier).clearChat();
               },
             ),
         ],
@@ -197,22 +175,25 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Show health check error banner if there's an issue
             if (!_healthCheckBannerDismissed &&
                 healthCheckState.lastResult != null &&
                 !healthCheckState.lastResult!.isSuccess)
               _buildHealthCheckBanner(context, healthCheckState.lastResult!),
+            if (chatState.isLoadingHistory)
+              const LinearProgressIndicator(),
             Expanded(
               child: ListView(
                 controller: _scrollController,
                 padding: const EdgeInsets.only(bottom: 8),
                 children: [
-                  ChatHistory(
+                  AgenticChatHistory(
                     messages: chatState.messages,
                     showAssistantPending: chatState.showAssistantPending,
-                    retryState: chatState.retryState,
-                    onRetry: (text) {
-                      ref.read(chatProvider.notifier).sendMessage(text);
+                    engineHealthResult: healthCheckState.lastResult,
+                    onRetry: () {
+                      ref
+                          .read(agenticChatProvider.notifier)
+                          .retryFailedMessages();
                     },
                     onSpeak: (text, messageId) {
                       final status = ttsState.getMessageState(messageId).status;
@@ -220,18 +201,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
                       switch (status) {
                         case MessagePlaybackStatus.playing:
-                          // Pause if currently playing
                           ttsNotifier.pause();
                         case MessagePlaybackStatus.paused:
-                          // Resume if paused
                           ttsNotifier.resume();
                         case MessagePlaybackStatus.idle:
                         case MessagePlaybackStatus.completed:
                         case MessagePlaybackStatus.error:
-                          // Play from beginning
                           ttsNotifier.playNow(text, messageId);
                         case MessagePlaybackStatus.generating:
-                          // Do nothing while generating
                           break;
                       }
                     },
@@ -241,9 +218,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ],
               ),
             ),
-            ChatInput(
+            AgenticChatInput(
               onSubmitted: (text) {
-                ref.read(chatProvider.notifier).sendMessage(text);
+                ref.read(agenticChatProvider.notifier).sendMessage(text);
               },
             ),
           ],
@@ -254,11 +231,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   Widget _buildHealthCheckBanner(
     BuildContext context,
-    HealthCheckResult result,
+    EngineHealthResult result,
   ) {
     final theme = Theme.of(context);
-    final bool isAuthIssue =
-        result.requiresAuth || result.status == HealthCheckStatus.authFailed;
+    final isAuthIssue = result.requiresAuth ||
+        result.status == EngineHealthStatus.authFailed;
 
     String title;
     String message;
@@ -266,16 +243,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     if (result.requiresAuth) {
       title = 'Authentication Required';
-      message =
-          'The API requires authentication. Please configure your credentials in settings.';
+      message = 'The engine requires authentication. '
+          'Configure credentials in settings.';
       actionText = 'Configure Auth';
-    } else if (result.status == HealthCheckStatus.authFailed) {
+    } else if (result.status == EngineHealthStatus.authFailed) {
       title = 'Authentication Failed';
-      message =
-          'The API rejected your credentials. Please check your username and password in settings.';
+      message = 'Check your engine username and password.';
       actionText = 'Check Credentials';
     } else {
-      title = 'Connection Issue';
+      title = 'Engine Connection Issue';
       message = result.message;
       actionText = 'Check Settings';
     }
@@ -348,4 +324,5 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ),
     );
   }
+
 }
