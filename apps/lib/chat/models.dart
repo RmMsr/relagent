@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import '/agentic/models.dart';
+
 enum ChatRole { user, assistant, error }
 
 enum PendingAssistantState { waiting, delayed, error }
@@ -18,6 +20,7 @@ class ChatMessage {
   final String text;
   final ChatRole role;
   final String? technicalDetails;
+  final AgentStats? stats;
   late final DateTime timestamp;
 
   ChatMessage(
@@ -25,6 +28,7 @@ class ChatMessage {
     String? id,
     this.role = ChatRole.assistant,
     this.technicalDetails,
+    this.stats,
     DateTime? timestamp,
   }) : id = id ?? generateMessageId(),
        timestamp = timestamp ?? DateTime.now();
@@ -50,12 +54,14 @@ class ChatMessage {
     String? id,
     String? text,
     ChatRole? role,
+    AgentStats? stats,
     DateTime? timestamp,
   }) {
     return ChatMessage(
       text ?? this.text,
       id: id ?? this.id,
       role: role ?? this.role,
+      stats: stats ?? this.stats,
       timestamp: timestamp ?? this.timestamp,
     );
   }

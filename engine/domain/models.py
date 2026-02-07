@@ -23,6 +23,28 @@ class SessionInfo(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class AgentStats(BaseModel):
+    agent_name: str | None = Field(default=None, description="Internal agent name")
+    answering_model_name: str | None = Field(
+        default=None, description="Name of the initial model answering the request"
+    )
+    duration_seconds: float | None = Field(
+        default=None, description="Total duration the agent spent"
+    )
+    input_tokens: int | None = Field(
+        default=None, description="Input tokens for this request"
+    )
+    output_tokens: int | None = Field(
+        default=None, description="Output tokens for this request"
+    )
+    requests_count: int | None = Field(
+        default=None, description="Number of requests to a model"
+    )
+    tool_calls_count: int | None = Field(
+        default=None, description="Number of tool calls made"
+    )
+
+
 class UserMessage(BaseModel):
     role: Literal["user"] = "user"
     content: str
@@ -33,6 +55,7 @@ class AssistantMessage(BaseModel):
     role: Literal["assistant"] = "assistant"
     content: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    stats: AgentStats | None = None
 
 
 ChatMessage = UserMessage | AssistantMessage

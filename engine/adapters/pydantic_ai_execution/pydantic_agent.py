@@ -1,3 +1,4 @@
+import time
 from typing import Sequence
 
 from pydantic_ai import (
@@ -13,7 +14,7 @@ from engine.adapters.pydantic_ai_execution.agent_definitions import (
     discussion_agent,
     title_summarizer_agent,
 )
-from engine.domain.models import AssistantMessage, ChatContext, ChatMessage
+from engine.domain.models import AgentStats, AssistantMessage, ChatContext, ChatMessage
 from engine.domain.ports import AgentExecution
 
 
@@ -26,10 +27,27 @@ class PydanticAgentAdapter(AgentExecution):
         self, context: ChatContext, query: str
     ) -> AssistantMessage:
         history = self._get_history_from_messages(context.messages)
+
+        start_time = time.time()
         ai_response = await discussion_agent.run(query, message_history=history)
+        agent_duration_seconds = time.time() - start_time
+
+        answering_model_name = getattr(discussion_agent.model, "model_name", "") or None
+
+        stats = AgentStats(
+            agent_name=discussion_agent.name,
+            answering_model_name=answering_model_name,
+            duration_seconds=agent_duration_seconds,
+            input_tokens=ai_response.usage().input_tokens,
+            output_tokens=ai_response.usage().output_tokens,
+            requests_count=ai_response.usage().requests,
+            tool_calls_count=ai_response.usage().tool_calls,
+        )
         if self.debug_dumps:
             self._dump_raw_messages(ai_response, "basic_query")
-        return AssistantMessage(role="assistant", content=ai_response.output)
+        return AssistantMessage(
+            role="assistant", content=ai_response.output, stats=stats
+        )
 
     async def generate_title(self, query: str) -> str:
         ai_response = await title_summarizer_agent.run(query)

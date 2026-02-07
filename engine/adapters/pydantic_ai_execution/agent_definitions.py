@@ -1,4 +1,4 @@
-from pydantic_ai import Agent
+from pydantic_ai import Agent, InstrumentationSettings
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider
 
@@ -11,7 +11,11 @@ default_model = OpenAIChatModel(
     provider=provider,
 )
 
-Agent.instrument_all(True)
+Agent.instrument_all(
+    InstrumentationSettings(
+        include_content=True, include_binary_content=True, version=3
+    )
+)
 
 simple_question_agent = Agent(
     model=default_model,

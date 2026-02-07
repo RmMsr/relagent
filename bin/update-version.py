@@ -177,6 +177,19 @@ def main() -> int:
     # Update all artifacts
     print("\nSynchronizing version to artifacts...")
     update_pyproject(version)
+    # Sync dependencies after pyproject update
+    import subprocess
+
+    try:
+        subprocess.run(
+            ["uv", "sync"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Error: uv sync failed with exit code {e.returncode}", file=sys.stderr)
+        return 1
     update_pubspec(version)
     update_container(version)
 

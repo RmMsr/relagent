@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 from engine.api import api_router, dependency_chat_service
 from engine.domain.exceptions import ChatContextNotFound
 from engine.domain.models import (
+    AgentStats,
     AssistantMessage,
     ChatResponse,
     MessagesResponse,
@@ -61,6 +63,46 @@ class TestPostMessages:
         assert data["session_id"] == str(session_id)
         assert data["message"]["role"] == "assistant"
         assert data["message"]["content"] == "Hello, it is 9:55"
+
+    def test_response_includes_agent_stats(
+        self, client: TestClient, mock_chat_service: MagicMock
+    ):
+        session_id = uuid.uuid4()
+        stats = AgentStats(input_tokens=250, output_tokens=125)
+        mock_chat_service.perform_user_input = AsyncMock(
+            return_value=ChatResponse(
+                session_id=session_id,
+                message=AssistantMessage(
+                    content="Response",
+                    stats=stats,
+                    timestamp=datetime(2025, 10, 14, 9, 55),
+                ),
+            )
+        )
+
+        response = client.post(
+            "/api/v1/messages",
+            json={"messages": [{"role": "user", "content": "Hello"}]},
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "session_id": str(session_id),
+            "message": {
+                "role": "assistant",
+                "content": "Response",
+                "stats": {
+                    "agent_name": None,
+                    "answering_model_name": None,
+                    "duration_seconds": None,
+                    "input_tokens": 250,
+                    "output_tokens": 125,
+                    "requests_count": None,
+                    "tool_calls_count": None,
+                },
+                "timestamp": "2025-10-14T09:55:00",
+            },
+        }
 
     def test_valid_chat_request_without_session_id(
         self, client: TestClient, mock_chat_service: MagicMock
@@ -117,19 +159,32 @@ class TestGetMessages:
         mock_chat_service.get_messages.return_value = MessagesResponse(
             session_id=session_id,
             messages=[
-                UserMessage(content="Hello"),
-                AssistantMessage(content="Hi!"),
+                UserMessage(content="Hello", timestamp=datetime(2025, 10, 14, 9, 55)),
+                AssistantMessage(
+                    content="Hi!", timestamp=datetime(2025, 10, 14, 9, 57)
+                ),
             ],
         )
 
         response = client.get(f"/api/v1/messages/{session_id}")
 
         assert response.status_code == 200
-        data = response.json()
-        assert data["session_id"] == str(session_id)
-        assert len(data["messages"]) == 2
-        assert data["messages"][0]["role"] == "user"
-        assert data["messages"][1]["role"] == "assistant"
+        assert response.json() == {
+            "session_id": str(session_id),
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Hello",
+                    "timestamp": "2025-10-14T09:55:00",
+                },
+                {
+                    "role": "assistant",
+                    "content": "Hi!",
+                    "stats": None,
+                    "timestamp": "2025-10-14T09:57:00",
+                },
+            ],
+        }
 
     def test_invalid_uuid_format(self, client: TestClient):
         response = client.get("/api/v1/messages/not-a-valid-uuid")
@@ -147,4 +202,4 @@ class TestGetMessages:
         response = client.get(f"/api/v1/messages/{session_id}")
 
         assert response.status_code == 404
-        assert response.json()["detail"] == "Session not found"
+        assert response.json() == {"detail": "Session not found"}

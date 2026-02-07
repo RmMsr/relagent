@@ -6,6 +6,7 @@ import pytest
 from engine.adapters.yaml_persistence import YamlPersistenceAdapter
 from engine.domain.exceptions import ChatContextNotFound, SessionNotFound
 from engine.domain.models import (
+    AgentStats,
     AssistantMessage,
     ChatContext,
     SessionInfo,
@@ -19,7 +20,9 @@ def yaml_adapter(tmp_path: Path) -> YamlPersistenceAdapter:
 
 
 class TestSessionPersistence:
-    def test_save_and_load_session_round_trip(self, yaml_adapter: YamlPersistenceAdapter):
+    def test_save_and_load_session_round_trip(
+        self, yaml_adapter: YamlPersistenceAdapter
+    ):
         session = SessionInfo(title="Test Session")
 
         yaml_adapter.save_session(session)
@@ -54,17 +57,42 @@ class TestContextPersistence:
             messages=[
                 UserMessage(content="Hello"),
                 AssistantMessage(content="Hi there!"),
+                AssistantMessage(
+                    content="Please remember todays appointmen at 12:00",
+                    stats=AgentStats(
+                        agent_name="test_agent",
+                        answering_model_name="test_model",
+                        duration_seconds=10.5,
+                        input_tokens=100,
+                        output_tokens=50,
+                        requests_count=1,
+                        tool_calls_count=0,
+                    ),
+                ),
             ]
         )
 
         yaml_adapter.save_context(session=session, context=context)
         loaded = yaml_adapter.load_context(session_id=session.session_id)
 
-        assert len(loaded.messages) == 2
+        assert len(loaded.messages) == 3
+        assert isinstance(loaded.messages[0], UserMessage)
         assert loaded.messages[0].role == "user"
         assert loaded.messages[0].content == "Hello"
+        assert isinstance(loaded.messages[1], AssistantMessage)
         assert loaded.messages[1].role == "assistant"
         assert loaded.messages[1].content == "Hi there!"
+        assert loaded.messages[1].stats is None
+        assert isinstance(loaded.messages[2], AssistantMessage)
+        assert loaded.messages[2].stats == AgentStats(
+            agent_name="test_agent",
+            answering_model_name="test_model",
+            duration_seconds=10.5,
+            input_tokens=100,
+            output_tokens=50,
+            requests_count=1,
+            tool_calls_count=0,
+        )
 
     def test_load_context_not_found(self, yaml_adapter: YamlPersistenceAdapter):
         non_existent_id = uuid.uuid4()
@@ -90,9 +118,7 @@ class TestContextPersistence:
         self, yaml_adapter: YamlPersistenceAdapter
     ):
         session = SessionInfo()
-        messages = [
-            UserMessage(content=f"Message {i}") for i in range(5)
-        ] + [
+        messages = [UserMessage(content=f"Message {i}") for i in range(5)] + [
             AssistantMessage(content=f"Response {i}") for i in range(5)
         ]
         context = ChatContext(messages=messages)

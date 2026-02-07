@@ -15,7 +15,9 @@ from engine.domain.services import ChatService
 
 
 @pytest.fixture
-def chat_service(mock_persistence: MagicMock, mock_agent_execution: MagicMock) -> ChatService:
+def chat_service(
+    mock_persistence: MagicMock, mock_agent_execution: MagicMock
+) -> ChatService:
     return ChatService(
         persistence_repository=mock_persistence,
         agent_execution=mock_agent_execution,
@@ -118,6 +120,28 @@ class TestPerformUserInput:
         mock_agent_execution.run_basic_query.assert_called_once()
         mock_persistence.save_context.assert_called_once()
         mock_persistence.save_session.assert_called_once()
+
+    async def test_response_includes_agent_stats(
+        self,
+        chat_service: ChatService,
+        mock_persistence: MagicMock,
+        mock_agent_execution: MagicMock,
+        sample_session: SessionInfo,
+    ):
+        mock_persistence.load_session.return_value = sample_session
+        mock_persistence.load_context.side_effect = ChatContextNotFound(
+            session_id=sample_session.session_id
+        )
+        request = ChatRequest(
+            session_id=sample_session.session_id,
+            messages=[UserMessage(content="Hello")],
+        )
+
+        response = await chat_service.perform_user_input(request)
+
+        # Stats from mock_agent_execution fixture (100 input, 50 output)
+        assert response.message.stats is not None
+        assert response.message.stats.input_tokens == 100
 
 
 class TestEnsureSessionTitle:

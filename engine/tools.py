@@ -1,6 +1,6 @@
 import os
 
-from ddgs import DDGS
+from ddgs import DDGS  # type: ignore[import-untyped]
 from pydantic_ai import RunContext, Tool
 
 

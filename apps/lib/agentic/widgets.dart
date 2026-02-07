@@ -375,14 +375,15 @@ class _AgenticMessageBubble extends StatelessWidget {
               child:
                   isUser ? Text(message.text) : GptMarkdown(message.text),
             ),
-          if (!isUser && !isError && onSpeak != null)
+          if (!isUser && !isError)
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 4),
-              child: _SpeakerButton(
+              child: _MessageActionsRow(
                 messageId: message.id,
-                text: message.text,
-                onSpeak: onSpeak!,
-                getStatus: getMessagePlaybackStatus,
+                messageText: message.text,
+                stats: message.stats,
+                onSpeak: onSpeak,
+                getMessagePlaybackStatus: getMessagePlaybackStatus,
               ),
             ),
           if (isError && onRetry != null)
@@ -486,6 +487,191 @@ class _ErrorMessageBubbleState extends State<_ErrorMessageBubble> {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _MessageActionsRow extends StatefulWidget {
+  final String messageId;
+  final String messageText;
+  final AgentStats? stats;
+  final void Function(String, String)? onSpeak;
+  final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
+
+  const _MessageActionsRow({
+    required this.messageId,
+    required this.messageText,
+    this.stats,
+    this.onSpeak,
+    this.getMessagePlaybackStatus,
+  });
+
+  @override
+  State<_MessageActionsRow> createState() => _MessageActionsRowState();
+}
+
+class _MessageActionsRowState extends State<_MessageActionsRow> {
+  bool _statsExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasStats = widget.stats != null && widget.stats!.hasData;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.onSpeak != null)
+              _SpeakerButton(
+                messageId: widget.messageId,
+                text: widget.messageText,
+                onSpeak: widget.onSpeak!,
+                getStatus: widget.getMessagePlaybackStatus,
+              ),
+            if (hasStats)
+              IconButton(
+                icon: Icon(
+                  _statsExpanded ? Icons.insights_outlined : Icons.insights,
+                  size: 18,
+                ),
+                onPressed: () => setState(() => _statsExpanded = !_statsExpanded),
+                tooltip: _statsExpanded ? 'Hide stats' : 'Show stats',
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(32, 32),
+                  foregroundColor: _statsExpanded
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
+        if (_statsExpanded && hasStats)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: _StatsContent(stats: widget.stats!),
+          ),
+      ],
+    );
+  }
+}
+
+class _StatsContent extends StatelessWidget {
+  final AgentStats stats;
+  static final _numberFormat = NumberFormat('#,###');
+
+  const _StatsContent({required this.stats});
+
+  String _formatNumber(int number) => _numberFormat.format(number);
+
+  String _formatDuration(double seconds) {
+    if (seconds < 1) {
+      return '${(seconds * 1000).round()}ms';
+    } else if (seconds < 60) {
+      return '${seconds.toStringAsFixed(1)}s';
+    } else {
+      final mins = (seconds / 60).floor();
+      final secs = (seconds % 60).round();
+      return '${mins}m ${secs}s';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final iconColor = theme.colorScheme.onSurfaceVariant;
+    const iconSize = 14.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (stats.agentName != null || stats.answeringModelName != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 4,
+              children: [
+                if (stats.agentName != null)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.smart_toy_outlined, size: iconSize, color: iconColor),
+                      const SizedBox(width: 4),
+                      Text('Agent: ${stats.agentName!}', style: textStyle),
+                    ],
+                  ),
+                if (stats.answeringModelName != null)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.memory, size: iconSize, color: iconColor),
+                      const SizedBox(width: 4),
+                      Text('Model: ${stats.answeringModelName!}', style: textStyle),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        Wrap(
+          spacing: 16,
+          runSpacing: 8,
+          children: [
+            if (stats.inputTokens != null)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.arrow_downward, size: iconSize, color: iconColor),
+                  const SizedBox(width: 4),
+                  Text('${_formatNumber(stats.inputTokens!)} tokens in', style: textStyle),
+                ],
+              ),
+            if (stats.outputTokens != null)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.arrow_upward, size: iconSize, color: iconColor),
+                  const SizedBox(width: 4),
+                  Text('${_formatNumber(stats.outputTokens!)} tokens out', style: textStyle),
+                ],
+              ),
+            if (stats.toolCallsCount != null && stats.toolCallsCount! > 0)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.build_outlined, size: iconSize, color: iconColor),
+                  const SizedBox(width: 4),
+                  Text('${stats.toolCallsCount} tool calls', style: textStyle),
+                ],
+              ),
+            if (stats.requestsCount != null && stats.requestsCount! > 1)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.sync, size: iconSize, color: iconColor),
+                  const SizedBox(width: 4),
+                  Text('${stats.requestsCount} requests', style: textStyle),
+                ],
+              ),
+            if (stats.durationSeconds != null)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.timer_outlined, size: iconSize, color: iconColor),
+                  const SizedBox(width: 4),
+                  Text(_formatDuration(stats.durationSeconds!), style: textStyle),
+                ],
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

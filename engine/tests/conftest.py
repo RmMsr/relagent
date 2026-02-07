@@ -6,6 +6,7 @@ from uuid import UUID
 import pytest
 
 from engine.domain.models import (
+    AgentStats,
     AssistantMessage,
     ChatContext,
     SessionInfo,
@@ -42,6 +43,11 @@ def sample_assistant_message() -> AssistantMessage:
     return AssistantMessage(
         content="I'm doing well, thank you!",
         timestamp=datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc),
+        stats=AgentStats(
+            agent_name="discussion",
+            input_tokens=150,
+            output_tokens=75,
+        ),
     )
 
 
@@ -62,7 +68,14 @@ def mock_persistence() -> MagicMock:
 def mock_agent_execution() -> MagicMock:
     mock = MagicMock(spec=AgentExecution)
     mock.run_basic_query = AsyncMock(
-        return_value=AssistantMessage(content="Mock response")
+        return_value=AssistantMessage(
+            content="Mock response",
+            stats=AgentStats(
+                agent_name="discussion",
+                input_tokens=100,
+                output_tokens=50,
+            ),
+        )
     )
     mock.generate_title = AsyncMock(return_value="Generated Title")
     return mock

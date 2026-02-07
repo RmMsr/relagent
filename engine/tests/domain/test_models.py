@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import pytest
 
 from engine.domain.models import (
+    AgentStats,
     AssistantMessage,
     ChatContext,
     ChatRequest,
@@ -54,6 +55,18 @@ class TestUserMessage:
             UserMessage(content="Hello", role="assistant")  # type: ignore[arg-type]
 
 
+class TestAgentStats:
+    def test_default_values_are_none(self):
+        stats = AgentStats()
+        assert stats.agent_name is None
+        assert stats.input_tokens is None
+
+    def test_custom_values_preserved(self):
+        stats = AgentStats(agent_name="test", duration_seconds=10.5, input_tokens=100)
+        assert stats.agent_name == "test"
+        assert stats.duration_seconds == 10.5
+
+
 class TestAssistantMessage:
     def test_role_is_assistant(self):
         msg = AssistantMessage(content="Hi there")
@@ -62,6 +75,16 @@ class TestAssistantMessage:
     def test_invalid_role_raises_value_error(self):
         with pytest.raises(ValueError):
             AssistantMessage(content="Hello", role="user")  # type: ignore[arg-type]
+
+    def test_has_default_stats(self):
+        msg = AssistantMessage(content="Response")
+        assert msg.stats is None
+
+    def test_custom_stats_preserved(self):
+        stats = AgentStats(agent_name="test", input_tokens=200)
+        msg = AssistantMessage(content="Response", stats=stats)
+        assert msg.stats is not None
+        assert msg.stats.agent_name == "test"
 
 
 class TestChatContext:
@@ -106,6 +129,28 @@ class TestMessageSerialization:
 
         assert restored.content == msg.content
         assert restored.role == "assistant"
+
+    def test_assistant_message_stats_round_trip(self):
+        stats = AgentStats(
+            agent_name="test-agent",
+            answering_model_name="test-model",
+            duration_seconds=10.5,
+            input_tokens=500,
+            output_tokens=250,
+            requests_count=2,
+            tool_calls_count=1,
+        )
+        msg = AssistantMessage(content="Response", stats=stats)
+        restored = AssistantMessage.model_validate(msg.model_dump(mode="json"))
+
+        assert restored.stats is not None
+        assert restored.stats.agent_name == "test-agent"
+        assert restored.stats.answering_model_name == "test-model"
+        assert restored.stats.duration_seconds == 10.5
+        assert restored.stats.input_tokens == 500
+        assert restored.stats.output_tokens == 250
+        assert restored.stats.requests_count == 2
+        assert restored.stats.tool_calls_count == 1
 
     def test_messages_distinguished_by_role(self):
         user_data = {"role": "user", "content": "Hello"}
