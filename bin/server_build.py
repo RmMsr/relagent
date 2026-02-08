@@ -19,20 +19,33 @@ def get_version() -> str:
     return VERSION_FILE.read_text().strip()
 
 
-def build_with_framework(framework: str) -> str:
+def build_with_framework(framework: str, allow_cache: bool = False) -> str:
     """Build container image with version tag. Returns the version."""
     version = get_version()
     image_versioned = f"{IMAGE_BASE}:{version}"
     image_latest = f"{IMAGE_BASE}:latest"
 
-    # Build with version tag
-    command = [framework, "build", "--tag", image_versioned, "-f", "Containerfile", "."]
+    # Build with version tags
+    command = [
+        framework,
+        "build",
+        "--tag",
+        image_versioned,
+        "--tag",
+        image_latest,
+        "-f",
+        "Containerfile",
+    ]
+    if not allow_cache:
+        command.append("--no-cache")
+    command.append(".")
+
     print(f"Building image: {image_versioned}")
     print(f"Running command: {' '.join(command)}")
     try:
         run_subprocess(
             command,
-            cwd=str(REPO_ROOT),
+            cwd=REPO_ROOT,
             raise_error=True,
         )
     except subprocess.CalledProcessError as e:
@@ -40,11 +53,6 @@ def build_with_framework(framework: str) -> str:
             f"{framework} build failed with exit code {e.returncode}.", file=sys.stderr
         )
         sys.exit(1)
-
-    # Tag as latest
-    tag_command = [framework, "tag", image_versioned, image_latest]
-    print(f"Tagging as: {image_latest}")
-    run_subprocess(tag_command, cwd=str(REPO_ROOT))
 
     return version
 

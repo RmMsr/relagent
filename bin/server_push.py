@@ -16,12 +16,12 @@ def push_with_framework(framework: str, version: str) -> None:
     for image in [image_versioned, image_latest]:
         command = [framework, "image", "push", image]
         print(f"Pushing: {image}")
-        run_subprocess(command, cwd=str(REPO_ROOT))
+        run_subprocess(command, cwd=REPO_ROOT)
 
 
 if __name__ == "__main__":
     framework = find_container_framework()
-    version = build_with_framework(framework)
+    version = build_with_framework(framework, allow_cache=False)
     ensure_registry_login()
     push_with_framework(framework, version)
     print("\nPushed images:")

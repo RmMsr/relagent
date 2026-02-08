@@ -50,8 +50,22 @@ def ensure_registry_login() -> None:
     if not run_subprocess(
         ["podman", "login", "--get-login", "registry.gitlab.com"], quiet=True
     ):
+        print("Logging in to registry.gitlab.com...")
         secret_name = "relagent-registry"
-        if not run_subprocess(["podman", "secret", "exists", secret_name], quiet=True):
+        if run_subprocess(["podman", "secret", "exists", secret_name], quiet=True):
+            print("Using existing secret for registry.gitlab.com.")
+            run_subprocess(
+                [
+                    "podman",
+                    "login",
+                    "--username",
+                    "gitlab+deploy-token-19",
+                    "--secret",
+                    secret_name,
+                    "registry.gitlab.com",
+                ]
+            )
+        else:
             print("Please enter your credentials for registry.gitlab.com.")
             username = input("Registry username: ")
             password = input("Registry secret: ")

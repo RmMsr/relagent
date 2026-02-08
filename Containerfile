@@ -8,9 +8,14 @@ WORKDIR /app
 
 EXPOSE 8000
 
-ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+ENV PATH="/app/.venv/bin:$PATH" \
+  PYTHONUNBUFFERED=1 \
+  DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get upgrade -y && apt-get clean
+RUN apt-get update && \
+  apt-get upgrade -y && \
+  apt-get install ca-certificates -y && \
+  apt-get clean
 
 ADD ./pyproject.toml ./uv.lock ./VERSION /app/
 

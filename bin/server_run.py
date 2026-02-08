@@ -19,7 +19,7 @@ def run_with_framework(framework: str) -> None:
         f"--volume={Path.home()}/.local/share/relagent/data:/app/.local/share/relagent/data:rw",
         "--publish=8000:8000",
         "--userns=keep-id:uid=1000,gid=1000",
-        "registry.gitlab.com/rmmsr/relagent",
+        "registry.gitlab.com/rmmsr/relagent:latest",
     ]
     print(f"Running command: {' '.join(command)}")
     try:
@@ -35,5 +35,5 @@ def run_with_framework(framework: str) -> None:
 
 if __name__ == "__main__":
     framework = find_container_framework()
-    build_with_framework(framework)
+    build_with_framework(framework, allow_cache=True)
     run_with_framework(framework)
