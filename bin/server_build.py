@@ -22,17 +22,14 @@ def get_version() -> str:
 def build_with_framework(framework: str, allow_cache: bool = False) -> str:
     """Build container image with version tag. Returns the version."""
     version = get_version()
-    image_versioned = f"{IMAGE_BASE}:{version}"
-    image_latest = f"{IMAGE_BASE}:latest"
+    image = f"{IMAGE_BASE}:{version}"
 
     # Build with version tags
     command = [
         framework,
         "build",
         "--tag",
-        image_versioned,
-        "--tag",
-        image_latest,
+        image,
         "-f",
         "Containerfile",
     ]
@@ -40,7 +37,7 @@ def build_with_framework(framework: str, allow_cache: bool = False) -> str:
         command.append("--no-cache")
     command.append(".")
 
-    print(f"Building image: {image_versioned}")
+    print(f"Building image: {image}")
     print(f"Running command: {' '.join(command)}")
     try:
         run_subprocess(
@@ -62,4 +59,3 @@ if __name__ == "__main__":
     version = build_with_framework(framework)
     print("\nBuilt images:")
     print(f"  {IMAGE_BASE}:{version}")
-    print(f"  {IMAGE_BASE}:latest")

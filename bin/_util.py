@@ -38,49 +38,46 @@ def run_subprocess(
         )
     except subprocess.CalledProcessError as e:
         command = " ".join(args)
-        print(f"{args[0]} failed with exit code {e.returncode}.", file=sys.stderr)
-        print(f"Command: {command}", file=sys.stderr)
+        if not quiet:
+            print(f"{args[0]} failed with exit code {e.returncode}.", file=sys.stderr)
+            print(f"Command: {command}", file=sys.stderr)
         if raise_error:
             raise
         return False
 
 
 def ensure_registry_login() -> None:
-    # Setup podman registry login
     if not run_subprocess(
         ["podman", "login", "--get-login", "registry.gitlab.com"], quiet=True
     ):
         print("Logging in to registry.gitlab.com...")
         secret_name = "relagent-registry"
-        if run_subprocess(["podman", "secret", "exists", secret_name], quiet=True):
-            print("Using existing secret for registry.gitlab.com.")
-            run_subprocess(
-                [
-                    "podman",
-                    "login",
-                    "--username",
-                    "gitlab+deploy-token-19",
-                    "--secret",
-                    secret_name,
-                    "registry.gitlab.com",
-                ]
-            )
-        else:
-            print("Please enter your credentials for registry.gitlab.com.")
-            username = input("Registry username: ")
+        username = input("Registry username: ")
+
+        secret_exists = run_subprocess(
+            ["podman", "secret", "exists", secret_name], quiet=True
+        )
+
+        if not secret_exists:
             password = input("Registry secret: ")
+            print(f"Storing password as secret '{secret_name}'...")
             run_subprocess(
                 ["podman", "secret", "create", secret_name, "-"],
                 input=password.encode("utf-8"),
             )
-            run_subprocess(
-                [
-                    "podman",
-                    "login",
-                    "--username",
-                    username,
-                    "--secret",
-                    secret_name,
-                    "registry.gitlab.com",
-                ]
+        else:
+            print(
+                f"Trying to use existing password from secret '{secret_name}'. Try removing it if login fails."
             )
+
+        run_subprocess(
+            [
+                "podman",
+                "login",
+                "--username",
+                username,
+                "--secret",
+                secret_name,
+                "registry.gitlab.com",
+            ]
+        )
