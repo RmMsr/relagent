@@ -1,5 +1,5 @@
 import 'package:http/http.dart' as http;
-import 'package:relagent/models/settings.dart';
+import '/models/settings.dart';
 
 /// Result of authentication type detection
 class AuthDetectionResult {

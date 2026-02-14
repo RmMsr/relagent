@@ -1,8 +1,8 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:relagent/chat/auth_detection.dart';
-import 'package:relagent/models/settings.dart';
-import 'package:relagent/utils/logger.dart';
+import '/chat/auth_detection.dart';
+import '/models/settings.dart';
+import '/utils/logger.dart';
 
 /// Result of API health check
 class HealthCheckResult {
@@ -78,7 +78,10 @@ class HealthCheckResult {
     );
   }
 
-  factory HealthCheckResult.invalidEndpoint(String details, {int? httpStatusCode}) {
+  factory HealthCheckResult.invalidEndpoint(
+    String details, {
+    int? httpStatusCode,
+  }) {
     return HealthCheckResult(
       status: HealthCheckStatus.invalidEndpoint,
       message: 'Invalid endpoint: $details',
@@ -140,7 +143,7 @@ class ApiHealthCheckService {
     // Build minimal request body (match actual chat request format)
     final body = {
       'messages': [
-        {'role': 'user', 'content': 'test'}
+        {'role': 'user', 'content': 'test'},
       ],
       'model': model,
       'max_completion_tokens': 10,
@@ -163,19 +166,11 @@ class ApiHealthCheckService {
     try {
       if (_httpClient != null) {
         response = await _httpClient
-            .post(
-              uri,
-              body: jsonEncode(body),
-              headers: headers,
-            )
+            .post(uri, body: jsonEncode(body), headers: headers)
             .timeout(timeout);
       } else {
         response = await http
-            .post(
-              uri,
-              body: jsonEncode(body),
-              headers: headers,
-            )
+            .post(uri, body: jsonEncode(body), headers: headers)
             .timeout(timeout);
       }
 

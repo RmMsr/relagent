@@ -2,9 +2,11 @@
 
 ## Why
 
-The SettingsNotifier class in `apps/lib/providers/settings_provider.dart` has grown to 277 lines and handles multiple responsibilities: settings persistence, history management, and credential storage. This violates the project's guideline of "smaller, focused classes with distinct purpose" and makes the code harder to maintain and test.
+The SettingsNotifier class in `apps/lib/providers/settings_provider.dart` has grown very big and handles multiple responsibilities: settings persistence, history management, and credential storage. This violates the project's guideline of "smaller, focused classes with distinct purpose" and makes the code harder to maintain and test.
 
 Include a review of the Architecture specialist as quality control.
+
+Also there is a problem with the auth verification. It steals the focus from the url input field. The verification should not interferre with input elements.
 
 ## What Changes
 

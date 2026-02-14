@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
-import 'package:relagent/chat/models.dart';
+import '/chat/models.dart';
 
 import '/models/app_info.dart';
 import '/providers/chat_provider.dart';

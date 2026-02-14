@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:relagent/chat/models.dart';
-import 'package:relagent/models/settings.dart';
+import '/chat/models.dart';
+import '/models/settings.dart';
 
 enum InputClassification { request, abort, confirm, ignore, clientControl }
 

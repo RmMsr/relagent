@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
-import 'package:relagent/models/app_info.dart';
+import '/models/app_info.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '/config/app_config.dart';
