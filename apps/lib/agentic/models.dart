@@ -1,5 +1,28 @@
 enum AgenticRole { user, assistant, error }
 
+class SessionInfo {
+  final String sessionId;
+  final String? title;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const SessionInfo({
+    required this.sessionId,
+    this.title,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory SessionInfo.fromJson(Map<String, dynamic> json) {
+    return SessionInfo(
+      sessionId: json['session_id'] as String,
+      title: json['title'] as String?,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
+    );
+  }
+}
+
 class AgentStats {
   final String? agentName;
   final String? answeringModelName;
@@ -39,7 +62,8 @@ class AgentStats {
 }
 
 class AgenticMessage {
-  final String id;
+  final int? id; // API message ID for synchronization (null for local-only messages)
+  final String localId; // Internal ID for UI tracking (TTS, etc.)
   final String text;
   final AgenticRole role;
   final DateTime timestamp;
@@ -48,7 +72,8 @@ class AgenticMessage {
   final AgentStats? stats; // Stats from engine response
 
   AgenticMessage({
-    required this.id,
+    this.id,
+    required this.localId,
     required this.text,
     required this.role,
     DateTime? timestamp,
@@ -59,7 +84,7 @@ class AgenticMessage {
 
   factory AgenticMessage.user(String text) {
     return AgenticMessage(
-      id: _generateId(),
+      localId: _generateLocalId(),
       text: text,
       role: AgenticRole.user,
     );
@@ -67,7 +92,7 @@ class AgenticMessage {
 
   factory AgenticMessage.assistant(String text) {
     return AgenticMessage(
-      id: _generateId(),
+      localId: _generateLocalId(),
       text: text,
       role: AgenticRole.assistant,
     );
@@ -75,7 +100,7 @@ class AgenticMessage {
 
   factory AgenticMessage.error(String text, {String? technicalDetails}) {
     return AgenticMessage(
-      id: _generateId(),
+      localId: _generateLocalId(),
       text: text,
       role: AgenticRole.error,
       technicalDetails: technicalDetails,
@@ -105,7 +130,8 @@ class AgenticMessage {
     }
 
     return AgenticMessage(
-      id: json['id'] as String? ?? _generateId(),
+      id: json['id'] as int?,
+      localId: _generateLocalId(),
       text: json['content'] as String,
       role: role,
       timestamp: timestamp,
@@ -116,14 +142,13 @@ class AgenticMessage {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
       'content': text,
       'role': role.name,
       'timestamp': timestamp.toIso8601String(),
     };
   }
 
-  static String _generateId() {
+  static String _generateLocalId() {
     return DateTime.now().millisecondsSinceEpoch.toRadixString(36);
   }
 }

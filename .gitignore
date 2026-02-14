@@ -12,7 +12,7 @@ wheels/
 
 # Temporary files
 data
-schema.json
+openapi-schema.json
 
 # Development tools
 .aider*

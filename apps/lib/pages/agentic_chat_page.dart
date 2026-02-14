@@ -8,6 +8,7 @@ import '/providers/agentic_chat_provider.dart';
 import '/providers/audio_coordinator_provider.dart';
 import '/providers/engine_health_check_provider.dart';
 import '/providers/recording_provider.dart';
+import '/providers/sse_provider.dart';
 import '/providers/tts_provider.dart';
 import '/widgets/voice_mode_selector.dart';
 
@@ -28,8 +29,10 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
       ref.read(agenticChatProvider.notifier).loadHistory();
+      ref.read(agenticChatProvider.notifier).loadSessionInfo();
       ref.read(recordingProvider.notifier).checkAutoStart();
       ref.read(ttsProvider.notifier).initialize();
+      ref.read(sseProvider.notifier).connect();
     });
   }
 
@@ -63,6 +66,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
     // Check engine health after settings change
     ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
     ref.read(agenticChatProvider.notifier).loadHistory();
+    ref.read(sseProvider.notifier).connect();
 
     // Reset banner if health status changed
     final newResult = ref.read(engineHealthCheckProvider).lastResult;
@@ -156,6 +160,13 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
             ),
           ],
         ),
+        title: chatState.sessionTitle != null
+            ? Text(
+                chatState.sessionTitle!,
+                style: Theme.of(context).textTheme.titleMedium,
+                overflow: TextOverflow.ellipsis,
+              )
+            : null,
         actions: [
           const VoiceModeSelector(),
           const SizedBox(width: 8),

@@ -10,12 +10,13 @@ from pydantic_ai import (
     UserPromptPart,
 )
 
-from engine.adapters.pydantic_ai_execution.agent_definitions import (
+from engine.domain.models import AgentStats, AssistantMessage, ChatContext, ChatMessage
+from engine.domain.ports.agent_execution import AgentExecution
+
+from .agent_definitions import (
     discussion_agent,
     title_summarizer_agent,
 )
-from engine.domain.models import AgentStats, AssistantMessage, ChatContext, ChatMessage
-from engine.domain.ports import AgentExecution
 
 
 class PydanticAgentAdapter(AgentExecution):

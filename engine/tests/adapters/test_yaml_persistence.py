@@ -72,7 +72,7 @@ class TestContextPersistence:
             ]
         )
 
-        yaml_adapter.save_context(session=session, context=context)
+        yaml_adapter.save_context(session_id=session.session_id, context=context)
         loaded = yaml_adapter.load_context(session_id=session.session_id)
 
         assert len(loaded.messages) == 3
@@ -108,7 +108,7 @@ class TestContextPersistence:
         session = SessionInfo()
         context = ChatContext(messages=[UserMessage(content="Test")])
 
-        yaml_adapter.save_context(session=session, context=context)
+        yaml_adapter.save_context(session_id=session.session_id, context=context)
 
         expected_dir = tmp_path / "sessions" / str(session.session_id)
         assert expected_dir.exists()
@@ -123,7 +123,7 @@ class TestContextPersistence:
         ]
         context = ChatContext(messages=messages)
 
-        yaml_adapter.save_context(session=session, context=context)
+        yaml_adapter.save_context(session_id=session.session_id, context=context)
         loaded = yaml_adapter.load_context(session_id=session.session_id)
 
         assert len(loaded.messages) == 10

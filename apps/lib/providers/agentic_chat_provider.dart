@@ -12,6 +12,7 @@ class AgenticChatState {
   final bool isLoadingHistory;
   final String? error;
   final bool showAssistantPending;
+  final String? sessionTitle;
 
   const AgenticChatState({
     required this.messages,
@@ -19,6 +20,7 @@ class AgenticChatState {
     this.isLoadingHistory = false,
     this.error,
     this.showAssistantPending = false,
+    this.sessionTitle,
   });
 
   factory AgenticChatState.initial() {
@@ -31,6 +33,8 @@ class AgenticChatState {
     bool? isLoadingHistory,
     String? error,
     bool? showAssistantPending,
+    String? sessionTitle,
+    bool clearSessionTitle = false,
   }) {
     return AgenticChatState(
       messages: messages ?? this.messages,
@@ -38,6 +42,7 @@ class AgenticChatState {
       isLoadingHistory: isLoadingHistory ?? this.isLoadingHistory,
       error: error,
       showAssistantPending: showAssistantPending ?? this.showAssistantPending,
+      sessionTitle: clearSessionTitle ? null : (sessionTitle ?? this.sessionTitle),
     );
   }
 }
@@ -53,7 +58,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     return AgenticChatState.initial();
   }
 
-  Future<void> loadHistory() async {
+  Future<void> loadHistory({int? fromId}) async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final sessionId = settings.agenticSessionId;
@@ -72,19 +77,31 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       final messages = await getMessageHistory(
         baseUrl: settings.engineBaseUrl,
         sessionId: sessionId,
+        fromId: fromId,
         authType: settings.engineAuthType,
         username: settings.engineUsername,
         password: password,
       );
 
-      state = state.copyWith(
-        messages: messages,
-        isLoadingHistory: false,
-      );
-
-      Logger.debug(
-        'AgenticChat: Loaded ${messages.length} messages for session $sessionId',
-      );
+      if (fromId != null && fromId > 0) {
+        // Incremental load - append new messages
+        state = state.copyWith(
+          messages: [...state.messages, ...messages],
+          isLoadingHistory: false,
+        );
+        Logger.debug(
+          'AgenticChat: Appended ${messages.length} messages from index $fromId',
+        );
+      } else {
+        // Full load - replace all messages
+        state = state.copyWith(
+          messages: messages,
+          isLoadingHistory: false,
+        );
+        Logger.debug(
+          'AgenticChat: Loaded ${messages.length} messages for session $sessionId',
+        );
+      }
     } catch (e) {
       Logger.debug('AgenticChat: Failed to load history: $e');
       state = state.copyWith(
@@ -139,11 +156,13 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       final preview = response.text.length > 50
           ? '${response.text.substring(0, 50)}...'
           : response.text;
-      Logger.debug('AgenticChat: Received response [${response.id}]: $preview');
+      Logger.debug(
+        'AgenticChat: Received response [id=${response.id}]: $preview',
+      );
 
       // Auto-queue for TTS if in auto-playback mode
       if (settings.isAutoPlayback) {
-        ref.read(ttsProvider.notifier).enqueue(response.text, response.id);
+        ref.read(ttsProvider.notifier).enqueue(response.text, response.localId);
       }
     } catch (e) {
       final errorText = e is EngineApiException ? e.userMessage : e.toString();
@@ -169,7 +188,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     // Clear session ID so next message starts a new session
     await ref.read(settingsProvider.notifier).clearAgenticSessionId();
 
-    // Clear messages
+    // Clear messages and session title
     state = AgenticChatState.initial();
 
     // Clear TTS queue
@@ -180,6 +199,33 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
   void clearError() {
     state = state.copyWith(error: null);
+  }
+
+  Future<void> loadSessionInfo() async {
+    final settings = ref.read(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+    final sessionId = settings.agenticSessionId;
+
+    if (sessionId == null) {
+      return;
+    }
+
+    try {
+      final password = await settingsNotifier.getEnginePassword();
+
+      final sessionInfo = await getSessionInfo(
+        baseUrl: settings.engineBaseUrl,
+        sessionId: sessionId,
+        authType: settings.engineAuthType,
+        username: settings.engineUsername,
+        password: password,
+      );
+
+      state = state.copyWith(sessionTitle: sessionInfo.title);
+      Logger.debug('AgenticChat: Loaded session title: ${sessionInfo.title}');
+    } catch (e) {
+      Logger.debug('AgenticChat: Failed to load session info: $e');
+    }
   }
 
   /// Retry sending all user messages that haven't been acknowledged by the engine.

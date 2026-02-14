@@ -3,13 +3,7 @@ from datetime import datetime, timezone
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
-
-
-class Metadata(BaseModel):
-    session_id: UUID
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 class SessionInfo(BaseModel):
@@ -46,12 +40,18 @@ class AgentStats(BaseModel):
 
 
 class UserMessage(BaseModel):
+    sequence_id: int | None = Field(
+        default=None, description="Message ID within session"
+    )
     role: Literal["user"] = "user"
     content: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class AssistantMessage(BaseModel):
+    sequence_id: int | None = Field(
+        default=None, description="Message ID within session"
+    )
     role: Literal["assistant"] = "assistant"
     content: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -63,6 +63,7 @@ ChatMessage = UserMessage | AssistantMessage
 
 class ChatContext(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
+    _next_sequence_id: int = PrivateAttr(default=0)
 
 
 class ChatRequest(BaseModel):

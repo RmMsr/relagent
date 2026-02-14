@@ -1,10 +1,14 @@
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 
+from engine.adapters.test_adapters import (
+    EchoAgentExecution,
+    MemoryEventStoreAdapter,
+    MemoryPersistence,
+)
 from engine.domain.models import (
     AgentStats,
     AssistantMessage,
@@ -12,7 +16,9 @@ from engine.domain.models import (
     SessionInfo,
     UserMessage,
 )
-from engine.domain.ports import AgentExecution, Persistence
+from engine.domain.ports.events import EventStore
+from engine.domain.ports.persistence import Persistence
+from engine.domain.services import ChatService
 
 
 @pytest.fixture
@@ -59,23 +65,32 @@ def sample_context(
 
 
 @pytest.fixture
-def mock_persistence() -> MagicMock:
-    mock = MagicMock(spec=Persistence)
-    return mock
+def persistence() -> Persistence:
+    """In-memory persistence adapter for testing."""
+    return MemoryPersistence()
 
 
 @pytest.fixture
-def mock_agent_execution() -> MagicMock:
-    mock = MagicMock(spec=AgentExecution)
-    mock.run_basic_query = AsyncMock(
-        return_value=AssistantMessage(
-            content="Mock response",
-            stats=AgentStats(
-                agent_name="discussion",
-                input_tokens=100,
-                output_tokens=50,
-            ),
-        )
+def event_store() -> EventStore:
+    """In-memory event store adapter for testing."""
+    return MemoryEventStoreAdapter()
+
+
+@pytest.fixture
+def echo_agent_execution() -> EchoAgentExecution:
+    """Echo agent execution for testing."""
+    return EchoAgentExecution()
+
+
+@pytest.fixture
+def chat_service(
+    persistence: Persistence,
+    echo_agent_execution: EchoAgentExecution,
+    event_store: EventStore,
+) -> ChatService:
+    """Chat service with real in-memory adapters."""
+    return ChatService(
+        persistence_repository=persistence,
+        agent_execution=echo_agent_execution,
+        event_store=event_store,
     )
-    mock.generate_title = AsyncMock(return_value="Generated Title")
-    return mock

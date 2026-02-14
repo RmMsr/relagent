@@ -94,7 +94,7 @@ Prepare settings and data directory:
 mkdir -p ~/.local/share/relagent/data
 cp settings.ini.template ~/.local/share/relagent/settings.ini
 uv sync
-uv run uvicorn --reload --reload-dir=engine engine.run:app
+uv run uvicorn --reload --reload-dir=engine engine.api.run:app
 ```
 
 For production performance you can run the server from a container:

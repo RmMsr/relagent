@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from engine.api import api_router, dependency_chat_service
+from engine.api.v1 import api_router, dependency_chat_service
 from engine.domain.exceptions import ChatContextNotFound
 from engine.domain.models import (
     AgentStats,
@@ -89,6 +89,7 @@ class TestPostMessages:
         assert response.json() == {
             "session_id": str(session_id),
             "message": {
+                "sequence_id": None,
                 "role": "assistant",
                 "content": "Response",
                 "stats": {
@@ -173,11 +174,13 @@ class TestGetMessages:
             "session_id": str(session_id),
             "messages": [
                 {
+                    "sequence_id": None,
                     "role": "user",
                     "content": "Hello",
                     "timestamp": "2025-10-14T09:55:00",
                 },
                 {
+                    "sequence_id": None,
                     "role": "assistant",
                     "content": "Hi!",
                     "stats": None,
@@ -203,3 +206,41 @@ class TestGetMessages:
 
         assert response.status_code == 404
         assert response.json() == {"detail": "Session not found"}
+
+    def test_from_id_parameter_passed_to_service(
+        self, client: TestClient, mock_chat_service: MagicMock
+    ):
+        session_id = uuid.uuid4()
+        mock_chat_service.get_messages.return_value = MessagesResponse(
+            session_id=session_id,
+            messages=[
+                UserMessage(sequence_id=5, content="After"),
+                AssistantMessage(sequence_id=6, content="Response"),
+            ],
+        )
+
+        response = client.get(f"/api/v1/messages/{session_id}?from_id=5")
+
+        assert response.status_code == 200
+        mock_chat_service.get_messages.assert_called_once_with(
+            session_id=session_id, from_id=5
+        )
+
+    def test_from_id_filters_response_messages(
+        self, client: TestClient, mock_chat_service: MagicMock
+    ):
+        session_id = uuid.uuid4()
+        mock_chat_service.get_messages.return_value = MessagesResponse(
+            session_id=session_id,
+            messages=[
+                UserMessage(sequence_id=5, content="Message 5"),
+            ],
+        )
+
+        response = client.get(f"/api/v1/messages/{session_id}?from_id=5")
+
+        assert response.status_code == 200
+        messages = response.json()["messages"]
+        assert len(messages) == 1
+        assert messages[0]["sequence_id"] == 5
+        assert messages[0]["content"] == "Message 5"

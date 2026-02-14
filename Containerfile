@@ -25,4 +25,4 @@ RUN uv sync --locked --no-dev --no-cache
 
 ADD ./engine /app/engine
 
-CMD [ "python", "-m", "engine.run" ]
+CMD [ "python", "-m", "engine.api.run" ]

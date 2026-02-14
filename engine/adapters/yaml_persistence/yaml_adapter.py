@@ -18,11 +18,12 @@ from engine.domain.models import (
     AssistantMessage,
     ChatContext,
     ChatMessage,
-    Metadata,
     SessionInfo,
     UserMessage,
 )
-from engine.domain.ports import Persistence
+from engine.domain.ports.persistence import Persistence
+
+from .models import Metadata
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +32,9 @@ class YamlPersistenceAdapter(Persistence):
     def __init__(self, data_dir: os.PathLike[str]) -> None:
         self.base_dir: Path = Path(data_dir)
 
-    def save_context(self, session: SessionInfo, context: ChatContext) -> None:
+    def save_context(self, session_id: UUID, context: ChatContext) -> None:
         file_path = self._get_file_path(
-            session_id=session.session_id, part_name="chat_messages"
+            session_id=session_id, part_name="chat_messages"
         )
         logger.info("Saving chat messages to: %s", file_path)
 
@@ -45,12 +46,12 @@ class YamlPersistenceAdapter(Persistence):
 
         if file_path.exists():
             metadata = self._get_document_metadata(file_path)
-            if metadata.session_id != session.session_id:
+            if metadata.session_id != session_id:
                 logger.error("Found session_id mismatch in file: %s", file_path)
                 raise PersistenceError("Chat context inconsistent")
             metadata.updated_at = datetime.now(tz=timezone.utc)
         else:
-            metadata = Metadata(session_id=session.session_id)
+            metadata = Metadata(session_id=session_id)
 
         documents.append(metadata)
 

@@ -9,7 +9,7 @@ def main():
     # Make engine module available and load app
     project_path = Path(__file__).parent.parent
     sys.path.append(project_path.as_posix())
-    from engine.run import app
+    from engine.api.run import app
 
     with open("openapi-schema.json", mode="w") as fh:
         json.dump(app.openapi(), fh, indent=2)

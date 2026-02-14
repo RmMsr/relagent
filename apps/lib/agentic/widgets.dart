@@ -379,7 +379,7 @@ class _AgenticMessageBubble extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 4),
               child: _MessageActionsRow(
-                messageId: message.id,
+                messageId: message.localId,
                 messageText: message.text,
                 stats: message.stats,
                 onSpeak: onSpeak,

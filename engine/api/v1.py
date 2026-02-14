@@ -1,0 +1,144 @@
+import logging
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sse_starlette import EventSourceResponse
+
+from engine.api.helpers import dependency_chat_service, dependency_event_store
+from engine.domain.exceptions import ChatContextNotFound, SessionNotFound
+from engine.domain.models import (
+    ChatRequest,
+    ChatResponse,
+    MessagesResponse,
+    SessionInfo,
+    UserMessage,
+)
+from engine.domain.ports.events import (
+    EventStore,
+    SessionMessagesAppendedEvent,
+    SessionUpdatedEvent,
+)
+from engine.domain.services import ChatService
+
+logger = logging.getLogger(__name__)
+
+api_router = APIRouter()
+
+
+ChatServiceDepends = Annotated[ChatService, Depends(dependency_chat_service)]
+EventStoreDepends = Annotated[EventStore, Depends(dependency_event_store)]
+
+
+@api_router.post("/messages")
+async def messages(
+    body: ChatRequest | str, service: ChatServiceDepends
+) -> ChatResponse | str:
+    plain_body = not isinstance(body, ChatRequest)
+
+    request: ChatRequest = (
+        ChatRequest(messages=[UserMessage(content=body)]) if plain_body else body
+    )
+
+    response: ChatResponse = await service.perform_user_input(request=request)
+
+    if plain_body:
+        return response.message.content
+    else:
+        return response
+
+
+@api_router.get("/messages/{session_id}")
+def get_messages(
+    session_id: UUID, service: ChatServiceDepends, from_id: int | None = None
+) -> MessagesResponse:
+    try:
+        return service.get_messages(session_id=session_id, from_id=from_id)
+    except ChatContextNotFound:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
+@api_router.get("/sessions/{session_id}")
+def get_session(session_id: UUID, service: ChatServiceDepends) -> SessionInfo:
+    try:
+        return service.get_session(session_id=session_id)
+    except SessionNotFound:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
+@api_router.get(
+    "/events",
+    response_class=EventSourceResponse,
+    responses={
+        200: {
+            "description": "Server-Sent Events stream for real-time notifications",
+            "model": SessionUpdatedEvent | SessionMessagesAppendedEvent,
+            "content": {
+                "text/event-stream": {
+                    "schema": {
+                        "type": "array",
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "object",
+                                    "$ref": "#/components/schemas/SessionUpdatedEvent",
+                                },
+                                {
+                                    "type": "object",
+                                    "$ref": "#/components/schemas/SessionMessagesAppendedEvent",
+                                },
+                            ]
+                        },
+                    },
+                    "example": (
+                        "event: session.updated\n"
+                        "id: 42\n"
+                        'data: {"session_id": "151a0cfb-74bb-4978-8881-3d15e4017a5e", '
+                        '"created_at": "2024-01-15T10:30:00Z"}\n\n'
+                        "event: session.messages.appended\n"
+                        "id: 43\n"
+                        'data: {"session_id": "151a0cfb-74bb-4978-8881-3d15e4017a5e", '
+                        '"latest_sequence_id": 5, "created_at": "2024-01-15T10:30:01Z"}\n\n'
+                        ": ping - 2024-01-15T10:30:15Z"
+                    ),
+                }
+            },
+        }
+    },
+    summary="Subscribe to real-time events",
+    description="""
+Subscribe to Server-Sent Events (SSE) for real-time notifications. See the
+[HTML5 specification](https://html.spec.whatwg.org/multipage/server-sent-events.html#server-sent-events) for more details
+.
+
+## Event Types
+
+- **session.updated**: Session metadata changed (e.g., title generated)
+- **session.messages.appended**: New message(s) added to a session
+
+The connection sends a ping every 15 seconds to keep it alive.
+
+## Reconnection
+
+Include `Last-Event-ID` header with the last received event ID to replay missed events.
+
+## Retention
+
+Maximum 100 events are replayed. Events before that or older than 72 hours are not re-sent.
+""",
+)
+async def events(
+    event_store: EventStoreDepends,
+    last_event_id: Annotated[
+        int | None,
+        Header(
+            alias="Last-Event-ID",
+            description="Last received event ID for reconnection replay",
+        ),
+    ] = None,
+) -> EventSourceResponse:
+    event_id = 0
+    if last_event_id is not None:
+        event_id = last_event_id
+
+    return EventSourceResponse(event_store.generate_server_sent_events(event_id))

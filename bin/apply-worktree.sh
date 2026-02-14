@@ -45,7 +45,6 @@ ask_ai() {
     export OPENCODE_PERMISSION='{"bash":"deny", "read":"deny", "glob":"deny", "list":"deny", "grep":"deny"}'
     if result=$(echo "$@" | timeout --kill-after=5s 1m opencode run); then
         echo "$result"
-        #echo "$result" | sed /^\$/d
     else
         return 1
     fi
@@ -71,14 +70,10 @@ Give a list of significant changes. Leave out insignificant details. Use minimal
 
 $(git diff --staged)"
 
-    #echo "$query" | xxd
-
     message=$(ask_ai "$query")
     if [ -z "$message" ]; then
         message="Latest changes (default message)"
     fi
-
-    #echo "$message" | xxd
 
     git commit --all --message "$message" > /dev/null
     echo "${SUCCESS_SYM} New commit: $(git show --oneline --no-patch)"
@@ -95,7 +90,6 @@ squash_changes() {
     echo "Generating squash commit..."
 
     git_log=$(git log main-worktree/HEAD..)
-    #git_diff=$(git diff --merge-base main-worktree/HEAD)
 
     git reset --soft "$(git merge-base main-worktree/HEAD HEAD)"
 

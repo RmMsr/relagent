@@ -100,7 +100,81 @@ Map<String, String> _buildHeaders({
   return headers;
 }
 
+/// Fetches session info including title.
+Future<SessionInfo> getSessionInfo({
+  required String baseUrl,
+  required String sessionId,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
+}) async {
+  final normalizedUrl = _normalizeBaseUrl(baseUrl);
+  final uri = Uri.parse('$normalizedUrl/api/v1/sessions/$sessionId');
+
+  final headers = _buildHeaders(
+    authType: authType,
+    username: username,
+    password: password,
+  );
+
+  final http.Response response;
+  try {
+    response = await http.get(uri, headers: headers);
+  } catch (e) {
+    final isNetworkError = e.toString().contains('SocketException') ||
+        e.toString().contains('Connection refused') ||
+        e.toString().contains('Network is unreachable') ||
+        e.toString().contains('Connection timeout');
+
+    throw EngineApiException(
+      userMessage: isNetworkError
+          ? 'Network connection error'
+          : 'Could not connect to the engine',
+      technicalDetails: e.toString(),
+      url: uri.toString(),
+    );
+  }
+
+  if (response.statusCode >= 300) {
+    String userMessage;
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      userMessage = 'Authentication failed';
+    } else if (response.statusCode == 404) {
+      userMessage = 'Session not found';
+    } else if (response.statusCode >= 500) {
+      userMessage = 'Engine error occurred';
+    } else {
+      userMessage = 'Request failed';
+    }
+
+    throw EngineApiException(
+      userMessage: userMessage,
+      technicalDetails: _extractErrorDetails(
+        response.statusCode,
+        response.body,
+      ),
+      url: uri.toString(),
+    );
+  }
+
+  final Map<String, dynamic> responseJson;
+  try {
+    responseJson = jsonDecode(response.body) as Map<String, dynamic>;
+  } on FormatException catch (e) {
+    throw EngineApiException(
+      userMessage: 'Engine returned invalid response',
+      technicalDetails: 'JSON parsing failed: ${e.message}',
+      url: uri.toString(),
+    );
+  }
+
+  return SessionInfo.fromJson(responseJson);
+}
+
 /// Fetches message history for a session.
+///
+/// If [fromId] is provided, only messages starting from that index are returned.
+/// This enables incremental fetching when new messages are appended.
 ///
 /// Response format (MessagesResponse from OpenAPI schema):
 /// ```json
@@ -115,12 +189,17 @@ Map<String, String> _buildHeaders({
 Future<List<AgenticMessage>> getMessageHistory({
   required String baseUrl,
   required String sessionId,
+  int? fromId,
   AuthType authType = AuthType.none,
   String? username,
   String? password,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
-  final uri = Uri.parse('$normalizedUrl/api/v1/messages/$sessionId');
+  var uriString = '$normalizedUrl/api/v1/messages/$sessionId';
+  if (fromId != null) {
+    uriString += '?from_id=$fromId';
+  }
+  final uri = Uri.parse(uriString);
 
   final headers = _buildHeaders(
     authType: authType,
