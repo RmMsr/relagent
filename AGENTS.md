@@ -1,21 +1,3 @@
-<!-- OPENSPEC:START -->
-# OpenSpec Instructions
-
-These instructions are for AI assistants working in this project.
-
-Always open `@/openspec/AGENTS.md` when the request:
-- Mentions planning or proposals (words like proposal, spec, change, plan)
-- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
-- Sounds ambiguous and you need the authoritative spec before coding
-
-Use `@/openspec/AGENTS.md` to learn:
-- How to create and apply change proposals
-- Spec format and conventions
-- Project structure and guidelines
-
-Keep this managed block so 'openspec update' can refresh the instructions.
-
-<!-- OPENSPEC:END -->
 
 # Relagent Project Guide
 
@@ -30,7 +12,7 @@ This file provides high-level guidance for working with the Relagent codebase.
 Relagent ("Relatable Agentic Minion") is a privacy-focused AI assistant project consisting of:
 
 - **Flutter mobile/desktop app** (primary focus) - Multi-platform frontend with on-device speech recognition
-- **Backend server** (obsolete, being replaced) - Original Python-based chat server, no longer actively developed
+- **Engine** - Python-based agentic service with API and persistence
 
 The current development focus is on the Flutter app, which connects to any OpenAI-compatible API server.
 
@@ -106,12 +88,11 @@ This project prioritizes:
 ```
 relagent/
 ├── apps/                  # Flutter application (see apps/AGENTS.md for details)
-├── engine/                # Python backend engine (see engine/CLAUDE.md for details)
+├── engine/                # Python engine (see engine/CLAUDE.md for details)
 ├── docs/                  # Project documentation
 │   ├── development.md     # Development values and priorities
 │   ├── vision.md          # Project vision and use cases
 │   └── goals.md           # Project goals and principles
-├── bin/                   # Backend scripts (obsolete)
 └── README.md              # Main project readme
 ```
 
@@ -120,9 +101,9 @@ relagent/
 **Frontend (Active Development):**
 - Flutter multi-platform app - See [apps/AGENTS.md](apps/AGENTS.md) for details
 
-**Backend (Obsolete):**
-- Python-based server (being phased out)
-- Any OpenAI-compatible server can be used instead (LM Studio, Ollama, vLLM, etc.)
+**Engine:**
+- Python-based agentic service with API and persistence
+- Connects to any OpenAI-compatible LLM server (LM Studio, Ollama, vLLM, etc.)
 
 **Experiments:**
 - Python prototypes in `experiments/` directory
@@ -176,6 +157,4 @@ This ensures optimal use of AI capabilities while maintaining accuracy and devel
 
 Use friendly, inclusive language. Avoid: master, slave, one-shot, white-list
 
-## Backend Status
 
-The original Python-based backend in `bin/` is obsolete and being replaced. The Flutter app now connects directly to any OpenAI-compatible API server (LM Studio, Ollama, vLLM, etc.). Backend-related code and documentation should be considered deprecated.

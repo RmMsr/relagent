@@ -83,6 +83,7 @@ def init_instrumentation(app: FastAPI):
             "content-type",
         ],
         http_capture_headers_server_response=["content-type"],
+        excluded_urls="/status",
     )
 
     logger.info(

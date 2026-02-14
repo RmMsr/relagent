@@ -15,7 +15,7 @@ The primary use case is an agentic chat agent running on a self hosted server wi
 - Only marginally tested setup and update routines
 - Multi language support (the default ASR streaming model can be easily replaced)
 - Multi user support
-- API key management (You can add HTTP basic auth on top of the backend)
+- API key management (You can add HTTP basic auth on top of the engine)
 
 ## Installation
 
@@ -43,7 +43,7 @@ iOS and desktop versions should work, but are currently untested.
 
 Relagent requires a running OpenAI compatible inference server. Like [LM Studio](https://lmstudio.ai/), [Lemonade-Server](https://lemonade-server.ai/), [vLLM](https://github.com/vllm-project/vllm) or [Ollama](https://github.com/ollama/ollama).
 
-### Engine: The backend server
+### Engine
 
 The Relagent server requires a Linux operating system to run. The easiest setup is using `podman` and `systemd`. You can also use Docker or run the Python service standalone.
 

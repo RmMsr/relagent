@@ -1,6 +1,6 @@
 # Relagent Engine
 
-The agentic backend with api and agent orchestration.
+The agentic engine with api and agent orchestration.
 
 ## Development
 

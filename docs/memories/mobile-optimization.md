@@ -6,7 +6,7 @@ The Relagent Android app experiences Application Not Responding (ANR) errors and
 
 - Speech recognition model initialization and usage
 - Text-to-speech (TTS) model initialization and audio generation
-- HTTP communication with the backend
+- HTTP communication with the engine
 - Audio data processing and caching
 
 ANRs occur when the main thread is blocked for more than 5 seconds, causing the Android system to show a "App not responding" dialog.

@@ -23,10 +23,10 @@ Relagent ("Relatable Agentic Minion") is a privacy-focused AI assistant for dail
 - **Sherpa-ONNX** - On-device streaming speech recognition
 - **SharedPreferences** - Settings persistence
 
-**Backend:**
+**Engine:**
 
-- Any OpenAI-compatible API server (LM Studio, Lemonade-Server, vLLM, Ollama)
-- Original Python-based server is **obsolete** and being phased out
+- Python-based agentic service with API and persistence
+- Connects to any OpenAI-compatible LLM server (LM Studio, Lemonade-Server, vLLM, Ollama)
 
 **Development Tools:**
 
@@ -118,9 +118,9 @@ Relagent ("Relatable Agentic Minion") is a privacy-focused AI assistant for dail
 
 **Privacy-First AI Assistant:**
 
-- All data processed and stored within the system (backend and frontend)
+- All data processed and stored within the system (engine and frontend)
 - External services require explicit user enablement/allowance
-- Works offline (as long as frontend and backend can communicate)
+- Works offline (as long as frontend and engine can communicate)
 - Self-hosted on user-controlled servers
 
 **Speech Recognition:**
@@ -186,4 +186,4 @@ Relagent ("Relatable Agentic Minion") is a privacy-focused AI assistant for dail
 
 - Flutter SDK (via fvm)
 - Android SDK (for Android builds, located in `$ANDROID_HOME`)
-- Podman or Docker (for obsolete backend, being phased out)
+- Podman or Docker (for containerized engine deployment)

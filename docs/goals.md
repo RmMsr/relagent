@@ -8,11 +8,11 @@ This project was created to explore how useful an open-source, self-hosted AI as
 
 ### Data sovereignty
 
-All data is processed and stored within the system (backend and frontend). If an external service is used, it needs to be explicitly enabled or allowed by the user. For example a web search or interaction with a 3rd party AI.
+All data is processed and stored within the system (engine and frontend). If an external service is used, it needs to be explicitly enabled or allowed by the user. For example a web search or interaction with a 3rd party AI.
 
 - Pure local execution and storage
 - No external services for core functionality
-- Works offline (without or with restricted internet access) as long as frontend and backend can comminicate
+- Works offline (without or with restricted internet access) as long as frontend and engine can comminicate
 
 ### Open and transparent
 
