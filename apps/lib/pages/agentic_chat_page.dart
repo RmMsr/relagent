@@ -22,66 +22,7 @@ class AgenticChatPage extends ConsumerStatefulWidget {
 class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
   final ScrollController _scrollController = ScrollController();
   bool _healthCheckBannerDismissed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
-      ref.read(agenticChatProvider.notifier).loadHistory();
-      ref.read(agenticChatProvider.notifier).loadSessionInfo();
-      ref.read(recordingProvider.notifier).checkAutoStart();
-      ref.read(ttsProvider.notifier).initialize();
-      ref.read(sseProvider.notifier).connect();
-    });
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-    }
-  }
-
-  Future<void> _navigateToSettings() async {
-    final previousResult = ref.read(engineHealthCheckProvider).lastResult;
-
-    final result = await context.push<String>('/settings');
-
-    if (!mounted) return;
-
-    // Check engine health after settings change
-    ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
-    ref.read(agenticChatProvider.notifier).loadHistory();
-    ref.read(sseProvider.notifier).connect();
-
-    // Reset banner if health status changed
-    final newResult = ref.read(engineHealthCheckProvider).lastResult;
-    if (previousResult?.status != newResult?.status) {
-      setState(() {
-        _healthCheckBannerDismissed = false;
-      });
-    }
-
-    if (result != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result), duration: const Duration(seconds: 3)),
-      );
-    }
-  }
+  final GlobalKey _chatInputKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -190,8 +131,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
                 healthCheckState.lastResult != null &&
                 !healthCheckState.lastResult!.isSuccess)
               _buildHealthCheckBanner(context, healthCheckState.lastResult!),
-            if (chatState.isLoadingHistory)
-              const LinearProgressIndicator(),
+            if (chatState.isLoadingHistory) const LinearProgressIndicator(),
             Expanded(
               child: ListView(
                 controller: _scrollController,
@@ -230,6 +170,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
               ),
             ),
             AgenticChatInput(
+              key: _chatInputKey,
               onSubmitted: (text) {
                 ref.read(agenticChatProvider.notifier).sendMessage(text);
               },
@@ -240,13 +181,32 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
     );
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
+      ref.read(agenticChatProvider.notifier).loadHistory();
+      ref.read(agenticChatProvider.notifier).loadSessionInfo();
+      ref.read(recordingProvider.notifier).checkAutoStart();
+      ref.read(ttsProvider.notifier).initialize();
+      ref.read(sseProvider.notifier).connect();
+    });
+  }
+
   Widget _buildHealthCheckBanner(
     BuildContext context,
     EngineHealthResult result,
   ) {
     final theme = Theme.of(context);
-    final isAuthIssue = result.requiresAuth ||
-        result.status == EngineHealthStatus.authFailed;
+    final isAuthIssue =
+        result.requiresAuth || result.status == EngineHealthStatus.authFailed;
 
     String title;
     String message;
@@ -254,7 +214,8 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
 
     if (result.requiresAuth) {
       title = 'Authentication Required';
-      message = 'The engine requires authentication. '
+      message =
+          'The engine requires authentication. '
           'Configure credentials in settings.';
       actionText = 'Configure Auth';
     } else if (result.status == EngineHealthStatus.authFailed) {
@@ -336,4 +297,53 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
     );
   }
 
+  Future<void> _navigateToSettings() async {
+    final previousResult = ref.read(engineHealthCheckProvider).lastResult;
+
+    final result = await context.push<String>('/settings');
+
+    if (!mounted) return;
+
+    // Check engine health after settings change
+    ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
+    ref.read(agenticChatProvider.notifier).loadHistory();
+    ref.read(sseProvider.notifier).connect();
+
+    // Reset banner if health status changed
+    final newResult = ref.read(engineHealthCheckProvider).lastResult;
+    if (previousResult?.status != newResult?.status) {
+      setState(() {
+        _healthCheckBannerDismissed = false;
+      });
+    }
+
+    if (result != null && mounted) {
+      final renderBox =
+          _chatInputKey.currentContext?.findRenderObject() as RenderBox?;
+      final inputHeight = renderBox?.size.height ?? 0;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(bottom: inputHeight + 8),
+          showCloseIcon: true,
+        ),
+      );
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
 }

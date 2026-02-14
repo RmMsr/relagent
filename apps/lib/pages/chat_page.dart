@@ -21,6 +21,7 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   final ScrollController _scrollController = ScrollController();
   bool _healthCheckBannerDismissed = false;
+  final GlobalKey _chatInputKey = GlobalKey();
 
   @override
   void initState() {
@@ -77,8 +78,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     // Show snackbar if settings returned a message
     if (result != null && mounted) {
+      final renderBox =
+          _chatInputKey.currentContext?.findRenderObject() as RenderBox?;
+      final inputHeight = renderBox?.size.height ?? 0;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result), duration: const Duration(seconds: 3)),
+        SnackBar(
+          content: Text(result),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(bottom: inputHeight + 8),
+        ),
       );
     }
   }
@@ -242,6 +251,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
             ),
             ChatInput(
+              key: _chatInputKey,
               onSubmitted: (text) {
                 ref.read(chatProvider.notifier).sendMessage(text);
               },
