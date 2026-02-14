@@ -7,6 +7,8 @@ Usage:
     python bin/update-version.py --bump minor  # Bump minor version and sync
     python bin/update-version.py --bump major  # Bump major version and sync
     python bin/update-version.py --bump patch  # Bump patch version and sync
+    python bin/update-version.py --preview     # Add -pre suffix and sync
+    python bin/update-version.py --stable      # Remove -pre suffix and sync
 """
 
 import argparse
@@ -39,7 +41,6 @@ def read_version() -> str:
 def write_version(version: str) -> None:
     """Write version to VERSION file."""
     VERSION_FILE.write_text(f"{version}\n")
-    print(f"Updated {VERSION_FILE.relative_to(REPO_ROOT)}: {version}")
 
 
 def validate_semver(version: str) -> bool:
@@ -54,6 +55,18 @@ def parse_semver(version: str) -> tuple[int, int, int, str | None]:
         raise ValueError(f"Invalid semver: {version}")
     major, minor, patch, prerelease, _ = match.groups()
     return int(major), int(minor), int(patch), prerelease
+
+
+def add_prerelease_suffix(version: str, suffix: str = "pre") -> str:
+    """Add a pre-release suffix to the version."""
+    major, minor, patch, _ = parse_semver(version)
+    return f"{major}.{minor}.{patch}-{suffix}"
+
+
+def remove_prerelease_suffix(version: str) -> str:
+    """Remove pre-release suffix from version."""
+    major, minor, patch, _ = parse_semver(version)
+    return f"{major}.{minor}.{patch}"
 
 
 def bump_version(version: str, bump_type: str) -> str:
@@ -88,7 +101,6 @@ def update_pyproject(version: str) -> bool:
         return False
 
     PYPROJECT_FILE.write_text(new_content)
-    print(f"Updated {PYPROJECT_FILE.relative_to(REPO_ROOT)}: {version}")
     return True
 
 
@@ -116,7 +128,6 @@ def update_pubspec(version: str) -> bool:
         return False
 
     PUBSPEC_FILE.write_text(new_content)
-    print(f"Updated {PUBSPEC_FILE.relative_to(REPO_ROOT)}: {version}")
     return True
 
 
@@ -144,7 +155,6 @@ def update_container(version: str) -> bool:
         return False
 
     CONTAINER_FILE.write_text(new_content)
-    print(f"Updated {CONTAINER_FILE.relative_to(REPO_ROOT)}: {version}")
     return True
 
 
@@ -156,6 +166,16 @@ def main() -> int:
         "--bump",
         choices=["major", "minor", "patch"],
         help="Bump version before syncing",
+    )
+    parser.add_argument(
+        "--preview",
+        action="store_true",
+        help="Add -pre suffix to version",
+    )
+    parser.add_argument(
+        "--stable",
+        action="store_true",
+        help="Remove -pre suffix from version",
     )
     args = parser.parse_args()
 
@@ -171,11 +191,23 @@ def main() -> int:
     # Bump if requested
     if args.bump:
         version = bump_version(version, args.bump)
-        print(f"Bumped to: {version}")
         write_version(version)
 
+    # Add or remove pre-release suffix
+    if args.preview and args.stable:
+        print("Error: Cannot use both --preview and --stable", file=sys.stderr)
+        return 1
+
+    if args.preview:
+        version = add_prerelease_suffix(version)
+        write_version(version)
+    elif args.stable:
+        if "-" in version:
+            version = remove_prerelease_suffix(version)
+            write_version(version)
+
     # Update all artifacts
-    print("\nSynchronizing version to artifacts...")
+    print(f"New version: {version}")
     update_pyproject(version)
     # Sync dependencies after pyproject update
     import subprocess
@@ -193,7 +225,6 @@ def main() -> int:
     update_pubspec(version)
     update_container(version)
 
-    print("\nVersion synchronization complete.")
     return 0
 
 

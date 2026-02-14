@@ -113,7 +113,8 @@ git worktree add -b "$WORKTREE_NAME" "$WORKTREE_PATH" "$BRANCH"
 # Run the existing setup script for symlinks
 if [ -f "./bin/git-worktree-setup.sh" ]; then
   cd "$WORKTREE_PATH"
-  "../$REPO_NAME/bin/git-worktree-setup.sh"
+  "$WORKTREE_PATH/bin/git-worktree-setup.sh"
+  "$WORKTREE_PATH/bin/update-version.py" --bump patch --preview
   cd - > /dev/null
 fi
 
