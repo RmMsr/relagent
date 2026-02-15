@@ -16,6 +16,8 @@ from engine.domain.models import (
 )
 from engine.domain.ports.events import (
     EventStore,
+    SessionCreatedEvent,
+    SessionDeletedEvent,
     SessionMessagesAppendedEvent,
     SessionUpdatedEvent,
 )
@@ -58,10 +60,37 @@ def get_messages(
         raise HTTPException(status_code=404, detail="Session not found")
 
 
+@api_router.get("/sessions")
+def list_sessions(
+    service: ChatServiceDepends,
+    limit: int = 100,
+) -> list[SessionInfo]:
+    """List recent sessions sorted by last modified time."""
+    # Validate and cap limit parameter
+    if limit < 1:
+        limit = 1
+    elif limit > 1000:
+        limit = 1000
+    return service.list_recent_sessions(limit=limit)
+
+
 @api_router.get("/sessions/{session_id}")
 def get_session(session_id: UUID, service: ChatServiceDepends) -> SessionInfo:
     try:
         return service.get_session(session_id=session_id)
+    except SessionNotFound:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
+@api_router.delete("/sessions/{session_id}")
+def delete_session(
+    session_id: UUID,
+    service: ChatServiceDepends,
+) -> dict[str, str]:
+    """Delete a session and all its associated data."""
+    try:
+        service.delete_session(session_id=session_id)
+        return {"status": "deleted", "session_id": str(session_id)}
     except SessionNotFound:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -72,13 +101,26 @@ def get_session(session_id: UUID, service: ChatServiceDepends) -> SessionInfo:
     responses={
         200: {
             "description": "Server-Sent Events stream for real-time notifications",
-            "model": SessionUpdatedEvent | SessionMessagesAppendedEvent,
+            "model": (
+                SessionCreatedEvent
+                | SessionDeletedEvent
+                | SessionUpdatedEvent
+                | SessionMessagesAppendedEvent
+            ),
             "content": {
                 "text/event-stream": {
                     "schema": {
                         "type": "array",
                         "items": {
                             "anyOf": [
+                                {
+                                    "type": "object",
+                                    "$ref": "#/components/schemas/SessionCreatedEvent",
+                                },
+                                {
+                                    "type": "object",
+                                    "$ref": "#/components/schemas/SessionDeletedEvent",
+                                },
                                 {
                                     "type": "object",
                                     "$ref": "#/components/schemas/SessionUpdatedEvent",
@@ -91,12 +133,20 @@ def get_session(session_id: UUID, service: ChatServiceDepends) -> SessionInfo:
                         },
                     },
                     "example": (
-                        "event: session.updated\n"
+                        "event: session.created\n"
+                        "id: 41\n"
+                        'data: {"session_id": "151a0cfb-74bb-4978-8881-3d15e4017a5e", '
+                        '"created_at": "2024-01-15T10:29:00Z"}\n\n'
+                        "event: session.deleted\n"
                         "id: 42\n"
                         'data: {"session_id": "151a0cfb-74bb-4978-8881-3d15e4017a5e", '
                         '"created_at": "2024-01-15T10:30:00Z"}\n\n'
-                        "event: session.messages.appended\n"
+                        "event: session.updated\n"
                         "id: 43\n"
+                        'data: {"session_id": "151a0cfb-74bb-4978-8881-3d15e4017a5e", '
+                        '"created_at": "2024-01-15T10:30:00Z"}\n\n'
+                        "event: session.messages.appended\n"
+                        "id: 44\n"
                         'data: {"session_id": "151a0cfb-74bb-4978-8881-3d15e4017a5e", '
                         '"latest_sequence_id": 5, "created_at": "2024-01-15T10:30:01Z"}\n\n'
                         ": ping - 2024-01-15T10:30:15Z"
@@ -113,6 +163,8 @@ Subscribe to Server-Sent Events (SSE) for real-time notifications. See the
 
 ## Event Types
 
+- **session.created**: A new session was created
+- **session.deleted**: A session was deleted
 - **session.updated**: Session metadata changed (e.g., title generated)
 - **session.messages.appended**: New message(s) added to a session
 

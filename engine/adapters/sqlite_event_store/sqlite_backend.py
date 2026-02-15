@@ -14,6 +14,8 @@ from engine.domain.ports.events import (
     Event,
     EventNames,
     EventStore,
+    SessionCreatedEvent,
+    SessionDeletedEvent,
     SessionMessagesAppendedEvent,
     SessionUpdatedEvent,
 )
@@ -153,6 +155,10 @@ class SqliteEventStoreAdapter(EventStore):
             data["created_at"] = row["created_at"]
 
             match event_name:
+                case EventNames.SESSION_CREATED:
+                    return SessionCreatedEvent.model_validate(data)
+                case EventNames.SESSION_DELETED:
+                    return SessionDeletedEvent.model_validate(data)
                 case EventNames.SESSION_UPDATED:
                     return SessionUpdatedEvent.model_validate(data)
                 case EventNames.SESSION_MESSAGES_APPENDED:

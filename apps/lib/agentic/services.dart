@@ -52,10 +52,9 @@ String _extractErrorDetails(int statusCode, String responseBody) {
     }
   } catch (_) {
     // If JSON parsing fails, include raw body (truncated)
-    final truncated =
-        responseBody.length > 200
-            ? '${responseBody.substring(0, 200)}...'
-            : responseBody;
+    final truncated = responseBody.length > 200
+        ? '${responseBody.substring(0, 200)}...'
+        : responseBody;
     buffer.write('\n$truncated');
   }
 
@@ -121,7 +120,8 @@ Future<SessionInfo> getSessionInfo({
   try {
     response = await http.get(uri, headers: headers);
   } catch (e) {
-    final isNetworkError = e.toString().contains('SocketException') ||
+    final isNetworkError =
+        e.toString().contains('SocketException') ||
         e.toString().contains('Connection refused') ||
         e.toString().contains('Network is unreachable') ||
         e.toString().contains('Connection timeout');
@@ -211,7 +211,8 @@ Future<List<AgenticMessage>> getMessageHistory({
   try {
     response = await http.get(uri, headers: headers);
   } catch (e) {
-    final isNetworkError = e.toString().contains('SocketException') ||
+    final isNetworkError =
+        e.toString().contains('SocketException') ||
         e.toString().contains('Connection refused') ||
         e.toString().contains('Network is unreachable') ||
         e.toString().contains('Connection timeout');
@@ -320,7 +321,8 @@ Future<AgenticMessage> sendAgenticMessage({
   try {
     response = await http.post(uri, headers: headers, body: body);
   } catch (e) {
-    final isNetworkError = e.toString().contains('SocketException') ||
+    final isNetworkError =
+        e.toString().contains('SocketException') ||
         e.toString().contains('Connection refused') ||
         e.toString().contains('Network is unreachable') ||
         e.toString().contains('Connection timeout');
@@ -385,4 +387,147 @@ Future<AgenticMessage> sendAgenticMessage({
   messageJson['session_id'] = sessionIdFromResponse;
 
   return AgenticMessage.fromJson(messageJson);
+}
+
+/// Fetches list of recent sessions.
+///
+/// Response format (list of SessionInfo from OpenAPI schema):
+/// ```json
+/// [
+///   {"session_id": "uuid", "title": "...", "created_at": "ISO8601", "updated_at": "ISO8601"},
+///   ...
+/// ]
+/// ```
+Future<List<SessionInfo>> getSessionsList({
+  required String baseUrl,
+  int limit = 100,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
+}) async {
+  final normalizedUrl = _normalizeBaseUrl(baseUrl);
+  final uri = Uri.parse('$normalizedUrl/api/v1/sessions?limit=$limit');
+
+  final headers = _buildHeaders(
+    authType: authType,
+    username: username,
+    password: password,
+  );
+
+  final http.Response response;
+  try {
+    response = await http.get(uri, headers: headers);
+  } catch (e) {
+    final isNetworkError =
+        e.toString().contains('SocketException') ||
+        e.toString().contains('Connection refused') ||
+        e.toString().contains('Network is unreachable') ||
+        e.toString().contains('Connection timeout');
+
+    throw EngineApiException(
+      userMessage: isNetworkError
+          ? 'Network connection error'
+          : 'Could not connect to the engine',
+      technicalDetails: e.toString(),
+      url: uri.toString(),
+    );
+  }
+
+  if (response.statusCode >= 300) {
+    String userMessage;
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      userMessage = 'Authentication failed';
+    } else if (response.statusCode == 404) {
+      userMessage = 'Sessions endpoint not found (check engine URL)';
+    } else if (response.statusCode >= 500) {
+      userMessage = 'Engine error occurred';
+    } else {
+      userMessage = 'Request failed';
+    }
+
+    throw EngineApiException(
+      userMessage: userMessage,
+      technicalDetails: _extractErrorDetails(
+        response.statusCode,
+        response.body,
+      ),
+      url: uri.toString(),
+    );
+  }
+
+  // Parse list of SessionInfo
+  final List<dynamic> responseJson;
+  try {
+    responseJson = jsonDecode(response.body) as List<dynamic>;
+  } on FormatException catch (e) {
+    throw EngineApiException(
+      userMessage: 'Engine returned invalid response',
+      technicalDetails: 'JSON parsing failed: ${e.message}',
+      url: uri.toString(),
+    );
+  }
+
+  return responseJson
+      .map((json) => SessionInfo.fromJson(json as Map<String, dynamic>))
+      .toList();
+}
+
+/// Deletes a session.
+///
+/// Returns successfully if session was deleted or didn't exist.
+Future<void> deleteSessionApi({
+  required String baseUrl,
+  required String sessionId,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
+}) async {
+  final normalizedUrl = _normalizeBaseUrl(baseUrl);
+  final uri = Uri.parse('$normalizedUrl/api/v1/sessions/$sessionId');
+
+  final headers = _buildHeaders(
+    authType: authType,
+    username: username,
+    password: password,
+  );
+
+  final http.Response response;
+  try {
+    response = await http.delete(uri, headers: headers);
+  } catch (e) {
+    final isNetworkError =
+        e.toString().contains('SocketException') ||
+        e.toString().contains('Connection refused') ||
+        e.toString().contains('Network is unreachable') ||
+        e.toString().contains('Connection timeout');
+
+    throw EngineApiException(
+      userMessage: isNetworkError
+          ? 'Network connection error'
+          : 'Could not connect to the engine',
+      technicalDetails: e.toString(),
+      url: uri.toString(),
+    );
+  }
+
+  // 404 is acceptable - session already deleted
+  if (response.statusCode >= 300 && response.statusCode != 404) {
+    String userMessage;
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      userMessage = 'Authentication failed';
+    } else if (response.statusCode >= 500) {
+      userMessage = 'Engine error occurred';
+    } else {
+      userMessage = 'Request failed';
+    }
+
+    throw EngineApiException(
+      userMessage: userMessage,
+      technicalDetails: _extractErrorDetails(
+        response.statusCode,
+        response.body,
+      ),
+      url: uri.toString(),
+    );
+  }
 }

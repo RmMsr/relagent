@@ -9,6 +9,8 @@ from sse_starlette import ServerSentEvent
 
 
 class EventNames(Enum):
+    SESSION_CREATED = "session.created"
+    SESSION_DELETED = "session.deleted"
     SESSION_UPDATED = "session.updated"
     SESSION_MESSAGES_APPENDED = "session.messages.appended"
 
@@ -24,6 +26,14 @@ class BaseEvent(BaseModel):
     session_id: UUID = Field(description="Session this event relates to")
 
 
+class SessionCreatedEvent(BaseEvent):
+    event_name: Literal[EventNames.SESSION_CREATED] = EventNames.SESSION_CREATED
+
+
+class SessionDeletedEvent(BaseEvent):
+    event_name: Literal[EventNames.SESSION_DELETED] = EventNames.SESSION_DELETED
+
+
 class SessionUpdatedEvent(BaseEvent):
     event_name: Literal[EventNames.SESSION_UPDATED] = EventNames.SESSION_UPDATED
 
@@ -37,7 +47,12 @@ class SessionMessagesAppendedEvent(BaseEvent):
     )
 
 
-Event = SessionUpdatedEvent | SessionMessagesAppendedEvent
+Event = (
+    SessionCreatedEvent
+    | SessionDeletedEvent
+    | SessionUpdatedEvent
+    | SessionMessagesAppendedEvent
+)
 
 
 class EventStore(ABC):

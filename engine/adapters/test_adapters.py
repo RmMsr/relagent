@@ -18,24 +18,49 @@ class MemoryPersistence(Persistence):
     def __init__(self) -> None:
         self._sessions: dict[UUID, SessionInfo] = {}
         self._contexts: dict[UUID, ChatContext] = {}
+        self._timestamps: dict[UUID, datetime] = {}
 
     def save_session(self, session: SessionInfo) -> None:
         self._sessions[session.session_id] = session.model_copy(deep=True)
+        self._timestamps[session.session_id] = datetime.now(timezone.utc)
 
     def load_session(self, session_id: UUID) -> SessionInfo:
         session = self._sessions.get(session_id)
         if session is None:
             raise SessionNotFound(session_id=session_id)
+        # Update timestamp on access
+        self._timestamps[session_id] = datetime.now(timezone.utc)
         return session
 
     def save_context(self, session_id: UUID, context: ChatContext) -> None:
         self._contexts[session_id] = context.model_copy(deep=True)
+        self._timestamps[session_id] = datetime.now(timezone.utc)
 
     def load_context(self, session_id: UUID) -> ChatContext:
         context = self._contexts.get(session_id)
         if context is None:
             raise ChatContextNotFound(session_id=session_id)
+        # Update timestamp on access
+        self._timestamps[session_id] = datetime.now(timezone.utc)
         return context
+
+    def list_recent_sessions(self, limit: int = 100) -> list[SessionInfo]:
+        sessions_with_time = [
+            (
+                session,
+                self._timestamps.get(
+                    session_id, datetime.min.replace(tzinfo=timezone.utc)
+                ),
+            )
+            for session_id, session in self._sessions.items()
+        ]
+        sessions_with_time.sort(key=lambda x: x[1], reverse=True)
+        return [session for session, _ in sessions_with_time[:limit]]
+
+    def delete_session(self, session_id: UUID) -> None:
+        self._sessions.pop(session_id, None)
+        self._contexts.pop(session_id, None)
+        self._timestamps.pop(session_id, None)
 
 
 class MemoryEventStoreAdapter(EventStore):

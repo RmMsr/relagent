@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '/pages/agentic_chat_page.dart';
 import '/pages/chat_page.dart';
 import '/pages/info_page.dart';
+import '/pages/sessions_page.dart';
 import '/pages/settings_page.dart';
 import '/pages/splash_page.dart';
 
@@ -36,6 +37,12 @@ final appRouter = GoRouter(
       path: '/info',
       name: 'info',
       pageBuilder: (context, state) => const MaterialPage(child: InfoPage()),
+    ),
+    GoRoute(
+      path: '/sessions',
+      name: 'sessions',
+      pageBuilder: (context, state) =>
+          const MaterialPage(child: SessionsPage()),
     ),
   ],
 );

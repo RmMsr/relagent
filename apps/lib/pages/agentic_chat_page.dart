@@ -43,12 +43,14 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
     ) {
       if (previous?.audioFocusState.status != AudioFocusStatus.permanentLoss &&
           next.audioFocusState.status == AudioFocusStatus.permanentLoss) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Voice mode changed because another app needs audio'),
-            duration: Duration(seconds: 4),
-          ),
-        );
+        _showSnackBar('Voice mode changed because another app needs audio');
+      }
+    });
+
+    ref.listen<SseState>(sseProvider, (previous, next) {
+      if (next.activeSessionDeleted != null) {
+        _showSnackBar('Session was deleted - started new session');
+        ref.read(sseProvider.notifier).clearActiveSessionDeleted();
       }
     });
 
@@ -62,6 +64,10 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
               context.go('/simple');
             } else if (route == '/info') {
               context.push('/info');
+            } else if (route == '/sessions') {
+              context.push('/sessions');
+            } else if (route == '/settings') {
+              context.push('/settings');
             }
           },
           itemBuilder: (context) => [
@@ -88,7 +94,27 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
                 ],
               ),
             ),
+            const PopupMenuItem(
+              value: '/sessions',
+              child: Row(
+                children: [
+                  Icon(Icons.list),
+                  SizedBox(width: 12),
+                  Text('Recent Sessions'),
+                ],
+              ),
+            ),
             const PopupMenuDivider(),
+            const PopupMenuItem(
+              value: '/settings',
+              child: Row(
+                children: [
+                  Icon(Icons.settings),
+                  SizedBox(width: 12),
+                  Text('Settings'),
+                ],
+              ),
+            ),
             const PopupMenuItem(
               value: '/info',
               child: Row(
@@ -112,16 +138,17 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
           const VoiceModeSelector(),
           const SizedBox(width: 8),
           IconButton(
+            icon: const Icon(Icons.restore_page),
+            tooltip: 'New Session',
+            onPressed: () {
+              ref.read(agenticChatProvider.notifier).clearChat();
+              _showSnackBar('New session started');
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: _navigateToSettings,
           ),
-          if (chatState.messages.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: () {
-                ref.read(agenticChatProvider.notifier).clearChat();
-              },
-            ),
         ],
       ),
       body: SafeArea(
@@ -318,18 +345,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
     }
 
     if (result != null && mounted) {
-      final renderBox =
-          _chatInputKey.currentContext?.findRenderObject() as RenderBox?;
-      final inputHeight = renderBox?.size.height ?? 0;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result),
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.only(bottom: inputHeight + 8),
-          showCloseIcon: true,
-        ),
-      );
+      _showSnackBar(result);
     }
   }
 
@@ -345,5 +361,20 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
         }
       });
     }
+  }
+
+  void _showSnackBar(String message) {
+    final renderBox =
+        _chatInputKey.currentContext?.findRenderObject() as RenderBox?;
+    final inputHeight = renderBox?.size.height ?? 0;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(bottom: inputHeight + 8),
+        showCloseIcon: true,
+      ),
+    );
   }
 }

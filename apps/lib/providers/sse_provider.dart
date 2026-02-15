@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '/agentic/services.dart';
 import '/agentic/sse_client.dart';
 import '/providers/agentic_chat_provider.dart';
 import '/providers/settings_provider.dart';
+import '/providers/sessions_provider.dart';
 import '/utils/logger.dart';
 
 const _lastEventIdKey = 'sse_last_event_id';
@@ -12,11 +14,32 @@ const _lastEventIdKey = 'sse_last_event_id';
 class SseState {
   final bool isConnected;
   final String? error;
+  final String? activeSessionDeleted;
 
-  const SseState({this.isConnected = false, this.error});
+  const SseState({
+    this.isConnected = false,
+    this.error,
+    this.activeSessionDeleted,
+  });
 
-  SseState copyWith({bool? isConnected, String? error}) {
-    return SseState(isConnected: isConnected ?? this.isConnected, error: error);
+  SseState copyWith({
+    bool? isConnected,
+    String? error,
+    String? activeSessionDeleted,
+  }) {
+    return SseState(
+      isConnected: isConnected ?? this.isConnected,
+      error: error,
+      activeSessionDeleted: activeSessionDeleted ?? this.activeSessionDeleted,
+    );
+  }
+
+  SseState clearActiveSessionDeleted() {
+    return SseState(
+      isConnected: isConnected,
+      error: error,
+      activeSessionDeleted: null,
+    );
   }
 }
 
@@ -115,28 +138,85 @@ class SseNotifier extends Notifier<SseState> {
       lastEventId: lastEventId,
     );
 
-    _eventSubscription = _client!.events.listen(_handleEvent);
+    _eventSubscription = _client!.events.listen((event) {
+      unawaited(_handleEvent(event));
+    });
 
     await _client!.connect();
     state = state.copyWith(isConnected: true);
   }
 
-  void _handleEvent(SseEvent event) {
+  Future<void> _handleEvent(SseEvent event) async {
     _persistLastEventId(event.id);
 
     final settings = ref.read(settingsProvider);
     final currentSessionId = settings.agenticSessionId;
 
     switch (event) {
-      case SessionUpdatedEvent(:final sessionId):
-        if (currentSessionId == null || sessionId != currentSessionId) {
-          Logger.debug(
-            'SSE: Ignoring session.updated for different session: $sessionId',
+      case SessionCreatedEvent(:final sessionId):
+        Logger.debug('SSE: Session created: $sessionId');
+        // Fetch the new session info and add it to the list
+        try {
+          final settings = ref.read(settingsProvider);
+          final settingsNotifier = ref.read(settingsProvider.notifier);
+          final password = await settingsNotifier.getEnginePassword();
+
+          final sessionInfo = await getSessionInfo(
+            baseUrl: settings.engineBaseUrl,
+            sessionId: sessionId,
+            authType: settings.engineAuthType,
+            username: settings.engineUsername,
+            password: password,
           );
-          return;
+
+          ref.read(sessionsProvider.notifier).addSession(sessionInfo);
+          Logger.debug('SSE: Added new session to list: ${sessionInfo.title}');
+        } catch (e) {
+          Logger.debug('SSE: Failed to fetch new session info: $e');
         }
-        Logger.debug('SSE: Session updated, refreshing session info...');
-        ref.read(agenticChatProvider.notifier).loadSessionInfo();
+      case SessionDeletedEvent(:final sessionId):
+        Logger.debug('SSE: Session deleted: $sessionId');
+        if (currentSessionId != null && sessionId == currentSessionId) {
+          Logger.debug(
+            'SSE: Active session was deleted, clearing chat state...',
+          );
+          // Clear the active session from settings
+          ref.read(settingsProvider.notifier).clearAgenticSessionId();
+          // Clear the chat state to start a new empty session
+          ref.read(agenticChatProvider.notifier).clearChat();
+          // Remove from sessions list if present
+          ref.read(sessionsProvider.notifier).removeSession(sessionId);
+          // Set flag to show snackbar notification
+          state = state.copyWith(activeSessionDeleted: sessionId);
+        } else {
+          // Just remove from sessions list if not the active session
+          ref.read(sessionsProvider.notifier).removeSession(sessionId);
+        }
+      case SessionUpdatedEvent(:final sessionId):
+        Logger.debug('SSE: Session updated: $sessionId');
+        // Fetch updated session info and update in sessions list
+        try {
+          final settings = ref.read(settingsProvider);
+          final settingsNotifier = ref.read(settingsProvider.notifier);
+          final password = await settingsNotifier.getEnginePassword();
+
+          final sessionInfo = await getSessionInfo(
+            baseUrl: settings.engineBaseUrl,
+            sessionId: sessionId,
+            authType: settings.engineAuthType,
+            username: settings.engineUsername,
+            password: password,
+          );
+
+          ref.read(sessionsProvider.notifier).updateSession(sessionInfo);
+
+          // Also refresh chat session info if this is the active session
+          if (currentSessionId != null && sessionId == currentSessionId) {
+            ref.read(agenticChatProvider.notifier).loadSessionInfo();
+          }
+        } catch (e) {
+          Logger.debug('SSE: Failed to fetch updated session info: $e');
+        }
       case MessagesAppendedEvent(:final sessionId, :final latestSequenceId):
         if (currentSessionId == null || sessionId != currentSessionId) {
           Logger.debug(
@@ -180,5 +260,10 @@ class SseNotifier extends Notifier<SseState> {
     _eventSubscription?.cancel();
     _client?.disconnect();
     state = state.copyWith(isConnected: false);
+  }
+
+  /// Clear the active session deleted flag after showing the notification.
+  void clearActiveSessionDeleted() {
+    state = state.clearActiveSessionDeleted();
   }
 }

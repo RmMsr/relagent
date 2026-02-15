@@ -14,6 +14,14 @@ sealed class SseEvent {
     final parsedId = int.parse(id);
     final json = jsonDecode(data) as Map<String, dynamic>;
     return switch (eventType) {
+      'session.created' => SessionCreatedEvent(
+        id: parsedId,
+        sessionId: json['session_id'] as String,
+      ),
+      'session.deleted' => SessionDeletedEvent(
+        id: parsedId,
+        sessionId: json['session_id'] as String,
+      ),
       'session.updated' => SessionUpdatedEvent(
         id: parsedId,
         sessionId: json['session_id'] as String,
@@ -26,6 +34,20 @@ sealed class SseEvent {
       _ => UnknownEvent(id: parsedId, eventType: eventType),
     };
   }
+}
+
+class SessionCreatedEvent extends SseEvent {
+  final String sessionId;
+  const SessionCreatedEvent({required super.id, required this.sessionId});
+  @override
+  String toString() => 'SessionCreatedEvent(id=$id, session=$sessionId)';
+}
+
+class SessionDeletedEvent extends SseEvent {
+  final String sessionId;
+  const SessionDeletedEvent({required super.id, required this.sessionId});
+  @override
+  String toString() => 'SessionDeletedEvent(id=$id, session=$sessionId)';
 }
 
 class SessionUpdatedEvent extends SseEvent {

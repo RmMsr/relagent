@@ -70,28 +70,28 @@ class TestEnsureContext:
 
 
 class TestPerformUserInput:
-    async def test_processes_message_and_saves(
+    async def test_processes_message_with_existing_session(
         self,
         chat_service: ChatService,
         persistence: Persistence,
         event_store: EventStore,
+        sample_session: SessionInfo,
     ):
-        session = chat_service.ensure_session()
-        persistence.save_session(session)
+        persistence.save_session(sample_session)
 
         request = ChatRequest(
-            session_id=session.session_id,
+            session_id=sample_session.session_id,
             messages=[UserMessage(content="Hello")],
         )
 
         response = await chat_service.perform_user_input(request)
 
-        assert response.session_id == session.session_id
+        assert response.session_id == sample_session.session_id
         assert isinstance(response.message, AssistantMessage)
         assert response.message.content == "Echo: Hello"
 
         # Verify context was saved
-        context = persistence.load_context(session.session_id)
+        context = persistence.load_context(sample_session.session_id)
         assert len(context.messages) == 2
 
         # Verify events were created
@@ -99,8 +99,38 @@ class TestPerformUserInput:
 
         assert len(events) == 2
         assert events[0].event_name == EventNames.SESSION_UPDATED
+        assert events[0].session_id == sample_session.session_id
         assert events[1].event_name == EventNames.SESSION_MESSAGES_APPENDED
-        assert events[1].session_id == session.session_id
+        assert events[1].session_id == sample_session.session_id
+        assert events[1].latest_sequence_id == response.message.sequence_id
+
+    async def test_processes_message_with_new_session(
+        self,
+        chat_service: ChatService,
+        persistence: Persistence,
+        event_store: EventStore,
+    ):
+        request = ChatRequest(
+            messages=[UserMessage(content="Hello")],
+        )
+
+        response = await chat_service.perform_user_input(request)
+
+        assert response.session_id is not None
+        assert isinstance(response.message, AssistantMessage)
+        assert response.message.content == "Echo: Hello"
+
+        # Verify context was saved
+        context = persistence.load_context(response.session_id)
+        assert len(context.messages) == 2
+
+        # Verify events were created
+        events = event_store.get_events_after()
+
+        assert len(events) == 2
+        assert events[0].event_name == EventNames.SESSION_CREATED
+        assert events[1].event_name == EventNames.SESSION_MESSAGES_APPENDED
+        assert events[1].session_id == response.session_id
         assert events[1].latest_sequence_id == response.message.sequence_id
 
     async def test_perform_user_input_increases_message_sequence_per_session(
@@ -183,10 +213,6 @@ class TestEnsureSessionTitle:
         # EchoAgentExecution returns "Title: " + query
         assert session.title is not None
         assert session.title.startswith("Title: ")
-        events = event_store.get_events_after()
-        assert len(events) == 1
-        assert events[0].event_name == EventNames.SESSION_UPDATED
-        assert events[0].session_id == session.session_id
 
     async def test_skips_generation_when_title_exists(
         self,

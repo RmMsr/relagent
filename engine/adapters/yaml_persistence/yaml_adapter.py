@@ -2,6 +2,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+import shutil
 from typing import Any, Iterable, Sequence
 from uuid import UUID
 
@@ -121,6 +122,10 @@ class YamlPersistenceAdapter(Persistence):
         session.updated_at = datetime.now(tz=timezone.utc)
 
         self._write_model_with_lock(file_path=file_path, model=session)
+        self._update_folder_timestamp(
+            folder_path=self._get_session_folder(session.session_id),
+            timestamp=session.updated_at,
+        )
 
     def load_session(self, session_id: UUID) -> SessionInfo:
         file_path = self._get_file_path(session_id=session_id, part_name="session_info")
@@ -128,14 +133,55 @@ class YamlPersistenceAdapter(Persistence):
         try:
             data = self._read_data_from_file(file_path=file_path)
             session: SessionInfo = SessionInfo.model_validate(data)
-            logger.info("Loaded session (%s) from: %s", session.session_id, file_path)
         except (PersistenceError, ValidationError) as exc:
             raise SessionNotFound(session_id=session_id) from exc
 
         return session
 
+    def list_recent_sessions(self, limit: int = 100) -> list[SessionInfo]:
+        sessions_dir = self.base_dir / "sessions"
+        if not sessions_dir.exists():
+            return []
+
+        # Collect folders with mtime (cheap filesystem metadata only)
+        folders_with_time: list[tuple[Path, float]] = []
+        for session_folder in sessions_dir.iterdir():
+            if not session_folder.is_dir():
+                continue
+            try:
+                UUID(session_folder.name)
+            except ValueError:
+                continue
+            folders_with_time.append((session_folder, session_folder.stat().st_mtime))
+
+        # Sort by mtime first, then only parse YAML for the top candidates
+        folders_with_time.sort(key=lambda x: x[1], reverse=True)
+
+        sessions: list[SessionInfo] = []
+        for session_folder, _ in folders_with_time:
+            if len(sessions) >= limit:
+                break
+            try:
+                session = self.load_session(UUID(session_folder.name))
+                sessions.append(session)
+            except SessionNotFound:
+                continue
+
+        return sessions
+
+    def delete_session(self, session_id: UUID) -> None:
+        session_folder = self._get_session_folder(session_id)
+        if session_folder.exists():
+            shutil.rmtree(session_folder)
+            logger.info("Deleted session folder: %s", session_folder)
+        else:
+            logger.warning("Session folder not found for deletion: %s", session_folder)
+
+    def _get_session_folder(self, session_id: UUID) -> Path:
+        return self.base_dir / "sessions" / str(session_id)
+
     def _get_file_path(self, session_id: UUID, part_name: str) -> Path:
-        return self.base_dir / "sessions" / str(session_id) / f"{part_name}.yaml"
+        return self._get_session_folder(session_id) / f"{part_name}.yaml"
 
     def _write_model_with_lock(self, file_path: Path, model: BaseModel) -> None:
         """
@@ -199,3 +245,15 @@ class YamlPersistenceAdapter(Persistence):
                 if isinstance(doc, dict) and "session_id" in doc:
                     return Metadata.model_validate(doc)
         raise PersistenceError("No valid metadata found in file: %s" % file_path)
+
+    @staticmethod
+    def _update_folder_timestamp(folder_path: Path, timestamp: datetime) -> None:
+        """
+        Update the modification time of a folder to the given timestamp.
+        """
+        try:
+            os.utime(folder_path, (timestamp.timestamp(), timestamp.timestamp()))
+        except OSError as e:
+            logger.warning(
+                "Failed to update folder timestamp for %s: %s", folder_path, e
+            )

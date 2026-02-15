@@ -14,6 +14,8 @@ from engine.domain.models import (
 from engine.domain.ports.agent_execution import AgentExecution
 from engine.domain.ports.events import (
     EventStore,
+    SessionCreatedEvent,
+    SessionDeletedEvent,
     SessionMessagesAppendedEvent,
     SessionUpdatedEvent,
 )
@@ -38,7 +40,17 @@ class ChatService:
         self.event_store = event_store
 
     async def perform_user_input(self, request: ChatRequest) -> ChatResponse:
-        session: SessionInfo = self.ensure_session(session_id=request.session_id)
+        new_session: bool = False
+        session: SessionInfo | None = None
+        if request.session_id:
+            session = self.persistence_repository.find_session(
+                session_id=request.session_id
+            )
+
+        if session is None:
+            session = SessionInfo()
+            new_session = True
+
         context: ChatContext = self.ensure_context(session_id=session.session_id)
 
         # Todo: Use all request messages
@@ -51,10 +63,16 @@ class ChatService:
 
         await self.ensure_session_title(session=session, context=context)
 
+        self.persistence_repository.save_session(session=session)
+
+        if new_session:
+            self._publish_session_created(session_id=session.session_id)
+        else:
+            self._publish_session_updated(session_id=session.session_id)
+
         self.persistence_repository.save_context(
             session_id=session.session_id, context=context
         )
-        self.persistence_repository.save_session(session=session)
 
         # Publish message append event with latest message ID
         self._publish_messages_appended(
@@ -111,6 +129,14 @@ class ChatService:
     def get_session(self, session_id: UUID) -> SessionInfo:
         return self.persistence_repository.load_session(session_id=session_id)
 
+    def list_recent_sessions(self, limit: int = 100) -> list[SessionInfo]:
+        return self.persistence_repository.list_recent_sessions(limit=limit)
+
+    def delete_session(self, session_id: UUID) -> None:
+        self.persistence_repository.delete_session(session_id=session_id)
+        self._publish_session_deleted(session_id=session_id)
+        logger.info("Deleted session: %s", session_id)
+
     async def ensure_session_title(
         self, session: SessionInfo, context: ChatContext
     ) -> None:
@@ -121,13 +147,30 @@ class ChatService:
             session.title = await self.agent_execution.generate_title(
                 query=context.messages[0].content
             )
-            self._publish_session_updated(session_id=session.session_id)
+
+    def _publish_session_created(self, session_id: UUID) -> None:
+        if self.event_store is None:
+            return
+        self.event_store.publish(
+            SessionCreatedEvent(
+                session_id=session_id,
+            )
+        )
 
     def _publish_session_updated(self, session_id: UUID) -> None:
         if self.event_store is None:
             return
         self.event_store.publish(
             SessionUpdatedEvent(
+                session_id=session_id,
+            )
+        )
+
+    def _publish_session_deleted(self, session_id: UUID) -> None:
+        if self.event_store is None:
+            return
+        self.event_store.publish(
+            SessionDeletedEvent(
                 session_id=session_id,
             )
         )

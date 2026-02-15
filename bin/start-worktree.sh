@@ -114,7 +114,6 @@ git worktree add -b "$WORKTREE_NAME" "$WORKTREE_PATH" "$BRANCH"
 if [ -f "./bin/git-worktree-setup.sh" ]; then
   cd "$WORKTREE_PATH"
   "$WORKTREE_PATH/bin/git-worktree-setup.sh"
-  "$WORKTREE_PATH/bin/update-version.py" --bump patch --preview
   cd - > /dev/null
 fi
 
