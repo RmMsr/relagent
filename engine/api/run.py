@@ -1,5 +1,4 @@
 import logging
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -13,34 +12,9 @@ from .v1 import api_router
 
 logger = logging.getLogger(__name__)
 
-# EVENT_PRUNE_INTERVAL_SECONDS = 3600  # 1 hour
+reset_env()
 
-
-@asynccontextmanager
-async def _lifespan(app: FastAPI):
-    reset_env()
-
-    # async def prune_events_periodically():
-    #     while True:
-    #         await asyncio.sleep(EVENT_PRUNE_INTERVAL_SECONDS)
-    #         try:
-    #             event_store = get_global_event_store()
-    #             deleted = event_store.prune_old_events()
-    #             if deleted > 0:
-    #                 logger.info("Periodic pruning: removed %d old events", deleted)
-    #         except Exception as e:
-    #             logger.warning("Event pruning failed: %s", e)
-
-    # task = asyncio.create_task(prune_events_periodically())
-    # try:
-    #     await task
-    # except asyncio.CancelledError:
-    #     pass
-    yield  # Executing FastAPI
-    # task.cancel()
-
-
-app = FastAPI(lifespan=_lifespan, version=VERSION)
+app = FastAPI(version=VERSION)
 app.include_router(api_router, prefix="/api/v1")
 init_instrumentation(app=app)
 

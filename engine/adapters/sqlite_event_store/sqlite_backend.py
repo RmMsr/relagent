@@ -59,6 +59,9 @@ class SqliteEventStoreAdapter(EventStore):
         event.id = event_id
         logger.info("Published event (#%d): %s", event_id, event.event_name.value)
 
+        if event_id % 100 == 0:
+            self.prune_old_events()
+
     def get_events_after(self, last_id: int = 0, limit: int = 100) -> list[Event]:
         with self._get_connection() as conn:
             cursor = conn.execute(

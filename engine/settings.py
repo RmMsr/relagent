@@ -58,10 +58,18 @@ def get_setting_bool(
     return value
 
 
+_env_reset_done = False
+
+
 def reset_env():
     """
-    Ensure no unintended configuration affects runtime behaviour
+    Ensure no unintended configuration affects runtime behaviour.
+
+    Idempotent - safe to call multiple times (e.g. from forked workers).
     """
+    global _env_reset_done
+    if _env_reset_done:
+        return
 
     backup = dict[str, str]()
     keep = ["PWD"]
@@ -75,5 +83,6 @@ def reset_env():
     for k, v in backup.items():
         os.environ[k] = v
 
+    _env_reset_done = True
     logger.info("Using settings at %s", _SETTINGS_FILE)
     logger.info("Environment reset to: %s", dict(os.environ))
