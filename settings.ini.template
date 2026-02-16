@@ -10,7 +10,7 @@
 # Local ollama server
 # api_base = http://localhost:11434
 # container host lemonade server
-# api_base = http://host.conteinrs.internal:3030/api/v1
+# api_base = http://host.containers.internal:3030/api/v1
 
 # api_key =
 
@@ -18,6 +18,9 @@
 
 [persistence]
 # data_dir = ~/.local/share/relagent/data
+
+[web]
+# source_directory = ./web
 
 [instrumentation]
 # service_name = relagent-engine

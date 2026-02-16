@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '/agentic/health_check.dart';
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
+import '/providers/voice_service_provider.dart';
 import '/services/api_health_check.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -875,25 +877,90 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _engineUrlController,
-              decoration: const InputDecoration(
-                labelText: 'Engine URL',
-                hintText: 'http://localhost:8000',
-                border: OutlineInputBorder(),
-                helperText: 'Relagent engine base URL',
-              ),
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.next,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter an engine URL';
-                }
-                if (!value.startsWith('http://') &&
-                    !value.startsWith('https://')) {
-                  return 'URL must start with http:// or https://';
-                }
-                return null;
+            Autocomplete<String>(
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                final engineUrlSuggestions = settings.engineUrlHistory;
+                final query = textEditingValue.text.toLowerCase();
+                final matches = engineUrlSuggestions.where((String option) {
+                  final display = option.isEmpty ? '(same origin)' : option;
+                  return display.toLowerCase().contains(query);
+                }).toList();
+                final nonMatches = engineUrlSuggestions.where((String option) {
+                  final display = option.isEmpty ? '(same origin)' : option;
+                  return !display.toLowerCase().contains(query);
+                }).toList();
+                return [...matches, ...nonMatches];
+              },
+              optionsViewBuilder: (context, onSelected, options) {
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 4,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: options.length,
+                        itemBuilder: (context, index) {
+                          final option = options.elementAt(index);
+                          return ListTile(
+                            title: Text(
+                              option.isEmpty ? '(same origin)' : option,
+                              style: option.isEmpty
+                                  ? const TextStyle(
+                                      fontStyle: FontStyle.italic,
+                                    )
+                                  : null,
+                            ),
+                            onTap: () => onSelected(option),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
+              onSelected: (String selection) {
+                _engineUrlController.text = selection;
+              },
+              fieldViewBuilder: (
+                BuildContext context,
+                TextEditingController fieldTextEditingController,
+                FocusNode fieldFocusNode,
+                VoidCallback onFieldSubmitted,
+              ) {
+                fieldTextEditingController.text = _engineUrlController.text;
+                fieldTextEditingController.addListener(() {
+                  _engineUrlController.text = fieldTextEditingController.text;
+                });
+                return TextFormField(
+                  controller: fieldTextEditingController,
+                  focusNode: fieldFocusNode,
+                  decoration: InputDecoration(
+                    labelText: 'Engine URL',
+                    hintText: kIsWeb
+                        ? '(empty = same origin)'
+                        : 'http://localhost:8000',
+                    border: const OutlineInputBorder(),
+                    helperText: kIsWeb
+                        ? 'Leave empty to use the current origin'
+                        : 'Relagent engine base URL',
+                  ),
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.next,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      if (kIsWeb) return null;
+                      return 'Please enter an engine URL';
+                    }
+                    if (!value.startsWith('http://') &&
+                        !value.startsWith('https://')) {
+                      return 'URL must start with http:// or https://';
+                    }
+                    return null;
+                  },
+                );
               },
             ),
             const SizedBox(height: 16),
@@ -998,80 +1065,88 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
             ],
-            const SizedBox(height: 32),
-            const Text(
-              'Voice Settings',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _ttsSpeakerIdController,
-              decoration: const InputDecoration(
-                labelText: 'TTS Speaker ID',
-                hintText: '0',
-                border: OutlineInputBorder(),
-                helperText: 'Voice ID for text-to-speech (0-based)',
+            if (ref.read(voiceCapabilitiesProvider).isAsrAvailable ||
+                ref.read(voiceCapabilitiesProvider).isTtsAvailable) ...[
+              const SizedBox(height: 32),
+              const Text(
+                'Voice Settings',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a speaker ID';
-                }
-                final id = int.tryParse(value.trim());
-                if (id == null || id < 0) {
-                  return 'Speaker ID must be a non-negative integer';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'TTS Speed: ${_ttsSpeed.toStringAsFixed(2)}x',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                Slider(
-                  value: _ttsSpeed,
-                  min: 0.5,
-                  max: 2.0,
-                  divisions: 30,
-                  label: '${_ttsSpeed.toStringAsFixed(2)}x',
-                  onChanged: (value) {
-                    setState(() {
-                      _ttsSpeed = value;
-                    });
+              if (ref.read(voiceCapabilitiesProvider).isTtsAvailable) ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _ttsSpeakerIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'TTS Speaker ID',
+                    hintText: '0',
+                    border: OutlineInputBorder(),
+                    helperText: 'Voice ID for text-to-speech (0-based)',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter a speaker ID';
+                    }
+                    final id = int.tryParse(value.trim());
+                    if (id == null || id < 0) {
+                      return 'Speaker ID must be a non-negative integer';
+                    }
+                    return null;
                   },
                 ),
-                Text(
-                  'Controls playback speed (0.5x - 2.0x)',
-                  style: Theme.of(context).textTheme.bodySmall,
+                const SizedBox(height: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TTS Speed: ${_ttsSpeed.toStringAsFixed(2)}x',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    Slider(
+                      value: _ttsSpeed,
+                      min: 0.5,
+                      max: 2.0,
+                      divisions: 30,
+                      label: '${_ttsSpeed.toStringAsFixed(2)}x',
+                      onChanged: (value) {
+                        setState(() {
+                          _ttsSpeed = value;
+                        });
+                      },
+                    ),
+                    Text(
+                      'Controls playback speed (0.5x - 2.0x)',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<BackgroundListeningDuration>(
-              initialValue: _backgroundListeningDuration,
-              decoration: const InputDecoration(
-                labelText: 'Background Listening Duration',
-                border: OutlineInputBorder(),
-                helperText: 'Maximum time for continuous background listening',
-              ),
-              items: BackgroundListeningDuration.values.map((duration) {
-                return DropdownMenuItem(
-                  value: duration,
-                  child: Text(duration.displayName),
-                );
-              }).toList(),
-              onChanged: (BackgroundListeningDuration? newValue) {
-                if (newValue != null) {
-                  setState(() {
-                    _backgroundListeningDuration = newValue;
-                  });
-                }
-              },
-            ),
+              if (ref.read(voiceCapabilitiesProvider).isAsrAvailable) ...[
+                const SizedBox(height: 16),
+                DropdownButtonFormField<BackgroundListeningDuration>(
+                  initialValue: _backgroundListeningDuration,
+                  decoration: const InputDecoration(
+                    labelText: 'Background Listening Duration',
+                    border: OutlineInputBorder(),
+                    helperText:
+                        'Maximum time for continuous background listening',
+                  ),
+                  items: BackgroundListeningDuration.values.map((duration) {
+                    return DropdownMenuItem(
+                      value: duration,
+                      child: Text(duration.displayName),
+                    );
+                  }).toList(),
+                  onChanged: (BackgroundListeningDuration? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _backgroundListeningDuration = newValue;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ],
             const SizedBox(height: 24),
             Row(
               children: [

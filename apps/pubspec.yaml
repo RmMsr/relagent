@@ -1,7 +1,7 @@
 name: relagent
 description: "Relatable Agentic Minion - Privacy focused and open AI agent"
 publish_to: "none"
-version: 0.1.7
+version: 0.1.8
 
 environment:
   sdk: ^3.9.2
@@ -51,6 +51,9 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
+  web:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
   image_path: "assets/icon/app_icon.png"
 
   # Android adaptive icon configuration

@@ -1,3 +1,25 @@
+FROM ghcr.io/cirruslabs/flutter:latest as flutter-builder
+
+RUN chown -R ubuntu:ubuntu /sdks/flutter && \
+  mkdir /app && chown ubuntu:ubuntu /app
+
+WORKDIR /app
+
+USER ubuntu
+
+RUN flutter precache --web
+
+ADD apps/pubspec.yaml apps/pubspec.lock ./
+
+RUN flutter pub get --enforce-lockfile
+
+ADD apps/lib ./lib
+ADD apps/web ./web
+ADD apps/assets/config.web.json ./assets/config.json
+ADD apps/assets/icon ./assets/icon
+
+RUN flutter build web --release --base-href=/app/
+
 FROM ghcr.io/astral-sh/uv:debian-slim
 
 RUN useradd --home-dir=/app --no-create-home --shell=/usr/bin/sh app
@@ -17,12 +39,14 @@ RUN apt-get update && \
   apt-get install ca-certificates -y && \
   apt-get clean
 
-ADD ./pyproject.toml ./uv.lock ./VERSION /app/
+ADD pyproject.toml uv.lock VERSION ./
 
 USER app
 
 RUN uv sync --locked --no-dev --no-cache
 
-ADD ./engine /app/engine
+ADD engine ./engine
+
+COPY --from=flutter-builder /app/build/web ./web
 
 CMD [ "python", "-m", "engine.api.run" ]

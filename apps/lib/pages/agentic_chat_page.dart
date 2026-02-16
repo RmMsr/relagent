@@ -10,6 +10,7 @@ import '/providers/engine_health_check_provider.dart';
 import '/providers/recording_provider.dart';
 import '/providers/sse_provider.dart';
 import '/providers/tts_provider.dart';
+import '/providers/voice_service_provider.dart';
 import '/widgets/voice_mode_selector.dart';
 
 class AgenticChatPage extends ConsumerStatefulWidget {
@@ -135,8 +136,10 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
               )
             : null,
         actions: [
-          const VoiceModeSelector(),
-          const SizedBox(width: 8),
+          if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable) ...[
+            const VoiceModeSelector(),
+            const SizedBox(width: 8),
+          ],
           IconButton(
             icon: const Icon(Icons.restore_page),
             tooltip: 'New Session',
@@ -168,12 +171,15 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
                     messages: chatState.messages,
                     showAssistantPending: chatState.showAssistantPending,
                     engineHealthResult: healthCheckState.lastResult,
+                    isVoiceAvailable: ref.watch(voiceCapabilitiesProvider).isAsrAvailable,
                     onRetry: () {
                       ref
                           .read(agenticChatProvider.notifier)
                           .retryFailedMessages();
                     },
-                    onSpeak: (text, messageId) {
+                    onSpeak: !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
+                        ? null
+                        : (text, messageId) {
                       final status = ttsState.getMessageState(messageId).status;
                       final ttsNotifier = ref.read(ttsProvider.notifier);
 
@@ -221,8 +227,13 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
       ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
       ref.read(agenticChatProvider.notifier).loadHistory();
       ref.read(agenticChatProvider.notifier).loadSessionInfo();
-      ref.read(recordingProvider.notifier).checkAutoStart();
-      ref.read(ttsProvider.notifier).initialize();
+      final capabilities = ref.read(voiceCapabilitiesProvider);
+      if (capabilities.isAsrAvailable) {
+        ref.read(recordingProvider.notifier).checkAutoStart();
+      }
+      if (capabilities.isTtsAvailable) {
+        ref.read(ttsProvider.notifier).initialize();
+      }
       ref.read(sseProvider.notifier).connect();
     });
   }

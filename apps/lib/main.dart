@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
@@ -9,22 +10,28 @@ import '/providers/background_service_provider.dart';
 import '/providers/health_check_provider.dart';
 import '/providers/settings_provider.dart';
 import '/router/app_router.dart';
-import '/tts/sherpa_tts.dart';
 import '/utils/logger.dart';
+import '/voice/voice_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  JustAudioMediaKit.ensureInitialized();
+
+  // Initialize Linux/Windows audio backend for just_audio (no-op on other platforms)
+  if (!kIsWeb) {
+    JustAudioMediaKit.ensureInitialized();
+  }
 
   // Load static app config (ASR model, etc.)
   await AppConfig.load();
 
+  // Pre-cache TTS model files on native platforms (don't block app startup)
+  final voiceService = createVoiceService();
+  if (voiceService.isTtsAvailable) {
+    Future.microtask(() => voiceService.preCacheTtsModels());
+  }
+
   // Get runtime app info
   await AppInfo.initialize();
-
-  // Pre-cache TTS model files in background (don't block app startup)
-  // This ensures TTS is ready when needed without delaying UI initialization
-  Future.microtask(() => preCacheTtsModelFiles());
 
   // Initialize SharedPreferences for user settings
   final sharedPreferences = await SharedPreferences.getInstance();

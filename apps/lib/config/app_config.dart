@@ -7,11 +7,11 @@ class AppConfig {
 
   // Ensure there is a directory with a streaming asr model with that name under /assets
   // Download it from: https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models
-  static late final String speechRecognitionStreamingAsrModelName;
+  static String? speechRecognitionStreamingAsrModelName;
 
   // Ensure there is a directory with a TTS model with that name under /assets
   // Download it from: https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models
-  static late final String ttsModelName;
+  static String? ttsModelName;
 
   static Future<void> load() async {
     final config = jsonDecode(
@@ -19,7 +19,7 @@ class AppConfig {
     );
 
     speechRecognitionStreamingAsrModelName =
-        config['speech_recognition']['streaming_asr_model'];
-    ttsModelName = config['tts']['model'];
+        config['speech_recognition']?['streaming_asr_model'];
+    ttsModelName = config['tts']?['model'];
   }
 }

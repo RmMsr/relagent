@@ -17,3 +17,5 @@ PROVIDER_API_KEY: str = get_setting("provider", "api_key")
 DEFAULT_MODEL: str = get_setting("provider", "default_model", default="olmo-3")
 
 DEBUG_DUMPS: bool = get_setting_bool("debug", "raw_data_dump", default=False)
+
+WEB_DIR: Path = Path(get_setting("web", "source_directory", default="./web"))

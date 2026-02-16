@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/models/settings.dart';
 import '/providers/playback_provider.dart';
 import '/providers/settings_provider.dart';
+import '/providers/voice_service_provider.dart';
 import '/tts/services.dart';
 
 enum MessagePlaybackStatus {
@@ -91,7 +92,8 @@ class TtsNotifier extends Notifier<TtsState> {
   TtsService _getService() {
     if (_service == null) {
       final settings = ref.read(settingsProvider);
-      _service = TtsService()
+      final voiceService = ref.read(voiceServiceProvider);
+      _service = TtsService(voiceService)
         ..speakerId = settings.ttsSpeakerId
         ..speed = settings.ttsSpeed;
     }

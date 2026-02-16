@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:record/record.dart';
 
 import '/models/settings.dart';
 import '/providers/recording_provider.dart';
 import '/providers/settings_provider.dart';
+import '/voice/voice_service.dart';
 
 class RecordingStateIndicator extends StatelessWidget {
   final RecordingState recordingState;
@@ -40,7 +40,7 @@ class RecordingStateIndicator extends StatelessWidget {
         ),
       );
       tooltip = 'Initializing speech recognition...';
-    } else if (recordingState.recordState == RecordState.pause) {
+    } else if (recordingState.recordingStatus == AudioRecordingStatus.paused) {
       icon = Container(
         width: 32,
         height: 32,
@@ -118,12 +118,10 @@ class _VolumeBarVisualizerState extends State<VolumeBarVisualizer>
   late final List<AnimationController> _animationControllers;
   late final List<Animation<double>> _heightAnimations;
 
-  // Current target heights for each bar
   final List<double> _targetHeights = List.filled(
     _amplitudeHistorySize,
     _minBarHeight,
   );
-  // Current displayed heights (animated)
   final List<double> _currentHeights = List.filled(
     _amplitudeHistorySize,
     _minBarHeight,
@@ -133,7 +131,6 @@ class _VolumeBarVisualizerState extends State<VolumeBarVisualizer>
   void initState() {
     super.initState();
 
-    // Initialize animation controllers for each bar
     _animationControllers = List.generate(
       _amplitudeHistorySize,
       (index) => AnimationController(duration: _fallDuration, vsync: this),
@@ -148,7 +145,6 @@ class _VolumeBarVisualizerState extends State<VolumeBarVisualizer>
         )
         .toList();
 
-    // Start listening to animations for 60fps updates
     for (int i = 0; i < _heightAnimations.length; i++) {
       _heightAnimations[i].addListener(() {
         if (mounted) {
@@ -195,29 +191,24 @@ class _VolumeBarVisualizerState extends State<VolumeBarVisualizer>
     final heights = widget.barHeights;
     if (heights.isEmpty) return;
 
-    // Direct update with pre-calculated heights from provider
     for (int i = 0; i < _amplitudeHistorySize; i++) {
       _targetHeights[i] = i < heights.length ? heights[i] : _minBarHeight;
     }
 
-    // Animate each bar to its new target height
     for (int i = 0; i < _amplitudeHistorySize; i++) {
       final targetHeight = _targetHeights[i];
       final currentHeight = _currentHeights[i];
 
-      // Choose animation based on rise/fall
       final isRising = targetHeight > currentHeight;
       final duration = isRising ? _riseDuration : _fallDuration;
       final curve = isRising ? _riseCurve : _fallCurve;
 
-      // Update animation
       _animationControllers[i].duration = duration;
       _heightAnimations[i] =
           Tween<double>(begin: currentHeight, end: targetHeight).animate(
             CurvedAnimation(parent: _animationControllers[i], curve: curve),
           );
 
-      // Restart animation
       _animationControllers[i].reset();
       _animationControllers[i].forward();
     }
@@ -230,21 +221,21 @@ class _VolumeBarVisualizerState extends State<VolumeBarVisualizer>
 
     return Row(
       mainAxisSize: MainAxisSize.min,
-      spacing: 2.0, // Tighter spacing for smaller bars
+      spacing: 2.0,
       children: List.generate(_amplitudeHistorySize, (index) {
         final level = _currentHeights[index];
-        final barHeight = 24 * level; // Smaller bar height
+        final barHeight = 24 * level;
 
         return Container(
-          width: 6, // Smaller bar container width
-          height: 32, // Smaller container height
+          width: 6,
+          height: 32,
           alignment: Alignment.bottomCenter,
           child: Container(
-            width: 4, // Smaller bar width
+            width: 4,
             height: barHeight,
             decoration: BoxDecoration(
               color: barColor,
-              borderRadius: BorderRadius.circular(1.0), // Normal radius
+              borderRadius: BorderRadius.circular(1.0),
             ),
           ),
         );
@@ -254,14 +245,6 @@ class _VolumeBarVisualizerState extends State<VolumeBarVisualizer>
 }
 
 /// Recording button widget that controls speech recognition.
-///
-/// This is a simple UI widget that:
-/// - Displays recording state visually (mic icon, amplitude visualizer)
-/// - Triggers start/stop recording actions via RecordingProvider
-/// - Handles voice mode transitions (listening/conversation modes)
-///
-/// The button does NOT handle text routing - that's managed by RecordingProvider
-/// routing events to the active RecordingTarget (typically ChatInput).
 class RecorderButton extends ConsumerWidget {
   const RecorderButton({super.key});
 
@@ -291,7 +274,7 @@ class RecorderButton extends ConsumerWidget {
               ? VoiceMode.silent
               : VoiceMode.reading;
           ref.read(settingsProvider.notifier).updateVoiceMode(newMode);
-          return; // Fix: Return early after voice mode change to prevent falling through to dictation logic
+          return;
         }
 
         if (recordingState.isRecording) {
@@ -301,17 +284,19 @@ class RecorderButton extends ConsumerWidget {
         }
       },
       icon: SizedBox(
-        width: 48, // Compact production size
-        height: 32, // Compact production size
+        width: 48,
+        height: 32,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (recordingState.recordState == RecordState.record)
+            if (recordingState.recordingStatus == AudioRecordingStatus.recording)
               VolumeBarVisualizer(barHeights: recordingState.barHeights),
             Opacity(
-              opacity: recordingState.recordState == RecordState.record
-                  ? 0.3
-                  : 1.0,
+              opacity:
+                  recordingState.recordingStatus ==
+                          AudioRecordingStatus.recording
+                      ? 0.3
+                      : 1.0,
               child: RecordingStateIndicator(
                 recordingState: recordingState,
                 voiceMode: voiceMode,

@@ -2,8 +2,10 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-from engine.constants import VERSION
+from engine.constants import VERSION, WEB_DIR
 from engine.settings import get_setting, get_setting_int, reset_env
 
 from .instrumentation import init_instrumentation
@@ -11,7 +13,7 @@ from .v1 import api_router
 
 logger = logging.getLogger(__name__)
 
-EVENT_PRUNE_INTERVAL_SECONDS = 3600  # 1 hour
+# EVENT_PRUNE_INTERVAL_SECONDS = 3600  # 1 hour
 
 
 @asynccontextmanager
@@ -39,9 +41,8 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=_lifespan, version=VERSION)
-init_instrumentation(app=app)
 app.include_router(api_router, prefix="/api/v1")
-# app.openapi = lambda: custom_openapi(app)
+init_instrumentation(app=app)
 
 
 @app.get("/status")
@@ -51,6 +52,21 @@ async def status() -> dict[str, str]:
         "version": VERSION,
         "status": "ok",
     }
+
+
+# Serve Relagent web app if build directory exists
+if WEB_DIR.is_dir() and (WEB_DIR / "index.html").exists():
+
+    @app.get("/app/{path:path}")
+    async def serve_web_app(path: str) -> FileResponse:
+        """Serve web app, falling back to index.html for single page routing."""
+        file_path = WEB_DIR / path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(WEB_DIR / "index.html")
+
+    app.mount("/app", StaticFiles(directory=WEB_DIR, html=True), name="web-app")
+    logger.info("Serving web app from %s at /app", WEB_DIR)
 
 
 def _print_banner() -> None:

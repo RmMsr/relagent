@@ -8,6 +8,7 @@ import '/providers/chat_provider.dart';
 import '/providers/health_check_provider.dart';
 import '/providers/recording_provider.dart';
 import '/providers/tts_provider.dart';
+import '/providers/voice_service_provider.dart';
 import '/services/api_health_check.dart';
 import '/widgets/voice_mode_selector.dart';
 
@@ -29,9 +30,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     // Trigger auto-recording check once the page is ready
     // This ensures we don't start recording during app initialization
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(recordingProvider.notifier).checkAutoStart();
-      // Pre-initialize TTS in background to minimize wait time on first use
-      ref.read(ttsProvider.notifier).initialize();
+      final capabilities = ref.read(voiceCapabilitiesProvider);
+      if (capabilities.isAsrAvailable) {
+        ref.read(recordingProvider.notifier).checkAutoStart();
+      }
+      if (capabilities.isTtsAvailable) {
+        ref.read(ttsProvider.notifier).initialize();
+      }
     });
   }
 
@@ -97,6 +102,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final chatState = ref.watch(chatProvider);
     final ttsState = ref.watch(ttsProvider);
     final healthCheckState = ref.watch(healthCheckProvider);
+    final voiceCapabilities = ref.watch(voiceCapabilitiesProvider);
 
     // Scroll to bottom whenever messages or pending state changes
     ref.listen<ChatState>(chatProvider, (previous, next) {
@@ -188,8 +194,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ],
         ),
         actions: [
-          const VoiceModeSelector(),
-          const SizedBox(width: 8),
+          if (voiceCapabilities.isAsrAvailable) ...[
+            const VoiceModeSelector(),
+            const SizedBox(width: 8),
+          ],
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: _navigateToSettings,
@@ -220,10 +228,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     messages: chatState.messages,
                     showAssistantPending: chatState.showAssistantPending,
                     retryState: chatState.retryState,
+                    isVoiceAvailable: voiceCapabilities.isAsrAvailable,
                     onRetry: (text) {
                       ref.read(chatProvider.notifier).sendMessage(text);
                     },
-                    onSpeak: (text, messageId) {
+                    onSpeak: !voiceCapabilities.isTtsAvailable
+                        ? null
+                        : (text, messageId) {
                       final status = ttsState.getMessageState(messageId).status;
                       final ttsNotifier = ref.read(ttsProvider.notifier);
 

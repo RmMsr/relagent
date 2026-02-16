@@ -1,5 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 // Sentinel value for copyWith to distinguish "not provided" from "explicitly null"
 const Object _unset = Object();
+
+/// Platform-aware default engine base URL: empty on web (relative to origin),
+/// localhost on native platforms.
+String get _defaultEngineBaseUrl =>
+    kIsWeb ? '' : 'http://localhost:8000';
 
 enum VoiceMode {
   silent, // Dictation mode, no auto-playback
@@ -121,6 +128,9 @@ class Settings {
   final String? engineUsername;
   final String? agenticSessionId;
 
+  // History of previously used engine URLs for autocomplete
+  final List<String> engineUrlHistory;
+
   // Selected chat backend type
   final ChatBackendType selectedBackend;
 
@@ -139,11 +149,12 @@ class Settings {
     required this.engineAuthType,
     this.engineUsername,
     this.agenticSessionId,
+    this.engineUrlHistory = const [],
     required this.selectedBackend,
   });
 
   factory Settings.defaults() {
-    return const Settings(
+    return Settings(
       simpleChatBaseUrl: 'http://localhost:1234/api/v1',
       simpleChatModel: 'gpt-oss-20b-mxfp4-GGUF',
       primeMessage: _defaultPrimeMessage,
@@ -153,7 +164,7 @@ class Settings {
       backgroundListeningDuration: BackgroundListeningDuration.oneHour,
       authType: AuthType.none,
       username: null,
-      engineBaseUrl: 'http://localhost:8000',
+      engineBaseUrl: _defaultEngineBaseUrl,
       engineAuthType: AuthType.none,
       engineUsername: null,
       agenticSessionId: null,
@@ -176,6 +187,7 @@ class Settings {
     AuthType? engineAuthType,
     String? engineUsername,
     Object? agenticSessionId = _unset,
+    List<String>? engineUrlHistory,
     ChatBackendType? selectedBackend,
   }) {
     return Settings(
@@ -196,6 +208,7 @@ class Settings {
       agenticSessionId: agenticSessionId == _unset
           ? this.agenticSessionId
           : agenticSessionId as String?,
+      engineUrlHistory: engineUrlHistory ?? this.engineUrlHistory,
       selectedBackend: selectedBackend ?? this.selectedBackend,
     );
   }
@@ -223,6 +236,7 @@ class Settings {
       'engineAuthType': engineAuthType.name,
       'engineUsername': engineUsername,
       'agenticSessionId': agenticSessionId,
+      'engineUrlHistory': engineUrlHistory,
       'selectedBackend': selectedBackend.name,
     };
   }
@@ -316,10 +330,13 @@ class Settings {
       username: json['username'] as String?,
       history: history,
       engineBaseUrl: (json['engineBaseUrl'] as String?) ??
-          'http://localhost:8000',
+          _defaultEngineBaseUrl,
       engineAuthType: engineAuthType,
       engineUsername: json['engineUsername'] as String?,
       agenticSessionId: json['agenticSessionId'] as String?,
+      engineUrlHistory: (json['engineUrlHistory'] as List<dynamic>?)
+              ?.cast<String>() ??
+          const [],
       selectedBackend: selectedBackend,
     );
   }
@@ -342,6 +359,7 @@ class Settings {
         other.engineAuthType == engineAuthType &&
         other.engineUsername == engineUsername &&
         other.agenticSessionId == agenticSessionId &&
+        _listEquals(other.engineUrlHistory, engineUrlHistory) &&
         other.selectedBackend == selectedBackend;
   }
 
@@ -361,6 +379,7 @@ class Settings {
     engineAuthType,
     engineUsername,
     agenticSessionId,
+    Object.hashAll(engineUrlHistory),
     selectedBackend,
   );
 

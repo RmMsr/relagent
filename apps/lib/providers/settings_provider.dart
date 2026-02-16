@@ -156,7 +156,18 @@ class SettingsNotifier extends Notifier<Settings> {
     }
 
     state = state.copyWith(engineBaseUrl: url);
+    _updateEngineUrlHistory(url);
     return await _persistenceManager.saveSettings(state);
+  }
+
+  void _updateEngineUrlHistory(String url) {
+    final history = List<String>.from(state.engineUrlHistory);
+    history.remove(url);
+    history.insert(0, url);
+    if (history.length > 5) {
+      history.removeRange(5, history.length);
+    }
+    state = state.copyWith(engineUrlHistory: history);
   }
 
   Future<bool> updateEngineAuthType(AuthType type) async {

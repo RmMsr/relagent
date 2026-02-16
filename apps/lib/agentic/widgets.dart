@@ -8,6 +8,7 @@ import '/agentic/models.dart';
 import '/models/app_info.dart';
 import '/providers/recording_provider.dart';
 import '/providers/tts_provider.dart';
+import '/providers/voice_service_provider.dart';
 import '/speech_recognition/recording_target.dart';
 import '/speech_recognition/widgets.dart';
 import '/utils/logger.dart';
@@ -50,8 +51,10 @@ class _AgenticChatInputState extends ConsumerState<AgenticChatInput>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _recordingNotifier = ref.read(recordingProvider.notifier);
-      _recordingNotifier!.registerTarget(this);
+      if (ref.read(voiceCapabilitiesProvider).isAsrAvailable) {
+        _recordingNotifier = ref.read(recordingProvider.notifier);
+        _recordingNotifier!.registerTarget(this);
+      }
     });
   }
 
@@ -147,7 +150,8 @@ class _AgenticChatInputState extends ConsumerState<AgenticChatInput>
             onPressed: _submitText,
             tooltip: 'Send message',
           ),
-          RecorderButton(),
+          if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable)
+            RecorderButton(),
         ],
       ),
     );
@@ -200,6 +204,7 @@ class AgenticChatHistory extends StatelessWidget {
   final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
   final EngineHealthResult? engineHealthResult;
   final VoidCallback? onRetry;
+  final bool isVoiceAvailable;
 
   const AgenticChatHistory({
     super.key,
@@ -209,6 +214,7 @@ class AgenticChatHistory extends StatelessWidget {
     this.getMessagePlaybackStatus,
     this.engineHealthResult,
     this.onRetry,
+    this.isVoiceAvailable = false,
   });
 
   @override
@@ -259,7 +265,9 @@ class AgenticChatHistory extends StatelessWidget {
               ],
               const SizedBox(height: 32),
               Text(
-                'Start a conversation by typing a message or using voice input',
+                isVoiceAvailable
+                    ? 'Start a conversation by typing a message or using voice input'
+                    : 'Start a conversation by typing a message',
                 style: theme.textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),

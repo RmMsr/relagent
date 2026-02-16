@@ -7,7 +7,7 @@ import '/utils/logger.dart';
 /// Pre-cache TTS model files to allow background isolate access
 /// MUST be called from main isolate before spawning TTS worker
 Future<void> preCacheTtsModelFiles({String? modelName}) async {
-  final name = modelName ?? AppConfig.ttsModelName;
+  final name = modelName ?? AppConfig.ttsModelName!;
   Logger.debug('[TTS] Pre-caching model files for $name...');
 
   final stopwatch = Stopwatch()..start();
@@ -46,7 +46,7 @@ Future<sherpa_onnx.OfflineTts> createOfflineTts({String? modelName}) async {
 Future<sherpa_onnx.OfflineTtsModelConfig> getOfflineTtsModelConfig({
   String? modelName,
 }) async {
-  final name = modelName ?? AppConfig.ttsModelName;
+  final name = modelName ?? AppConfig.ttsModelName!;
 
   // Kokoro model configuration
   // Model files need to be accessible on the file system
