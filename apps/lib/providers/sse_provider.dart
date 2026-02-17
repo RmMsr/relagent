@@ -116,7 +116,20 @@ class SseNotifier extends Notifier<SseState> {
     return const SseState();
   }
 
+  /// Connect if not already connected. Safe to call repeatedly (e.g., on
+  /// app lifecycle resume) without tearing down an active connection.
   Future<void> connect() async {
+    if (_client != null && _client!.isConnected) return;
+    await _connectInternal();
+  }
+
+  /// Force a fresh connection, tearing down any existing one. Use after
+  /// settings changes that affect the engine URL or credentials.
+  Future<void> reconnect() async {
+    await _connectInternal();
+  }
+
+  Future<void> _connectInternal() async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final prefs = ref.read(sharedPreferencesProvider);
@@ -170,6 +183,13 @@ class SseNotifier extends Notifier<SseState> {
           );
 
           ref.read(sessionsProvider.notifier).addSession(sessionInfo);
+
+          // Re-read active session ID (may have been set by sendMessage() concurrently)
+          final activeSessionId = ref.read(settingsProvider).agenticSessionId;
+          if (activeSessionId != null && sessionId == activeSessionId) {
+            ref.read(agenticChatProvider.notifier).loadSessionInfo();
+          }
+
           Logger.debug('SSE: Added new session to list: ${sessionInfo.title}');
         } catch (e) {
           Logger.debug('SSE: Failed to fetch new session info: $e');

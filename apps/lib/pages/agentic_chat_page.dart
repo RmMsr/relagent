@@ -20,7 +20,8 @@ class AgenticChatPage extends ConsumerStatefulWidget {
   ConsumerState<AgenticChatPage> createState() => _AgenticChatPageState();
 }
 
-class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
+class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
+    with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   bool _healthCheckBannerDismissed = false;
   final GlobalKey _chatInputKey = GlobalKey();
@@ -216,6 +217,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
   }
@@ -223,6 +225,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
       ref.read(agenticChatProvider.notifier).loadHistory();
@@ -236,6 +239,13 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
       }
       ref.read(sseProvider.notifier).connect();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(sseProvider.notifier).connect();
+    }
   }
 
   Widget _buildHealthCheckBanner(
@@ -345,7 +355,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage> {
     // Check engine health after settings change
     ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
     ref.read(agenticChatProvider.notifier).loadHistory();
-    ref.read(sseProvider.notifier).connect();
+    ref.read(sseProvider.notifier).reconnect();
 
     // Reset banner if health status changed
     final newResult = ref.read(engineHealthCheckProvider).lastResult;

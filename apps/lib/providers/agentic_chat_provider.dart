@@ -84,13 +84,20 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       );
 
       if (fromId != null && fromId > 0) {
-        // Incremental load - append new messages
+        // Incremental load - append only messages not already present locally
+        final existingIds = {
+          for (final m in state.messages)
+            if (m.id != null) m.id,
+        };
+        final newMessages =
+            messages.where((m) => m.id == null || !existingIds.contains(m.id)).toList();
         state = state.copyWith(
-          messages: [...state.messages, ...messages],
+          messages: [...state.messages, ...newMessages],
           isLoadingHistory: false,
         );
         Logger.debug(
-          'AgenticChat: Appended ${messages.length} messages from index $fromId',
+          'AgenticChat: Appended ${newMessages.length} messages from index $fromId'
+          ' (${messages.length - newMessages.length} duplicates skipped)',
         );
       } else {
         // Full load - replace all messages

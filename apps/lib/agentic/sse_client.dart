@@ -115,12 +115,21 @@ class SseClient {
   Future<void> connect() async {
     if (_isConnected) return;
     _shouldReconnect = true;
+    _reconnectAttempts = 0;
     await _doConnect();
   }
 
   Future<void> _doConnect() async {
     if (!_shouldReconnect) return;
     _reconnectScheduled = false;
+
+    // Clean up previous connection resources
+    _subscription?.cancel();
+    _subscription = null;
+    if (_injectedClient == null) {
+      _client?.close();
+    }
+    _client = null;
 
     try {
       _client = _injectedClient ?? http.Client();

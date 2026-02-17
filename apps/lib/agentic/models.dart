@@ -130,7 +130,7 @@ class AgenticMessage {
     }
 
     return AgenticMessage(
-      id: json['id'] as int?,
+      id: json['sequence_id'] as int? ?? json['id'] as int?,
       localId: _generateLocalId(),
       text: json['content'] as String,
       role: role,
