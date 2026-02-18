@@ -24,9 +24,13 @@ def get_setting(
         value = config.get(section, name, fallback=default)
     except (configparser.NoSectionError, ValueError):
         pass
-    finally:
-        if write_log:
-            logger.info("Setting '%s.%s' is %s", section, name, repr(value))
+
+    env = os.getenv(f"{section.upper()}_{name.upper()}")
+    if env:
+        value = env
+
+    if write_log:
+        logger.info("Setting '%s.%s' is %s", section, name, repr(value))
     return value
 
 
@@ -38,9 +42,16 @@ def get_setting_int(
         value = config.getint(section, name, fallback=default)
     except (configparser.NoSectionError, ValueError):
         pass
-    finally:
-        if write_log:
-            logger.info("Setting '%s.%s' is %s", section, name, repr(value))
+
+    try:
+        env = os.getenv(f"{section.upper()}_{name.upper()}")
+        if env:
+            value = int(env)
+    except ValueError:
+        pass
+
+    if write_log:
+        logger.info("Setting '%s.%s' is %s", section, name, repr(value))
     return value
 
 
@@ -52,9 +63,16 @@ def get_setting_bool(
         value = config.getboolean(section, name, fallback=default)
     except (configparser.NoSectionError, ValueError):
         pass
-    finally:
-        if write_log:
-            logger.info("Setting '%s.%s' is %s", section, name, repr(value))
+
+    try:
+        env = os.getenv(f"{section.upper()}_{name.upper()}")
+        if env:
+            value = bool(env)
+    except ValueError:
+        pass
+
+    if write_log:
+        logger.info("Setting '%s.%s' is %s", section, name, repr(value))
     return value
 
 
@@ -72,7 +90,7 @@ def reset_env():
         return
 
     backup = dict[str, str]()
-    keep = ["PWD"]
+    keep = ["PROVIDER_API_BASE", "PROVIDER_API_KEY", "PROVIDER_DEFAULT_MODEL", "PWD"]
 
     for k in keep:
         if k in os.environ:
@@ -85,4 +103,4 @@ def reset_env():
 
     _env_reset_done = True
     logger.info("Using settings at %s", _SETTINGS_FILE)
-    logger.info("Environment reset to: %s", dict(os.environ))
+    logger.info("Environment reset to: %s", sorted(os.environ.keys()))

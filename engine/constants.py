@@ -12,7 +12,7 @@ DATA_DIR: Path = Path(
 PROVIDER_API_BASE: str = get_setting(
     "provider", "api_base", default="http://localhost:11434"
 )
-PROVIDER_API_KEY: str = get_setting("provider", "api_key")
+PROVIDER_API_KEY: str = get_setting("provider", "api_key", write_log=False)
 
 DEFAULT_MODEL: str = get_setting("provider", "default_model", default="olmo-3")
 
