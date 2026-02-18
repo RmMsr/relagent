@@ -90,7 +90,7 @@ def reset_env():
         return
 
     backup = dict[str, str]()
-    keep = ["PROVIDER_API_BASE", "PROVIDER_API_KEY", "PROVIDER_DEFAULT_MODEL", "PWD"]
+    keep = ["PWD"]
 
     for k in keep:
         if k in os.environ:

@@ -2,7 +2,7 @@
 Description=Relagent engine
 
 [Container]
-Image=registry.gitlab.com/rmmsr/relagent:0.1.9-pre
+Image=registry.gitlab.com/rmmsr/relagent:0.1.10
 AutoUpdate=registry
 PublishPort=8000:8000
 ReadOnly=true
