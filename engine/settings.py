@@ -90,7 +90,11 @@ def reset_env():
         return
 
     backup = dict[str, str]()
-    keep = ["PWD"]
+    keep = [
+        "INSTRUMENTATION_OTLP_ENDPOINT",
+        "INSTRUMENTATION_GEN_AI_COLLECTOR_ENABLED",
+        "PWD",
+    ]
 
     for k in keep:
         if k in os.environ:
