@@ -1,22 +1,23 @@
-import logging
-
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from engine.constants import VERSION, WEB_DIR
+from engine.logging import get_logger, init_logging
 from engine.settings import get_setting, get_setting_int, reset_env
 
-from .instrumentation import init_instrumentation
+from .instrumentation import init_app_instrumentation, init_global_instrumentation
 from .v1 import api_router
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 reset_env()
+init_logging()
+init_global_instrumentation()
 
 app = FastAPI(version=VERSION)
 app.include_router(api_router, prefix="/api/v1")
-init_instrumentation(app=app)
+init_app_instrumentation(app=app)
 
 
 @app.get("/status")

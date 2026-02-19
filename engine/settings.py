@@ -1,19 +1,12 @@
 import configparser
-import logging
 import os
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from engine.logging import get_logger
 
-_SETTINGS_FILE: Path = (
-    Path("~") / ".local" / "share" / "relagent" / "settings.ini"
-).expanduser()
-
-
-config: ConfigParser = configparser.ConfigParser()
-config.read(_SETTINGS_FILE)
+logger = get_logger(__name__)
 
 
 def get_setting(
@@ -21,7 +14,7 @@ def get_setting(
 ) -> Any:
     value: Any = default
     try:
-        value = config.get(section, name, fallback=default)
+        value = _get_config_parser().get(section, name, fallback=default)
     except (configparser.NoSectionError, ValueError):
         pass
 
@@ -30,7 +23,7 @@ def get_setting(
         value = env
 
     if write_log:
-        logger.info("Setting '%s.%s' is %s", section, name, repr(value))
+        logger.debug("Setting '%s.%s' is %s", section, name, repr(value))
     return value
 
 
@@ -39,7 +32,7 @@ def get_setting_int(
 ) -> int:
     value: int = default
     try:
-        value = config.getint(section, name, fallback=default)
+        value = _get_config_parser().getint(section, name, fallback=default)
     except (configparser.NoSectionError, ValueError):
         pass
 
@@ -51,7 +44,7 @@ def get_setting_int(
         pass
 
     if write_log:
-        logger.info("Setting '%s.%s' is %s", section, name, repr(value))
+        logger.debug("Setting '%s.%s' is %s", section, name, repr(value))
     return value
 
 
@@ -60,7 +53,7 @@ def get_setting_bool(
 ) -> bool:
     value: bool = default
     try:
-        value = config.getboolean(section, name, fallback=default)
+        value = _get_config_parser().getboolean(section, name, fallback=default)
     except (configparser.NoSectionError, ValueError):
         pass
 
@@ -72,7 +65,7 @@ def get_setting_bool(
         pass
 
     if write_log:
-        logger.info("Setting '%s.%s' is %s", section, name, repr(value))
+        logger.debug("Setting '%s.%s' is %s", section, name, repr(value))
     return value
 
 
@@ -93,6 +86,7 @@ def reset_env():
     keep = [
         "INSTRUMENTATION_OTLP_ENDPOINT",
         "INSTRUMENTATION_GEN_AI_COLLECTOR_ENABLED",
+        "LOG_LEVEL",
         "PWD",
     ]
 
@@ -106,5 +100,31 @@ def reset_env():
         os.environ[k] = v
 
     _env_reset_done = True
-    logger.info("Using settings at %s", _SETTINGS_FILE)
-    logger.info("Environment reset to: %s", sorted(os.environ.keys()))
+    logger.debug("Environment reset to: %s", sorted(os.environ.keys()))
+
+
+_config_parser: ConfigParser | None = None
+
+
+def _get_config_parser() -> ConfigParser:
+    global _config_parser
+    if _config_parser is not None:
+        return _config_parser
+
+    config_parser = configparser.ConfigParser()
+
+    settings_file: Path = (
+        Path("~") / ".local" / "share" / "relagent" / "settings.ini"
+    ).expanduser()
+
+    if settings_file.exists():
+        config_parser.read(settings_file)
+        logger.debug("Using settings at '%s'", settings_file)
+    else:
+        logger.warning(
+            "Settings file not found at '%s'. Using defaults and environment variables.",
+            settings_file,
+        )
+
+    _config_parser = config_parser
+    return config_parser

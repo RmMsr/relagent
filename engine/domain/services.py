@@ -1,4 +1,3 @@
-import logging
 from typing import Sequence
 from uuid import UUID
 
@@ -20,8 +19,9 @@ from engine.domain.ports.events import (
     SessionUpdatedEvent,
 )
 from engine.domain.ports.persistence import Persistence
+from engine.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ChatService:

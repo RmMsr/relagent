@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated
 from uuid import UUID
 
@@ -22,8 +21,9 @@ from engine.domain.ports.events import (
     SessionUpdatedEvent,
 )
 from engine.domain.services import ChatService
+from engine.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 api_router = APIRouter()
 

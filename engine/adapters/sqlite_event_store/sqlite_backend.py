@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -19,8 +18,9 @@ from engine.domain.ports.events import (
     SessionMessagesAppendedEvent,
     SessionUpdatedEvent,
 )
+from engine.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 POLL_INTERVAL = 0.1  # 100ms; values down to 20ms tested with negligible CPU impact
 

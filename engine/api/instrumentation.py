@@ -1,4 +1,3 @@
-import logging
 from typing import Any
 
 from fastapi import FastAPI
@@ -13,14 +12,21 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.semconv.attributes import service_attributes
 from opentelemetry.trace import Span
 
+from engine.logging import get_logger
 from engine.settings import get_setting
 
-logging.basicConfig(level=logging.INFO)
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
-def init_instrumentation(app: FastAPI):
+_global_instrumentation_initialized: bool = False
+
+
+def init_global_instrumentation():
+    global _global_instrumentation_initialized
+    if _global_instrumentation_initialized:
+        logger.debug("Instrumentation already initialized, skipping")
+        return
+
     service_name = get_setting(
         "instrumentation", "service_name", default="relagent-engine"
     )
@@ -40,7 +46,7 @@ def init_instrumentation(app: FastAPI):
         "instrumentation", "gen_ai_collector_enabled", default=False
     ):
         # Add the OpenInference span processor for Phoenix to capture pydantic_ai traces
-        logger.info("Adding OpenInference span processor for Pydantic AI")
+        logger.debug("Adding OpenInference span processor for Pydantic AI")
 
         from openinference.instrumentation.pydantic_ai import (
             OpenInferenceSpanProcessor,
@@ -52,7 +58,14 @@ def init_instrumentation(app: FastAPI):
         exporter = OTLPSpanExporter(endpoint=endpoint)
         tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
 
-    # FastAPI instrumentation
+    _global_instrumentation_initialized = True
+
+    logger.debug(
+        "Tracing initialized. Endpoint: %s", endpoint if endpoint else "OTLP Default"
+    )
+
+
+def init_app_instrumentation(app: FastAPI):
     def server_request_hook(span: Span, scope: dict[str, Any]):
         if span and span.is_recording():
             span.set_attribute("openinference.span.kind", "CHAIN")
@@ -84,8 +97,4 @@ def init_instrumentation(app: FastAPI):
         ],
         http_capture_headers_server_response=["content-type"],
         excluded_urls="/status",
-    )
-
-    logger.info(
-        "Tracing initialized. Endpoint: %s", endpoint if endpoint else "OTLP Default"
     )

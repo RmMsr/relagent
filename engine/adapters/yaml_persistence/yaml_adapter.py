@@ -1,4 +1,3 @@
-import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,10 +22,11 @@ from engine.domain.models import (
     UserMessage,
 )
 from engine.domain.ports.persistence import Persistence
+from engine.logging import get_logger
 
 from .models import Metadata
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class YamlPersistenceAdapter(Persistence):
