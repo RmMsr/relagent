@@ -183,7 +183,7 @@ main() {
     fi
 
     echo "${SUCCESS_SYM} Worktree applied and cleaned up successfully!"
-    echo "Returned to: $(pwd)"
+    echo "Return to: $(pwd)"
 }
 
 main "$@"

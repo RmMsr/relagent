@@ -1,11 +1,18 @@
+from openai import AsyncOpenAI
 from pydantic_ai import Agent, InstrumentationSettings
 from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.ollama import OllamaProvider
+from pydantic_ai.providers.openai import OpenAIProvider
 
 from engine.constants import DEFAULT_MODEL, PROVIDER_API_BASE, PROVIDER_API_KEY
 from engine.tools import current_date_and_time_tool, user_name_tool, web_search_tool
 
-provider = OllamaProvider(base_url=PROVIDER_API_BASE, api_key=PROVIDER_API_KEY)
+provider = OpenAIProvider(
+    openai_client=AsyncOpenAI(
+        base_url=PROVIDER_API_BASE,
+        api_key=PROVIDER_API_KEY,
+    )
+)
+
 default_model = OpenAIChatModel(
     model_name=DEFAULT_MODEL,
     provider=provider,
