@@ -99,9 +99,10 @@ squash_changes() {
 
 No multi turn thinking or reasoning. just generate the message. Leave out insignificant details.
 
-1. Generate a short one line summary as title. Max 60 characters.
-2. Describe the major improvements and change patterns in one paragraph each. Add intention where context fits. Max 4 sentences. Use the collected commit messages for additional context.
+1. Generate a short one line summary as title. Max 60 characters. Prefixed with feat:, fix: or chore:
+2. Describe only the major improvements and change patterns in one short paragraph. Add intention where context fits. Max 4 sentences. Use the collected commit messages for additional context.
 3. Quickly list fixes and other relevant differences.
+4. Skip insignificant details, focus on higher level impact.
 
 ## Commit messages to be squashed for context
 

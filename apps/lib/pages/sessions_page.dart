@@ -49,7 +49,7 @@ class _SessionsPageState extends ConsumerState<SessionsPage> {
     await ref.read(agenticChatProvider.notifier).loadSessionInfo();
 
     if (mounted) {
-      context.go('/agentic');
+      context.go('/chat');
     }
   }
 
@@ -116,7 +116,7 @@ class _SessionsPageState extends ConsumerState<SessionsPage> {
         title: const Text('Recent Sessions'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/agentic'),
+          onPressed: () => context.go('/chat'),
         ),
       ),
       body: RefreshIndicator(
@@ -184,7 +184,7 @@ class _SessionsPageState extends ConsumerState<SessionsPage> {
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: () => context.go('/agentic'),
+              onPressed: () => context.go('/chat'),
               icon: const Icon(Icons.add),
               label: const Text('Start New Session'),
             ),

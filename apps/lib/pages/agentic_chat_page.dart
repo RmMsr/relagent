@@ -56,79 +56,66 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
       }
     });
 
+    // Health check recovery: dismiss banner + reload data on fail→success
+    ref.listen<EngineHealthCheckState>(engineHealthCheckProvider, (
+      previous,
+      next,
+    ) {
+      final wasFailing =
+          previous?.lastResult != null && !previous!.lastResult!.isSuccess;
+      final nowSucceeding =
+          next.lastResult != null && next.lastResult!.isSuccess;
+      if (wasFailing && nowSucceeding) {
+        setState(() {
+          _healthCheckBannerDismissed = true;
+        });
+        ref.read(agenticChatProvider.notifier).loadHistory();
+        ref.read(sseProvider.notifier).reconnect();
+      }
+    });
+
     return Scaffold(
-      appBar: AppBar(
-        leading: PopupMenuButton<String>(
-          icon: const Icon(Icons.menu),
-          tooltip: 'Navigation',
-          onSelected: (route) {
-            if (route == '/simple') {
-              context.go('/simple');
-            } else if (route == '/info') {
-              context.push('/info');
-            } else if (route == '/sessions') {
+      drawer: NavigationDrawer(
+        selectedIndex: 0,
+        onDestinationSelected: (index) {
+          Navigator.pop(context);
+          switch (index) {
+            case 0:
+              break;
+            case 1:
               context.push('/sessions');
-            } else if (route == '/settings') {
-              context.push('/settings');
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: '/agentic',
-              enabled: false,
-              child: Row(
-                children: [
-                  Icon(Icons.smart_toy),
-                  SizedBox(width: 12),
-                  Text('Agentic Chat'),
-                  Spacer(),
-                  Icon(Icons.check, size: 18),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: '/simple',
-              child: Row(
-                children: [
-                  Icon(Icons.chat_bubble_outline),
-                  SizedBox(width: 12),
-                  Text('Simple Chat'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: '/sessions',
-              child: Row(
-                children: [
-                  Icon(Icons.list),
-                  SizedBox(width: 12),
-                  Text('Recent Sessions'),
-                ],
-              ),
-            ),
-            const PopupMenuDivider(),
-            const PopupMenuItem(
-              value: '/settings',
-              child: Row(
-                children: [
-                  Icon(Icons.settings),
-                  SizedBox(width: 12),
-                  Text('Settings'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: '/info',
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline),
-                  SizedBox(width: 12),
-                  Text('About'),
-                ],
-              ),
-            ),
-          ],
-        ),
+            case 2:
+              _navigateToSettings();
+            case 3:
+              context.push('/info');
+          }
+        },
+        children: const [
+          SizedBox(height: 16),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: Text('Chat'),
+          ),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.list_outlined),
+            selectedIcon: Icon(Icons.list),
+            label: Text('Sessions'),
+          ),
+          Divider(indent: 28, endIndent: 28),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: Text('Settings'),
+          ),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.info_outline),
+            selectedIcon: Icon(Icons.info),
+            label: Text('About'),
+          ),
+        ],
+      ),
+      appBar: AppBar(
         title: chatState.sessionTitle != null
             ? Text(
                 chatState.sessionTitle!,
@@ -148,10 +135,6 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
               ref.read(agenticChatProvider.notifier).clearChat();
               _showSnackBar('New session started');
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _navigateToSettings,
           ),
         ],
       ),
@@ -329,6 +312,25 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              OutlinedButton.icon(
+                onPressed: () {
+                  ref
+                      .read(engineHealthCheckProvider.notifier)
+                      .triggerHealthCheck();
+                  setState(() {
+                    _healthCheckBannerDismissed = false;
+                  });
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.onErrorContainer,
+                  side: BorderSide(
+                    color: theme.colorScheme.onErrorContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: _navigateToSettings,
                 icon: const Icon(Icons.settings),

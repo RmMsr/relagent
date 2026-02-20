@@ -282,6 +282,11 @@ class SseNotifier extends Notifier<SseState> {
     state = state.copyWith(isConnected: false);
   }
 
+  /// Clear the persisted SSE last event ID from SharedPreferences.
+  void clearLastEventId() {
+    ref.read(sharedPreferencesProvider).remove(_lastEventIdKey);
+  }
+
   /// Clear the active session deleted flag after showing the notification.
   void clearActiveSessionDeleted() {
     state = state.clearActiveSessionDeleted();

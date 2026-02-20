@@ -204,6 +204,11 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     Logger.debug('AgenticChat: Chat cleared and session reset');
   }
 
+  void clearMessages() {
+    state = AgenticChatState.initial();
+    ref.read(ttsProvider.notifier).onChatCleared();
+  }
+
   void clearError() {
     state = state.copyWith(error: null);
   }

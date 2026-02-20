@@ -144,64 +144,59 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       }
     });
 
+    // Health check recovery: dismiss banner on fail→success transition
+    ref.listen<HealthCheckState>(healthCheckProvider, (previous, next) {
+      final wasFailing =
+          previous?.lastResult != null && !previous!.lastResult!.isSuccess;
+      final nowSucceeding =
+          next.lastResult != null && next.lastResult!.isSuccess;
+      if (wasFailing && nowSucceeding) {
+        setState(() {
+          _healthCheckBannerDismissed = true;
+        });
+      }
+    });
+
     return Scaffold(
-      appBar: AppBar(
-        leading: PopupMenuButton<String>(
-          icon: const Icon(Icons.menu),
-          tooltip: 'Navigation',
-          onSelected: (route) {
-            if (route == '/agentic') {
-              context.go('/agentic');
-            } else if (route == '/info') {
+      drawer: NavigationDrawer(
+        selectedIndex: 0,
+        onDestinationSelected: (index) {
+          Navigator.pop(context);
+          switch (index) {
+            case 0:
+              break;
+            case 1:
+              _navigateToSettings();
+            case 2:
               context.push('/info');
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: '/agentic',
-              child: Row(
-                children: [
-                  Icon(Icons.smart_toy),
-                  SizedBox(width: 12),
-                  Text('Agentic Chat'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: '/simple',
-              enabled: false,
-              child: Row(
-                children: [
-                  Icon(Icons.chat_bubble_outline),
-                  SizedBox(width: 12),
-                  Text('Simple Chat'),
-                  Spacer(),
-                  Icon(Icons.check, size: 18),
-                ],
-              ),
-            ),
-            const PopupMenuDivider(),
-            const PopupMenuItem(
-              value: '/info',
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline),
-                  SizedBox(width: 12),
-                  Text('About'),
-                ],
-              ),
-            ),
-          ],
-        ),
+          }
+        },
+        children: const [
+          SizedBox(height: 16),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: Text('Chat'),
+          ),
+          Divider(indent: 28, endIndent: 28),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: Text('Settings'),
+          ),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.info_outline),
+            selectedIcon: Icon(Icons.info),
+            label: Text('About'),
+          ),
+        ],
+      ),
+      appBar: AppBar(
         actions: [
           if (voiceCapabilities.isAsrAvailable) ...[
             const VoiceModeSelector(),
             const SizedBox(width: 8),
           ],
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _navigateToSettings,
-          ),
           if (chatState.messages.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete),
@@ -354,6 +349,25 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              OutlinedButton.icon(
+                onPressed: () {
+                  ref
+                      .read(healthCheckProvider.notifier)
+                      .performImmediateHealthCheck();
+                  setState(() {
+                    _healthCheckBannerDismissed = false;
+                  });
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.onErrorContainer,
+                  side: BorderSide(
+                    color: theme.colorScheme.onErrorContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: _navigateToSettings,
                 icon: const Icon(Icons.settings),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '/models/settings.dart';
 import '/providers/settings_provider.dart';
 import '/services/api_health_check.dart';
 import '/utils/logger.dart';
@@ -39,13 +40,15 @@ class HealthCheckState {
 
 class HealthCheckNotifier extends Notifier<HealthCheckState> {
   Timer? _debounceTimer;
+  Timer? _retryTimer;
   static const _debounceDuration = Duration(seconds: 2);
+  static const _retryInterval = Duration(seconds: 15);
 
   @override
   HealthCheckState build() {
-    // Cleanup timer when provider is disposed
     ref.onDispose(() {
       _debounceTimer?.cancel();
+      _retryTimer?.cancel();
     });
 
     return const HealthCheckState();
@@ -123,6 +126,12 @@ class HealthCheckNotifier extends Notifier<HealthCheckState> {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
 
+    // Don't run if OpenAI-compatible backend is not active
+    if (settings.selectedBackend != ChatBackendType.openAiCompatible) {
+      Logger.info('Health check skipped: OpenAI-compatible backend not active');
+      return;
+    }
+
     // Don't run if URL is empty or invalid
     if (settings.simpleChatBaseUrl.trim().isEmpty) {
       Logger.info('Health check skipped: empty URL');
@@ -159,18 +168,31 @@ class HealthCheckNotifier extends Notifier<HealthCheckState> {
       );
 
       Logger.info('Health check completed: ${result.status.name}');
+      _scheduleRetryIfNeeded(result);
     } catch (e) {
       Logger.error('Health check failed: $e');
+      final failResult = HealthCheckResult.connectionFailed(e.toString());
       state = state.copyWith(
-        lastResult: HealthCheckResult.connectionFailed(e.toString()),
+        lastResult: failResult,
         isRunning: false,
         lastCheckTime: DateTime.now(),
       );
+      _scheduleRetryIfNeeded(failResult);
+    }
+  }
+
+  void _scheduleRetryIfNeeded(HealthCheckResult result) {
+    _retryTimer?.cancel();
+    if (!result.isSuccess) {
+      _retryTimer = Timer(_retryInterval, () {
+        _performHealthCheck();
+      });
     }
   }
 
   /// Clear health check result
   void clearResult() {
-    state = state.copyWith(lastResult: null);
+    _retryTimer?.cancel();
+    state = const HealthCheckState();
   }
 }

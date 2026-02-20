@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '/models/app_info.dart';
-import '/models/settings.dart';
-import '/providers/settings_provider.dart';
 
 /// Splash screen displayed during app startup.
 /// Shows app icon, name, and version while background initialization completes.
@@ -26,11 +24,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
     // Minimum display time for splash screen
     await Future<void>.delayed(const Duration(milliseconds: 1500));
     if (mounted) {
-      final settings = ref.read(settingsProvider);
-      final route = settings.selectedBackend == ChatBackendType.relagentEngine
-          ? '/agentic'
-          : '/simple';
-      context.go(route);
+      context.go('/chat');
     }
   }
 

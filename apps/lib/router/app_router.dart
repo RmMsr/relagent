@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '/pages/agentic_chat_page.dart';
-import '/pages/chat_page.dart';
+import '/pages/chat_router_page.dart';
 import '/pages/info_page.dart';
 import '/pages/sessions_page.dart';
 import '/pages/settings_page.dart';
@@ -17,15 +16,10 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => const MaterialPage(child: SplashPage()),
     ),
     GoRoute(
-      path: '/agentic',
-      name: 'agentic chat',
+      path: '/chat',
+      name: 'chat',
       pageBuilder: (context, state) =>
-          const MaterialPage(child: AgenticChatPage()),
-    ),
-    GoRoute(
-      path: '/simple',
-      name: 'simple chat',
-      pageBuilder: (context, state) => const MaterialPage(child: ChatPage()),
+          const MaterialPage(child: ChatRouterPage()),
     ),
     GoRoute(
       path: '/settings',

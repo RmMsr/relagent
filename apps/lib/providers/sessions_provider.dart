@@ -190,6 +190,10 @@ class SessionsNotifier extends Notifier<SessionsState> {
     state = state.copyWith(sessions: updatedSessions);
   }
 
+  void clearSessions() {
+    state = SessionsState.initial();
+  }
+
   void clearError() {
     state = state.copyWith(error: null);
   }

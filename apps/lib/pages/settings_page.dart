@@ -76,8 +76,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _loadEnginePassword() async {
-    final password =
-        await ref.read(settingsProvider.notifier).getEnginePassword();
+    final password = await ref
+        .read(settingsProvider.notifier)
+        .getEnginePassword();
     if (password != null && mounted) {
       _enginePasswordController.text = password;
     }
@@ -271,15 +272,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
 
     // Save engine settings
-    await settingsNotifier.updateEngineBaseUrl(_engineUrlController.text.trim());
-    final engineAuthType = _engineBasicAuthEnabled ? AuthType.basic : AuthType.none;
+    await settingsNotifier.updateEngineBaseUrl(
+      _engineUrlController.text.trim(),
+    );
+    final engineAuthType = _engineBasicAuthEnabled
+        ? AuthType.basic
+        : AuthType.none;
     if (engineAuthType != settings.engineAuthType) {
       await settingsNotifier.updateEngineAuthType(engineAuthType);
     }
     if (_engineUsernameController.text.trim() !=
         (settings.engineUsername ?? '')) {
-      await settingsNotifier
-          .updateEngineUsername(_engineUsernameController.text.trim());
+      await settingsNotifier.updateEngineUsername(
+        _engineUsernameController.text.trim(),
+      );
     }
     if (_enginePasswordController.text.isNotEmpty) {
       await settingsNotifier.setEnginePassword(_enginePasswordController.text);
@@ -332,8 +338,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (updatedSettings.selectedBackend == ChatBackendType.relagentEngine) {
         // Engine health check
         final service = EngineHealthCheckService();
-        final engineAuthType =
-            _engineBasicAuthEnabled ? AuthType.basic : AuthType.none;
+        final engineAuthType = _engineBasicAuthEnabled
+            ? AuthType.basic
+            : AuthType.none;
         final result = await service.checkStatus(
           baseUrl: _engineUrlController.text.trim(),
           authType: engineAuthType,
@@ -534,8 +541,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ? 'Connect to any OpenAI-compatible API server (LM Studio, Ollama, vLLM, etc.)'
                   : 'Connect to the full-featured Relagent engine with persistence and agentic capabilities',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             if (settings.selectedBackend ==
                 ChatBackendType.openAiCompatible) ...[
@@ -545,327 +552,304 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              Autocomplete<String>(
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                // Always show all URL suggestions, but prioritize matches
-                final matches = urlSuggestions.where((String option) {
-                  return option.toLowerCase().contains(
-                    textEditingValue.text.toLowerCase(),
-                  );
-                }).toList();
-                final nonMatches = urlSuggestions.where((String option) {
-                  return !option.toLowerCase().contains(
-                    textEditingValue.text.toLowerCase(),
-                  );
-                }).toList();
-
-                // Return matches first, then non-matches
-                return [...matches, ...nonMatches];
-              },
-              onSelected: (String selection) {
-                _baseUrlController.text = selection;
-              },
-              fieldViewBuilder:
-                  (
-                    BuildContext context,
-                    TextEditingController fieldTextEditingController,
-                    FocusNode fieldFocusNode,
-                    VoidCallback onFieldSubmitted,
-                  ) {
-                    // Sync with our controller
-                    fieldTextEditingController.text = _baseUrlController.text;
-                    fieldTextEditingController.addListener(() {
-                      _baseUrlController.text = fieldTextEditingController.text;
-                    });
-                    return TextFormField(
-                      controller: fieldTextEditingController,
-                      focusNode: fieldFocusNode,
-                      decoration: const InputDecoration(
-                        labelText: 'API Base URL',
-                        hintText: 'http://localhost:1234/v1',
-                        border: OutlineInputBorder(),
-                        helperText: 'OpenAI-compatible API endpoint',
-                      ),
-                      keyboardType: TextInputType.url,
-                      textInputAction: TextInputAction.next,
-                      onEditingComplete: () {
-                        // Move to next field
-                        FocusScope.of(context).nextFocus();
-                      },
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter an API base URL';
-                        }
-                        if (!value.startsWith('http://') &&
-                            !value.startsWith('https://')) {
-                          return 'URL must start with http:// or https://';
-                        }
-                        return null;
-                      },
-                    );
-                  },
-            ),
-            const SizedBox(height: 16),
-            Autocomplete<String>(
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                // Always show all model suggestions, but prioritize matches
-                final matches = modelSuggestions.where((String option) {
-                  return option.toLowerCase().contains(
-                    textEditingValue.text.toLowerCase(),
-                  );
-                }).toList();
-                final nonMatches = modelSuggestions.where((String option) {
-                  return !option.toLowerCase().contains(
-                    textEditingValue.text.toLowerCase(),
-                  );
-                }).toList();
-
-                // Return matches first, then non-matches
-                return [...matches, ...nonMatches];
-              },
-              onSelected: (String selection) {
-                _modelController.text = selection;
-              },
-              fieldViewBuilder:
-                  (
-                    BuildContext context,
-                    TextEditingController fieldTextEditingController,
-                    FocusNode fieldFocusNode,
-                    VoidCallback onFieldSubmitted,
-                  ) {
-                    // Sync with our controller
-                    fieldTextEditingController.text = _modelController.text;
-                    fieldTextEditingController.addListener(() {
-                      _modelController.text = fieldTextEditingController.text;
-                    });
-                    return TextFormField(
-                      controller: fieldTextEditingController,
-                      focusNode: fieldFocusNode,
-                      decoration: const InputDecoration(
-                        labelText: 'Model Name',
-                        hintText: 'qwen2.5-coder:7b',
-                        border: OutlineInputBorder(),
-                        helperText: 'Model to use for chat completions',
-                      ),
-                      textInputAction: TextInputAction.done,
-                      onEditingComplete: () {
-                        // Save settings when pressing Enter on last field
-                        _saveSettings();
-                      },
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter a model name';
-                        }
-                        return null;
-                      },
-                    );
-                  },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _primeMessageController,
-              decoration: const InputDecoration(
-                labelText: 'Prime Message',
-                hintText: 'System prompt sent with every request',
-                border: OutlineInputBorder(),
-                helperText: 'Customize how the assistant should behave',
-              ),
-              minLines: 5,
-              maxLines: 12,
-              textInputAction: TextInputAction.newline,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Prime message cannot be empty';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 32),
-            Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                title: const Text(
-                  'Authentication',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                initiallyExpanded: _authenticationExpanded,
-                onExpansionChanged: (expanded) {
-                  setState(() {
-                    _authenticationExpanded = expanded;
-                  });
+              _AutocompleteWithFocusLoss<String>(
+                key: ValueKey('openai-url-${settings.selectedBackend}'),
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  return urlSuggestions;
                 },
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _usernameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Username',
-                            border: OutlineInputBorder(),
-                            helperText: 'HTTP Basic Auth username',
-                          ),
-                          textInputAction: TextInputAction.next,
+                onSelected: (String selection) {
+                  _baseUrlController.text = selection;
+                },
+                fieldViewBuilder:
+                    (
+                      BuildContext context,
+                      TextEditingController fieldTextEditingController,
+                      FocusNode fieldFocusNode,
+                      VoidCallback onFieldSubmitted,
+                    ) {
+                      fieldTextEditingController.text = _baseUrlController.text;
+                      fieldTextEditingController.addListener(() {
+                        _baseUrlController.text =
+                            fieldTextEditingController.text;
+                      });
+                      return TextFormField(
+                        controller: fieldTextEditingController,
+                        focusNode: fieldFocusNode,
+                        decoration: const InputDecoration(
+                          labelText: 'API Base URL',
+                          hintText: 'http://localhost:1234/v1',
+                          border: OutlineInputBorder(),
+                          helperText: 'OpenAI-compatible API endpoint',
                         ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            border: const OutlineInputBorder(),
-                            helperText:
-                                'Saved password can be revealed with the eye icon',
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility
-                                    : Icons.visibility_off,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
+                        keyboardType: TextInputType.url,
+                        textInputAction: TextInputAction.next,
+                        onEditingComplete: () {
+                          onFieldSubmitted();
+                          FocusScope.of(context).nextFocus();
+                        },
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter an API base URL';
+                          }
+                          if (!value.startsWith('http://') &&
+                              !value.startsWith('https://')) {
+                            return 'URL must start with http:// or https://';
+                          }
+                          return null;
+                        },
+                      );
+                    },
+              ),
+              const SizedBox(height: 16),
+              _AutocompleteWithFocusLoss<String>(
+                key: ValueKey('openai-model-${settings.selectedBackend}'),
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  return modelSuggestions;
+                },
+                onSelected: (String selection) {
+                  _modelController.text = selection;
+                },
+                fieldViewBuilder:
+                    (
+                      BuildContext context,
+                      TextEditingController fieldTextEditingController,
+                      FocusNode fieldFocusNode,
+                      VoidCallback onFieldSubmitted,
+                    ) {
+                      fieldTextEditingController.text = _modelController.text;
+                      fieldTextEditingController.addListener(() {
+                        _modelController.text = fieldTextEditingController.text;
+                      });
+                      return TextFormField(
+                        controller: fieldTextEditingController,
+                        focusNode: fieldFocusNode,
+                        decoration: const InputDecoration(
+                          labelText: 'Model Name',
+                          hintText: 'qwen2.5-coder:7b',
+                          border: OutlineInputBorder(),
+                          helperText: 'Model to use for chat completions',
+                        ),
+                        textInputAction: TextInputAction.next,
+                        onEditingComplete: () {
+                          onFieldSubmitted();
+                          FocusScope.of(context).nextFocus();
+                        },
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter a model name';
+                          }
+                          return null;
+                        },
+                      );
+                    },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _primeMessageController,
+                decoration: const InputDecoration(
+                  labelText: 'Prime Message',
+                  hintText: 'System prompt sent with every request',
+                  border: OutlineInputBorder(),
+                  helperText: 'Customize how the assistant should behave',
+                ),
+                minLines: 5,
+                maxLines: 12,
+                textInputAction: TextInputAction.newline,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Prime message cannot be empty';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 32),
+              Theme(
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  title: const Text(
+                    'Authentication',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  initiallyExpanded: _authenticationExpanded,
+                  onExpansionChanged: (expanded) {
+                    setState(() {
+                      _authenticationExpanded = expanded;
+                    });
+                  },
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _usernameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Username',
+                              border: OutlineInputBorder(),
+                              helperText: 'HTTP Basic Auth username',
                             ),
+                            textInputAction: TextInputAction.next,
                           ),
-                          obscureText: _obscurePassword,
-                          textInputAction: TextInputAction.done,
-                        ),
-                        const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          onPressed: _clearCredentials,
-                          icon: const Icon(Icons.clear),
-                          label: const Text('Clear Credentials'),
-                        ),
-                        if (_healthCheckResult != null) ...[
                           const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: _healthCheckResult!.isSuccess
-                                  ? Colors.green.withValues(alpha: 0.1)
-                                  : Colors.red.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: _healthCheckResult!.isSuccess
-                                    ? Colors.green
-                                    : Colors.red,
+                          TextFormField(
+                            controller: _passwordController,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              border: const OutlineInputBorder(),
+                              helperText:
+                                  'Saved password can be revealed with the eye icon',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
                               ),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      _healthCheckResult!.isSuccess
-                                          ? Icons.check_circle
-                                          : Icons.error,
-                                      color: _healthCheckResult!.isSuccess
-                                          ? Colors.green
-                                          : Colors.red,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _healthCheckResult!.message,
-                                        style: TextStyle(
-                                          color: _healthCheckResult!.isSuccess
-                                              ? Colors.green
-                                              : Colors.red,
-                                          fontWeight: FontWeight.bold,
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.done,
+                          ),
+                          const SizedBox(height: 16),
+                          OutlinedButton.icon(
+                            onPressed: _clearCredentials,
+                            icon: const Icon(Icons.clear),
+                            label: const Text('Clear Credentials'),
+                          ),
+                          if (_healthCheckResult != null) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: _healthCheckResult!.isSuccess
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.red.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _healthCheckResult!.isSuccess
+                                      ? Colors.green
+                                      : Colors.red,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _healthCheckResult!.isSuccess
+                                            ? Icons.check_circle
+                                            : Icons.error,
+                                        color: _healthCheckResult!.isSuccess
+                                            ? Colors.green
+                                            : Colors.red,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _healthCheckResult!.message,
+                                          style: TextStyle(
+                                            color: _healthCheckResult!.isSuccess
+                                                ? Colors.green
+                                                : Colors.red,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                const Divider(height: 1),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Request Details:',
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 4),
-                                _buildDebugInfo('Method', 'POST'),
-                                _buildDebugInfo(
-                                  'URL',
-                                  '${_baseUrlController.text.trim()}/chat/completions',
-                                ),
-                                _buildDebugInfo(
-                                  'Body',
-                                  '{"messages": [{"role": "user", "content": "test"}], "model": "${_modelController.text.trim()}", "max_completion_tokens": 100}',
-                                ),
-                                if (_healthCheckResult!.httpStatusCode != null)
-                                  _buildDebugInfo(
-                                    'Status',
-                                    'HTTP ${_healthCheckResult!.httpStatusCode}',
+                                    ],
                                   ),
-                                if (ref.read(settingsProvider).authType ==
-                                    AuthType.basic)
-                                  _buildDebugInfo(
-                                    'Auth',
-                                    'Basic ${_usernameController.text.isNotEmpty ? _usernameController.text : "(no username)"}',
-                                  ),
-                                if (_healthCheckResult!.requiresAuth) ...[
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 12),
                                   const Divider(height: 1),
                                   const SizedBox(height: 8),
-                                  _buildDebugInfo(
-                                    'Detected Auth Type',
-                                    _healthCheckResult!.detectedAuthType?.name
-                                            .toUpperCase() ??
-                                        'Unknown',
+                                  Text(
+                                    'Request Details:',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
-                                  if (_healthCheckResult!.realm != null)
+                                  const SizedBox(height: 4),
+                                  _buildDebugInfo('Method', 'POST'),
+                                  _buildDebugInfo(
+                                    'URL',
+                                    '${_baseUrlController.text.trim()}/chat/completions',
+                                  ),
+                                  _buildDebugInfo(
+                                    'Body',
+                                    '{"messages": [{"role": "user", "content": "test"}], "model": "${_modelController.text.trim()}", "max_completion_tokens": 100}',
+                                  ),
+                                  if (_healthCheckResult!.httpStatusCode !=
+                                      null)
                                     _buildDebugInfo(
-                                      'Realm',
-                                      _healthCheckResult!.realm!,
+                                      'Status',
+                                      'HTTP ${_healthCheckResult!.httpStatusCode}',
                                     ),
-                                  if (_healthCheckResult!.loginUrl != null)
+                                  if (ref.read(settingsProvider).authType ==
+                                      AuthType.basic)
                                     _buildDebugInfo(
-                                      'Login URL',
-                                      _healthCheckResult!.loginUrl!,
+                                      'Auth',
+                                      'Basic ${_usernameController.text.isNotEmpty ? _usernameController.text : "(no username)"}',
                                     ),
+                                  if (_healthCheckResult!.requiresAuth) ...[
+                                    const SizedBox(height: 8),
+                                    const Divider(height: 1),
+                                    const SizedBox(height: 8),
+                                    _buildDebugInfo(
+                                      'Detected Auth Type',
+                                      _healthCheckResult!.detectedAuthType?.name
+                                              .toUpperCase() ??
+                                          'Unknown',
+                                    ),
+                                    if (_healthCheckResult!.realm != null)
+                                      _buildDebugInfo(
+                                        'Realm',
+                                        _healthCheckResult!.realm!,
+                                      ),
+                                    if (_healthCheckResult!.loginUrl != null)
+                                      _buildDebugInfo(
+                                        'Login URL',
+                                        _healthCheckResult!.loginUrl!,
+                                      ),
+                                  ],
                                 ],
-                              ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _isHealthCheckRunning
+                                ? null
+                                : _testConnection,
+                            icon: _isHealthCheckRunning
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.health_and_safety),
+                            label: Text(
+                              _isHealthCheckRunning
+                                  ? 'Testing...'
+                                  : 'Test Connection',
                             ),
                           ),
+                          const SizedBox(height: 16),
                         ],
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _isHealthCheckRunning
-                              ? null
-                              : _testConnection,
-                          icon: _isHealthCheckRunning
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.health_and_safety),
-                          label: Text(
-                            _isHealthCheckRunning
-                                ? 'Testing...'
-                                : 'Test Connection',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             ],
-            if (settings.selectedBackend ==
-                ChatBackendType.relagentEngine) ...[
+            if (settings.selectedBackend == ChatBackendType.relagentEngine) ...[
               const SizedBox(height: 32),
               const Text(
                 'Engine Configuration',
@@ -876,194 +860,195 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 'Agentic chat backend (Relagent engine)',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            const SizedBox(height: 16),
-            Autocomplete<String>(
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                final engineUrlSuggestions = settings.engineUrlHistory;
-                final query = textEditingValue.text.toLowerCase();
-                final matches = engineUrlSuggestions.where((String option) {
-                  final display = option.isEmpty ? '(same origin)' : option;
-                  return display.toLowerCase().contains(query);
-                }).toList();
-                final nonMatches = engineUrlSuggestions.where((String option) {
-                  final display = option.isEmpty ? '(same origin)' : option;
-                  return !display.toLowerCase().contains(query);
-                }).toList();
-                return [...matches, ...nonMatches];
-              },
-              optionsViewBuilder: (context, onSelected, options) {
-                return Align(
-                  alignment: Alignment.topLeft,
-                  child: Material(
-                    elevation: 4,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 200),
-                      child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        shrinkWrap: true,
-                        itemCount: options.length,
-                        itemBuilder: (context, index) {
-                          final option = options.elementAt(index);
-                          return ListTile(
-                            title: Text(
-                              option.isEmpty ? '(same origin)' : option,
-                              style: option.isEmpty
-                                  ? const TextStyle(
-                                      fontStyle: FontStyle.italic,
-                                    )
-                                  : null,
-                            ),
-                            onTap: () => onSelected(option),
-                          );
-                        },
+              const SizedBox(height: 16),
+              _AutocompleteWithFocusLoss<String>(
+                key: ValueKey('engine-url-${settings.selectedBackend}'),
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  return settings.engineUrlHistory;
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          itemBuilder: (context, index) {
+                            final option = options.elementAt(index);
+                            return ListTile(
+                              title: Text(
+                                option.isEmpty ? '(same origin)' : option,
+                                style: option.isEmpty
+                                    ? const TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                      )
+                                    : null,
+                              ),
+                              onTap: () => onSelected(option),
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
-              onSelected: (String selection) {
-                _engineUrlController.text = selection;
-              },
-              fieldViewBuilder: (
-                BuildContext context,
-                TextEditingController fieldTextEditingController,
-                FocusNode fieldFocusNode,
-                VoidCallback onFieldSubmitted,
-              ) {
-                fieldTextEditingController.text = _engineUrlController.text;
-                fieldTextEditingController.addListener(() {
-                  _engineUrlController.text = fieldTextEditingController.text;
-                });
-                return TextFormField(
-                  controller: fieldTextEditingController,
-                  focusNode: fieldFocusNode,
-                  decoration: InputDecoration(
-                    labelText: 'Engine URL',
-                    hintText: kIsWeb
-                        ? '(empty = same origin)'
-                        : 'http://localhost:8000',
-                    border: const OutlineInputBorder(),
-                    helperText: kIsWeb
-                        ? 'Leave empty to use the current origin'
-                        : 'Relagent engine base URL',
-                  ),
-                  keyboardType: TextInputType.url,
-                  textInputAction: TextInputAction.next,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      if (kIsWeb) return null;
-                      return 'Please enter an engine URL';
-                    }
-                    if (!value.startsWith('http://') &&
-                        !value.startsWith('https://')) {
-                      return 'URL must start with http:// or https://';
-                    }
-                    return null;
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Basic Authentication'),
-              subtitle: const Text('Enable HTTP Basic Auth'),
-              value: _engineBasicAuthEnabled,
-              onChanged: (bool value) {
-                setState(() {
-                  _engineBasicAuthEnabled = value;
-                });
-              },
-              contentPadding: EdgeInsets.zero,
-            ),
-            if (_engineBasicAuthEnabled) ...[
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _engineUsernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Username',
-                  border: OutlineInputBorder(),
-                ),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _enginePasswordController,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureEnginePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscureEnginePassword = !_obscureEnginePassword;
+                  );
+                },
+                onSelected: (String selection) {
+                  _engineUrlController.text = selection;
+                },
+                fieldViewBuilder:
+                    (
+                      BuildContext context,
+                      TextEditingController fieldTextEditingController,
+                      FocusNode fieldFocusNode,
+                      VoidCallback onFieldSubmitted,
+                    ) {
+                      fieldTextEditingController.text =
+                          _engineUrlController.text;
+                      fieldTextEditingController.addListener(() {
+                        _engineUrlController.text =
+                            fieldTextEditingController.text;
                       });
+                      return TextFormField(
+                        controller: fieldTextEditingController,
+                        focusNode: fieldFocusNode,
+                        decoration: InputDecoration(
+                          labelText: 'Engine URL',
+                          hintText: kIsWeb
+                              ? '(empty = same origin)'
+                              : 'http://localhost:8000',
+                          border: const OutlineInputBorder(),
+                          helperText: kIsWeb
+                              ? 'Leave empty to use the current origin'
+                              : 'Relagent engine base URL',
+                        ),
+                        keyboardType: TextInputType.url,
+                        textInputAction: TextInputAction.next,
+                        onEditingComplete: () {
+                          onFieldSubmitted();
+                          FocusScope.of(context).nextFocus();
+                        },
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            if (kIsWeb) return null;
+                            return 'Please enter an engine URL';
+                          }
+                          if (!value.startsWith('http://') &&
+                              !value.startsWith('https://')) {
+                            return 'URL must start with http:// or https://';
+                          }
+                          return null;
+                        },
+                      );
                     },
-                  ),
-                ),
-                obscureText: _obscureEnginePassword,
-                textInputAction: TextInputAction.done,
               ),
-            ],
-            if (_engineHealthCheckResult != null) ...[
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _engineHealthCheckResult!.isSuccess
-                      ? Colors.green.withValues(alpha: 0.1)
-                      : Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _engineHealthCheckResult!.isSuccess
-                        ? Colors.green
-                        : Colors.red,
+              SwitchListTile(
+                title: const Text('Basic Authentication'),
+                subtitle: const Text('Enable HTTP Basic Auth'),
+                value: _engineBasicAuthEnabled,
+                onChanged: (bool value) {
+                  setState(() {
+                    _engineBasicAuthEnabled = value;
+                  });
+                },
+                contentPadding: EdgeInsets.zero,
+              ),
+              if (_engineBasicAuthEnabled) ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _engineUsernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    border: OutlineInputBorder(),
                   ),
+                  textInputAction: TextInputAction.next,
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _engineHealthCheckResult!.isSuccess
-                          ? Icons.check_circle
-                          : Icons.error,
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _enginePasswordController,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureEnginePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureEnginePassword = !_obscureEnginePassword;
+                        });
+                      },
+                    ),
+                  ),
+                  obscureText: _obscureEnginePassword,
+                  textInputAction: TextInputAction.done,
+                ),
+              ],
+              if (_engineHealthCheckResult != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _engineHealthCheckResult!.isSuccess
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
                       color: _engineHealthCheckResult!.isSuccess
                           ? Colors.green
                           : Colors.red,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _engineHealthCheckResult!.message,
-                        style: TextStyle(
-                          color: _engineHealthCheckResult!.isSuccess
-                              ? Colors.green
-                              : Colors.red,
-                          fontWeight: FontWeight.bold,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _engineHealthCheckResult!.isSuccess
+                            ? Icons.check_circle
+                            : Icons.error,
+                        color: _engineHealthCheckResult!.isSuccess
+                            ? Colors.green
+                            : Colors.red,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _engineHealthCheckResult!.message,
+                          style: TextStyle(
+                            color: _engineHealthCheckResult!.isSuccess
+                                ? Colors.green
+                                : Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _isEngineHealthCheckRunning
+                    ? null
+                    : _testEngineConnection,
+                icon: _isEngineHealthCheckRunning
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.health_and_safety),
+                label: Text(
+                  _isEngineHealthCheckRunning
+                      ? 'Testing...'
+                      : 'Test Connection',
                 ),
               ),
-            ],
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed:
-                  _isEngineHealthCheckRunning ? null : _testEngineConnection,
-              icon: _isEngineHealthCheckRunning
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.health_and_safety),
-              label: Text(
-                _isEngineHealthCheckRunning ? 'Testing...' : 'Test Connection',
-              ),
-            ),
             ],
             if (ref.read(voiceCapabilitiesProvider).isAsrAvailable ||
                 ref.read(voiceCapabilitiesProvider).isTtsAvailable) ...[
@@ -1168,6 +1153,119 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AutocompleteWithFocusLoss<T extends Object> extends StatefulWidget {
+  final Iterable<T> Function(TextEditingValue) optionsBuilder;
+  final void Function(T) onSelected;
+  final Widget Function(
+    BuildContext,
+    TextEditingController,
+    FocusNode,
+    VoidCallback,
+  )
+  fieldViewBuilder;
+  final Widget Function(BuildContext, void Function(T), Iterable<T>)?
+  optionsViewBuilder;
+
+  const _AutocompleteWithFocusLoss({
+    super.key,
+    required this.optionsBuilder,
+    required this.onSelected,
+    required this.fieldViewBuilder,
+    this.optionsViewBuilder,
+  });
+
+  @override
+  State<_AutocompleteWithFocusLoss<T>> createState() =>
+      _AutocompleteWithFocusLossState<T>();
+}
+
+class _AutocompleteWithFocusLossState<T extends Object>
+    extends State<_AutocompleteWithFocusLoss<T>> {
+  bool _showOptions = false;
+  FocusNode? _internalFocusNode;
+
+  @override
+  void dispose() {
+    _internalFocusNode?.removeListener(_onFocusChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    final hasFocus = _internalFocusNode?.hasFocus ?? false;
+    if (hasFocus != _showOptions) {
+      setState(() {
+        _showOptions = hasFocus;
+      });
+    }
+  }
+
+  void _onSelected(T value) {
+    setState(() {
+      _showOptions = false;
+    });
+    widget.onSelected(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RawAutocomplete<T>(
+      optionsBuilder: widget.optionsBuilder,
+      onSelected: _onSelected,
+      fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+        if (_internalFocusNode != focusNode) {
+          _internalFocusNode?.removeListener(_onFocusChange);
+          _internalFocusNode = focusNode;
+          focusNode.addListener(_onFocusChange);
+        }
+        return GestureDetector(
+          onTap: () {
+            if (!_showOptions) {
+              setState(() {
+                _showOptions = true;
+              });
+            }
+          },
+          child: widget.fieldViewBuilder(
+            context,
+            controller,
+            focusNode,
+            onSubmitted,
+          ),
+        );
+      },
+      optionsViewBuilder: widget.optionsViewBuilder != null
+          ? (context, onSelected, options) {
+              if (!_showOptions) return const SizedBox.shrink();
+              return widget.optionsViewBuilder!(context, onSelected, options);
+            }
+          : (context, onSelected, options) {
+              if (!_showOptions) return const SizedBox.shrink();
+              return Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 4,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      itemBuilder: (context, index) {
+                        final option = options.elementAt(index);
+                        return ListTile(
+                          title: Text(option.toString()),
+                          onTap: () => onSelected(option),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              );
+            },
     );
   }
 }

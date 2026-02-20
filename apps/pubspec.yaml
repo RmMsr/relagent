@@ -1,7 +1,7 @@
 name: relagent
 description: "Relatable Agentic Minion - Privacy focused and open AI agent"
 publish_to: "none"
-version: 0.1.10
+version: 0.1.10-pre
 
 environment:
   sdk: ^3.9.2
@@ -28,6 +28,7 @@ dependencies:
   package_info_plus: ^9.0.0
   connectivity_plus: ^7.0.0
   flutter_secure_storage: ^9.2.4
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

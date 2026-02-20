@@ -1,8 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '/models/settings.dart';
+import 'agentic_chat_provider.dart';
 import 'credentials_manager.dart';
+import 'engine_health_check_provider.dart';
 import '/services/secure_credential_service.dart';
+import 'sessions_provider.dart';
 import 'settings_history_manager.dart';
 import 'settings_persistence_manager.dart';
 
@@ -152,7 +155,24 @@ class SettingsNotifier extends Notifier<Settings> {
 
   Future<bool> updateEngineBaseUrl(String url) async {
     if (url != state.engineBaseUrl) {
-      await clearEngineCredentials();
+      // Clear stored credentials for the old URL
+      await _credentialsManager.clearEngineCredentials(state.engineBaseUrl);
+
+      // Reset engine-related state
+      state = state.copyWith(
+        engineAuthType: AuthType.none,
+        engineUsername: null,
+        agenticSessionId: null,
+      );
+
+      // Clear persisted SSE last event ID
+      final prefs = ref.read(sharedPreferencesProvider);
+      await prefs.remove('sse_last_event_id');
+
+      // Clear runtime state in dependent providers
+      ref.read(engineHealthCheckProvider.notifier).clearResult();
+      ref.read(sessionsProvider.notifier).clearSessions();
+      ref.read(agenticChatProvider.notifier).clearMessages();
     }
 
     state = state.copyWith(engineBaseUrl: url);
