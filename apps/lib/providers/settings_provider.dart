@@ -54,11 +54,16 @@ class SettingsNotifier extends Notifier<Settings> {
   }
 
   Future<bool> updateSimpleChatBaseUrl(String url) async {
-    if (url != state.simpleChatBaseUrl) {
+    final urlChanged = url != state.simpleChatBaseUrl;
+    if (urlChanged) {
       await _credentialsManager.clearCredentials(state.simpleChatBaseUrl);
+      await _credentialsManager.clearChatApiKey(state.simpleChatBaseUrl);
     }
 
-    state = state.copyWith(simpleChatBaseUrl: url);
+    state = state.copyWith(
+      simpleChatBaseUrl: url,
+      simpleChatHasApiKey: urlChanged ? false : state.simpleChatHasApiKey,
+    );
     _updateHistory(url, state.simpleChatModel);
     return await _persistenceManager.saveSettings(state);
   }
@@ -163,6 +168,7 @@ class SettingsNotifier extends Notifier<Settings> {
         engineAuthType: AuthType.none,
         engineUsername: null,
         agenticSessionId: null,
+        engineHasApiKey: false,
       );
 
       // Clear persisted SSE last event ID
@@ -214,6 +220,48 @@ class SettingsNotifier extends Notifier<Settings> {
   Future<void> clearEngineCredentials() async {
     await _credentialsManager.clearEngineCredentials(state.engineBaseUrl);
     state = state.copyWith(engineAuthType: AuthType.none, engineUsername: null);
+    await _persistenceManager.saveSettings(state);
+  }
+
+  Future<void> setEngineApiKey(String apiKey) async {
+    await _credentialsManager.storeEngineApiKey(state.engineBaseUrl, apiKey);
+    state = state.copyWith(engineHasApiKey: true);
+    await _persistenceManager.saveSettings(state);
+  }
+
+  Future<String?> getEngineApiKey() async {
+    final key = await _credentialsManager.getEngineApiKey(state.engineBaseUrl);
+    if (key == null && state.engineHasApiKey) {
+      state = state.copyWith(engineHasApiKey: false);
+      await _persistenceManager.saveSettings(state);
+    }
+    return key;
+  }
+
+  Future<void> clearEngineApiKey() async {
+    await _credentialsManager.clearEngineApiKey(state.engineBaseUrl);
+    state = state.copyWith(engineHasApiKey: false);
+    await _persistenceManager.saveSettings(state);
+  }
+
+  Future<void> setChatApiKey(String apiKey) async {
+    await _credentialsManager.storeChatApiKey(state.simpleChatBaseUrl, apiKey);
+    state = state.copyWith(simpleChatHasApiKey: true);
+    await _persistenceManager.saveSettings(state);
+  }
+
+  Future<String?> getChatApiKey() async {
+    final key = await _credentialsManager.getChatApiKey(state.simpleChatBaseUrl);
+    if (key == null && state.simpleChatHasApiKey) {
+      state = state.copyWith(simpleChatHasApiKey: false);
+      await _persistenceManager.saveSettings(state);
+    }
+    return key;
+  }
+
+  Future<void> clearChatApiKey() async {
+    await _credentialsManager.clearChatApiKey(state.simpleChatBaseUrl);
+    state = state.copyWith(simpleChatHasApiKey: false);
     await _persistenceManager.saveSettings(state);
   }
 

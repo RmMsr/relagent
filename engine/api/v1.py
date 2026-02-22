@@ -4,7 +4,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sse_starlette import EventSourceResponse
 
-from engine.api.helpers import dependency_chat_service, dependency_event_store
+from engine.api.helpers import (
+    dependency_chat_service,
+    dependency_event_store,
+    require_api_key,
+)
+from engine.api.models import StatusResponse
+from engine.constants import SERVICE_NAME, VERSION
 from engine.domain.exceptions import ChatContextNotFound, SessionNotFound
 from engine.domain.models import (
     ChatRequest,
@@ -25,11 +31,20 @@ from engine.logging import get_logger
 
 logger = get_logger(__name__)
 
-api_router = APIRouter()
+api_router = APIRouter(tags=["api"], dependencies=[Depends(require_api_key)])
 
 
 ChatServiceDepends = Annotated[ChatService, Depends(dependency_chat_service)]
 EventStoreDepends = Annotated[EventStore, Depends(dependency_event_store)]
+
+
+@api_router.get("/status")
+async def status() -> StatusResponse:
+    return StatusResponse(
+        service_name=SERVICE_NAME,
+        version=VERSION,
+        status="ok",
+    )
 
 
 @api_router.post("/messages")

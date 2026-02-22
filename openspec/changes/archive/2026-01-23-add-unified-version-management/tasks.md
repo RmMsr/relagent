@@ -12,9 +12,9 @@
 - [x] Add `--bump` flag to script for `major|minor|patch` increments
 - [x] Test script with various version formats
 
-## 2. Engine /status endpoint
+## 2. Engine /health endpoint
 
-- [x] Add `/status` endpoint to `engine/run.py`
+- [x] Add `/health` endpoint to `engine/run.py`
 - [x] Return JSON with name, version, and status
 - [x] Read version from package metadata using `importlib.metadata`
 - [ ] Test endpoint returns correct version (requires running server)

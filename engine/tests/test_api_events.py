@@ -3,7 +3,8 @@
 import json
 import uuid
 from datetime import datetime
-from unittest.mock import MagicMock
+from typing import Generator
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -21,6 +22,7 @@ from engine.domain.ports.events import (
     SessionUpdatedEvent,
 )
 from engine.domain.services import ChatService
+from engine.tests.utils import assert_required_authentication
 
 
 class TestEventConversion:
@@ -70,8 +72,6 @@ class TestEventConversion:
 
 
 class TestSSEHttpEndpoint:
-    """HTTP-level tests for SSE endpoint."""
-
     @pytest.fixture
     def event_store(self) -> MemoryEventStoreAdapter:
         return MemoryEventStoreAdapter()
@@ -83,18 +83,26 @@ class TestSSEHttpEndpoint:
     @pytest.fixture
     def app(
         self, mock_chat_service: MagicMock, event_store: MemoryEventStoreAdapter
-    ) -> FastAPI:
+    ) -> Generator[FastAPI, None, None]:
         test_app = FastAPI()
         test_app.include_router(api_router, prefix="/api/v1")
         test_app.dependency_overrides[dependency_chat_service] = lambda: (
             mock_chat_service
         )
         test_app.dependency_overrides[dependency_event_store] = lambda: event_store
-        return test_app
+        with patch("engine.api.helpers.SECRET_ACCESS_KEY", "test_api_key"):
+            yield test_app
 
     @pytest.fixture
     def client(self, app: FastAPI) -> TestClient:
-        return TestClient(app, raise_server_exceptions=False)
+        return TestClient(
+            app, raise_server_exceptions=False, headers={"X-API-Key": "test_api_key"}
+        )
+
+    def test_requires_authentication(self, app: FastAPI):
+        assert_required_authentication(
+            client=TestClient(app), endpoint="/api/v1/events", method="GET"
+        )
 
     def test_endpoint_returns_event_stream_content_type(
         self, client: TestClient, event_store: MemoryEventStoreAdapter
@@ -149,8 +157,12 @@ class TestSSEHttpEndpoint:
         session_id = uuid.UUID("151a0cfb-74bb-4978-8881-3d15e4017a5e")
         event_store.publish(SessionUpdatedEvent(session_id=session_id))
 
-        client1 = TestClient(app, raise_server_exceptions=False)
-        client2 = TestClient(app, raise_server_exceptions=False)
+        client1 = TestClient(
+            app, raise_server_exceptions=False, headers={"X-API-Key": "test_api_key"}
+        )
+        client2 = TestClient(
+            app, raise_server_exceptions=False, headers={"X-API-Key": "test_api_key"}
+        )
 
         def get_first_id(client: TestClient) -> str:
             with client.stream("GET", "/api/v1/events", timeout=0.1) as response:

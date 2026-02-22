@@ -18,6 +18,7 @@ enum VoiceMode {
 enum AuthType {
   none, // No authentication required
   basic, // HTTP Basic authentication
+  apiKey, // API key required (detection signal only, not persisted as auth type)
 }
 
 enum ChatBackendType {
@@ -134,6 +135,10 @@ class Settings {
   // Selected chat backend type
   final ChatBackendType selectedBackend;
 
+  // API key indicator fields (actual keys stored in secure storage)
+  final bool engineHasApiKey;
+  final bool simpleChatHasApiKey;
+
   const Settings({
     required this.simpleChatBaseUrl,
     required this.simpleChatModel,
@@ -151,6 +156,8 @@ class Settings {
     this.agenticSessionId,
     this.engineUrlHistory = const [],
     required this.selectedBackend,
+    this.engineHasApiKey = false,
+    this.simpleChatHasApiKey = false,
   });
 
   factory Settings.defaults() {
@@ -169,6 +176,8 @@ class Settings {
       engineUsername: null,
       agenticSessionId: null,
       selectedBackend: ChatBackendType.relagentEngine,
+      engineHasApiKey: false,
+      simpleChatHasApiKey: false,
     );
   }
 
@@ -189,6 +198,8 @@ class Settings {
     Object? agenticSessionId = _unset,
     List<String>? engineUrlHistory,
     ChatBackendType? selectedBackend,
+    bool? engineHasApiKey,
+    bool? simpleChatHasApiKey,
   }) {
     return Settings(
       simpleChatBaseUrl: simpleChatBaseUrl ?? this.simpleChatBaseUrl,
@@ -210,6 +221,8 @@ class Settings {
           : agenticSessionId as String?,
       engineUrlHistory: engineUrlHistory ?? this.engineUrlHistory,
       selectedBackend: selectedBackend ?? this.selectedBackend,
+      engineHasApiKey: engineHasApiKey ?? this.engineHasApiKey,
+      simpleChatHasApiKey: simpleChatHasApiKey ?? this.simpleChatHasApiKey,
     );
   }
 
@@ -238,6 +251,8 @@ class Settings {
       'agenticSessionId': agenticSessionId,
       'engineUrlHistory': engineUrlHistory,
       'selectedBackend': selectedBackend.name,
+      'engineHasApiKey': engineHasApiKey,
+      'simpleChatHasApiKey': simpleChatHasApiKey,
     };
   }
 
@@ -338,6 +353,8 @@ class Settings {
               ?.cast<String>() ??
           const [],
       selectedBackend: selectedBackend,
+      engineHasApiKey: (json['engineHasApiKey'] as bool?) ?? false,
+      simpleChatHasApiKey: (json['simpleChatHasApiKey'] as bool?) ?? false,
     );
   }
 
@@ -360,7 +377,9 @@ class Settings {
         other.engineUsername == engineUsername &&
         other.agenticSessionId == agenticSessionId &&
         _listEquals(other.engineUrlHistory, engineUrlHistory) &&
-        other.selectedBackend == selectedBackend;
+        other.selectedBackend == selectedBackend &&
+        other.engineHasApiKey == engineHasApiKey &&
+        other.simpleChatHasApiKey == simpleChatHasApiKey;
   }
 
   @override
@@ -381,6 +400,8 @@ class Settings {
     agenticSessionId,
     Object.hashAll(engineUrlHistory),
     selectedBackend,
+    engineHasApiKey,
+    simpleChatHasApiKey,
   );
 
   // Helper for list equality

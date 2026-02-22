@@ -73,6 +73,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
     try {
       final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
 
       final messages = await getMessageHistory(
         baseUrl: settings.engineBaseUrl,
@@ -81,6 +82,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         authType: settings.engineAuthType,
         username: settings.engineUsername,
         password: password,
+        apiKey: apiKey,
       );
 
       if (fromId != null && fromId > 0) {
@@ -136,6 +138,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
     try {
       final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
 
       final response = await sendAgenticMessage(
         baseUrl: settings.engineBaseUrl,
@@ -144,6 +147,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         authType: settings.engineAuthType,
         username: settings.engineUsername,
         password: password,
+        apiKey: apiKey,
       );
 
       // Store session_id from response if we got a new one
@@ -224,6 +228,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
     try {
       final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
 
       final sessionInfo = await getSessionInfo(
         baseUrl: settings.engineBaseUrl,
@@ -231,6 +236,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         authType: settings.engineAuthType,
         username: settings.engineUsername,
         password: password,
+        apiKey: apiKey,
       );
 
       state = state.copyWith(sessionTitle: sessionInfo.title);

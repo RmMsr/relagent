@@ -12,6 +12,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.semconv.attributes import service_attributes
 from opentelemetry.trace import Span
 
+from engine.constants import SERVICE_NAME
 from engine.logging import get_logger
 from engine.settings import get_setting
 
@@ -27,10 +28,7 @@ def init_global_instrumentation():
         logger.debug("Instrumentation already initialized, skipping")
         return
 
-    service_name = get_setting(
-        "instrumentation", "service_name", default="relagent-engine"
-    )
-
+    service_name = SERVICE_NAME
     resource = Resource.create(
         {
             service_attributes.SERVICE_NAME: service_name,
@@ -96,5 +94,5 @@ def init_app_instrumentation(app: FastAPI):
             "content-type",
         ],
         http_capture_headers_server_response=["content-type"],
-        excluded_urls="/status",
+        excluded_urls="/health",
     )

@@ -10,7 +10,12 @@ logger = get_logger(__name__)
 
 
 def get_setting(
-    section: str, name: str, *, default: Any = None, write_log: bool = True
+    section: str,
+    name: str,
+    *,
+    default: Any = None,
+    write_log: bool = True,
+    obscure_value: bool = False,
 ) -> Any:
     value: Any = default
     try:
@@ -23,12 +28,22 @@ def get_setting(
         value = env
 
     if write_log:
-        logger.debug("Setting '%s.%s' is %s", section, name, repr(value))
+        logger.debug(
+            "Setting '%s.%s' is %s",
+            section,
+            name,
+            "<hidden>" if value and obscure_value else repr(value),
+        )
     return value
 
 
 def get_setting_int(
-    section: str, name: str, *, default: int = 0, write_log: bool = True
+    section: str,
+    name: str,
+    *,
+    default: int = 0,
+    write_log: bool = True,
+    obscure_value: bool = False,
 ) -> int:
     value: int = default
     try:
@@ -44,12 +59,22 @@ def get_setting_int(
         pass
 
     if write_log:
-        logger.debug("Setting '%s.%s' is %s", section, name, repr(value))
+        logger.debug(
+            "Setting '%s.%s' is %s",
+            section,
+            name,
+            "<hidden>" if value and obscure_value else repr(value),
+        )
     return value
 
 
 def get_setting_bool(
-    section: str, name: str, *, default: bool = False, write_log: bool = True
+    section: str,
+    name: str,
+    *,
+    default: bool = False,
+    write_log: bool = True,
+    obscure_value: bool = False,
 ) -> bool:
     value: bool = default
     try:
@@ -65,7 +90,12 @@ def get_setting_bool(
         pass
 
     if write_log:
-        logger.debug("Setting '%s.%s' is %s", section, name, repr(value))
+        logger.debug(
+            "Setting '%s.%s' is %s",
+            section,
+            name,
+            "<hidden>" if value and obscure_value else repr(value),
+        )
     return value
 
 
@@ -88,6 +118,7 @@ def reset_env():
         "INSTRUMENTATION_GEN_AI_COLLECTOR_ENABLED",
         "LOG_LEVEL",
         "PWD",
+        "SERVER_SECRET_ACCESS_KEY",
     ]
 
     for k in keep:
@@ -100,10 +131,20 @@ def reset_env():
         os.environ[k] = v
 
     _env_reset_done = True
+
+    from engine.logging import init_logging
+
+    init_logging()
     logger.debug("Environment reset to: %s", sorted(os.environ.keys()))
 
 
 _config_parser: ConfigParser | None = None
+
+
+def override_config_parser(parser: ConfigParser) -> None:
+    """Replace the config parser. Used by tests to prevent reading settings.ini."""
+    global _config_parser
+    _config_parser = parser
 
 
 def _get_config_parser() -> ConfigParser:
@@ -114,7 +155,7 @@ def _get_config_parser() -> ConfigParser:
     config_parser = configparser.ConfigParser()
 
     settings_file: Path = (
-        Path("~") / ".local" / "share" / "relagent" / "settings.ini"
+        Path("~") / ".local" / "share" / "org.venkado.relagent-engine" / "settings.ini"
     ).expanduser()
 
     if settings_file.exists():

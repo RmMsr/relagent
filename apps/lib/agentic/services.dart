@@ -88,12 +88,17 @@ Map<String, String> _buildHeaders({
   required AuthType authType,
   String? username,
   String? password,
+  String? apiKey,
 }) {
   final headers = <String, String>{'content-type': 'application/json'};
 
   if (authType == AuthType.basic && username != null && password != null) {
     final credentials = base64Encode(utf8.encode('$username:$password'));
     headers['authorization'] = 'Basic $credentials';
+  }
+
+  if (apiKey != null) {
+    headers['x-api-key'] = apiKey;
   }
 
   return headers;
@@ -106,6 +111,7 @@ Future<SessionInfo> getSessionInfo({
   AuthType authType = AuthType.none,
   String? username,
   String? password,
+  String? apiKey,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse('$normalizedUrl/api/v1/sessions/$sessionId');
@@ -114,6 +120,7 @@ Future<SessionInfo> getSessionInfo({
     authType: authType,
     username: username,
     password: password,
+    apiKey: apiKey,
   );
 
   final http.Response response;
@@ -193,6 +200,7 @@ Future<List<AgenticMessage>> getMessageHistory({
   AuthType authType = AuthType.none,
   String? username,
   String? password,
+  String? apiKey,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   var uriString = '$normalizedUrl/api/v1/messages/$sessionId';
@@ -205,6 +213,7 @@ Future<List<AgenticMessage>> getMessageHistory({
     authType: authType,
     username: username,
     password: password,
+    apiKey: apiKey,
   );
 
   final http.Response response;
@@ -293,6 +302,7 @@ Future<AgenticMessage> sendAgenticMessage({
   AuthType authType = AuthType.none,
   String? username,
   String? password,
+  String? apiKey,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse('$normalizedUrl/api/v1/messages');
@@ -301,6 +311,7 @@ Future<AgenticMessage> sendAgenticMessage({
     authType: authType,
     username: username,
     password: password,
+    apiKey: apiKey,
   );
 
   // Build ChatRequest per OpenAPI schema
@@ -404,6 +415,7 @@ Future<List<SessionInfo>> getSessionsList({
   AuthType authType = AuthType.none,
   String? username,
   String? password,
+  String? apiKey,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse('$normalizedUrl/api/v1/sessions?limit=$limit');
@@ -412,6 +424,7 @@ Future<List<SessionInfo>> getSessionsList({
     authType: authType,
     username: username,
     password: password,
+    apiKey: apiKey,
   );
 
   final http.Response response;
@@ -481,6 +494,7 @@ Future<void> deleteSessionApi({
   AuthType authType = AuthType.none,
   String? username,
   String? password,
+  String? apiKey,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse('$normalizedUrl/api/v1/sessions/$sessionId');
@@ -489,6 +503,7 @@ Future<void> deleteSessionApi({
     authType: authType,
     username: username,
     password: password,
+    apiKey: apiKey,
   );
 
   final http.Response response;

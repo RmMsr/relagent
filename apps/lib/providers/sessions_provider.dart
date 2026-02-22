@@ -58,6 +58,7 @@ class SessionsNotifier extends Notifier<SessionsState> {
 
     try {
       final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
 
       final sessions = await getSessionsList(
         baseUrl: settings.engineBaseUrl,
@@ -65,6 +66,7 @@ class SessionsNotifier extends Notifier<SessionsState> {
         authType: settings.engineAuthType,
         username: settings.engineUsername,
         password: password,
+        apiKey: apiKey,
       );
 
       final activeSessionId = settings.agenticSessionId;
@@ -94,6 +96,7 @@ class SessionsNotifier extends Notifier<SessionsState> {
 
     try {
       final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
 
       await deleteSessionApi(
         baseUrl: settings.engineBaseUrl,
@@ -101,6 +104,7 @@ class SessionsNotifier extends Notifier<SessionsState> {
         authType: settings.engineAuthType,
         username: settings.engineUsername,
         password: password,
+        apiKey: apiKey,
       );
 
       // Remove from local list

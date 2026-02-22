@@ -57,12 +57,14 @@ class EngineHealthCheckNotifier extends Notifier<EngineHealthCheckState> {
     try {
       final settingsNotifier = ref.read(settingsProvider.notifier);
       final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
 
       final result = await _service.checkStatus(
         baseUrl: settings.engineBaseUrl,
         authType: settings.engineAuthType,
         username: settings.engineUsername,
         password: password,
+        apiKey: apiKey,
       );
 
       state = EngineHealthCheckState(

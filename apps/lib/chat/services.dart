@@ -37,6 +37,7 @@ Future<ChatMessage> getChatResponse(
   AuthType authType = AuthType.none,
   String? basicAuthUsername,
   String? basicAuthPassword,
+  String? apiKey,
 }) async {
   final uri = Uri.parse('$baseUrl/chat/completions');
   var messages = <dynamic>[];
@@ -61,10 +62,12 @@ Future<ChatMessage> getChatResponse(
   final body = {'messages': messages, 'model': model};
 
   // Build headers with authentication
+  // API key (Bearer) takes precedence over Basic Auth
   final headers = <String, String>{'content-type': 'application/json'};
 
-  // Add HTTP Basic Auth header if configured
-  if (authType == AuthType.basic &&
+  if (apiKey != null) {
+    headers['authorization'] = 'Bearer $apiKey';
+  } else if (authType == AuthType.basic &&
       basicAuthUsername != null &&
       basicAuthPassword != null) {
     final credentials = base64Encode(

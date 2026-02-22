@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '/chat/auth_detection.dart';
 import '/models/settings.dart';
 import '/utils/logger.dart';
 
@@ -29,6 +30,7 @@ class EngineHealthResult {
   final DateTime timestamp;
   final String? engineName;
   final String? engineVersion;
+  final AuthType? detectedAuthType;
 
   EngineHealthResult({
     required this.status,
@@ -36,6 +38,7 @@ class EngineHealthResult {
     this.httpStatusCode,
     this.engineName,
     this.engineVersion,
+    this.detectedAuthType,
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
 
@@ -53,11 +56,20 @@ class EngineHealthResult {
     );
   }
 
-  factory EngineHealthResult.authRequired({int? httpStatusCode}) {
+  factory EngineHealthResult.authRequired({
+    int? httpStatusCode,
+    AuthType? detectedAuthType,
+  }) {
+    final detail = switch (detectedAuthType) {
+      AuthType.apiKey => 'API key required or invalid (X-API-Key header)',
+      AuthType.basic => 'Basic Auth required',
+      _ => 'credentials required',
+    };
     return EngineHealthResult(
       status: EngineHealthStatus.authRequired,
-      message: 'Engine requires authentication',
+      message: 'Engine requires authentication: $detail',
       httpStatusCode: httpStatusCode,
+      detectedAuthType: detectedAuthType,
     );
   }
 
@@ -103,16 +115,21 @@ class EngineHealthCheckService {
     AuthType authType = AuthType.none,
     String? username,
     String? password,
+    String? apiKey,
     Duration timeout = _defaultTimeout,
   }) async {
     final normalizedUrl = _normalizeBaseUrl(baseUrl);
-    final uri = Uri.parse('$normalizedUrl/status');
+    final uri = Uri.parse('$normalizedUrl/api/v1/status');
 
     final headers = <String, String>{'content-type': 'application/json'};
 
     if (authType == AuthType.basic && username != null && password != null) {
       final credentials = base64Encode(utf8.encode('$username:$password'));
       headers['authorization'] = 'Basic $credentials';
+    }
+
+    if (apiKey != null) {
+      headers['x-api-key'] = apiKey;
     }
 
     Logger.debug('Engine health check: GET $uri');
@@ -139,7 +156,7 @@ class EngineHealthCheckService {
       String? engineVersion;
       try {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        engineName = json['name'] as String?;
+        engineName = json['service_name'] as String?;
         engineVersion = json['version'] as String?;
       } catch (_) {
         // Ignore parse errors, version info is optional
@@ -152,9 +169,15 @@ class EngineHealthCheckService {
     }
 
     if (response.statusCode == 401) {
-      return EngineHealthResult.authRequired(
-        httpStatusCode: response.statusCode,
-      );
+      final detection = detectAuthType(response);
+      if (detection.authType == AuthType.basic ||
+          detection.authType == AuthType.apiKey) {
+        return EngineHealthResult.authRequired(
+          httpStatusCode: response.statusCode,
+          detectedAuthType: detection.authType,
+        );
+      }
+      return EngineHealthResult.authFailed(httpStatusCode: response.statusCode);
     }
 
     if (response.statusCode == 403) {
@@ -167,8 +190,6 @@ class EngineHealthCheckService {
       );
     }
 
-    return EngineHealthResult.connectionFailed(
-      'HTTP ${response.statusCode}',
-    );
+    return EngineHealthResult.connectionFailed('HTTP ${response.statusCode}');
   }
 }

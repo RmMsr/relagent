@@ -1,3 +1,4 @@
+import configparser
 import uuid
 from datetime import datetime, timezone
 from uuid import UUID
@@ -20,6 +21,13 @@ from engine.domain.ports.events import EventStore
 from engine.domain.ports.persistence import Persistence
 from engine.domain.services import ChatService
 
+# Inject an empty config parser before any engine module reads settings.ini.
+# This must happen before importing modules that transitively import
+# engine.constants (which calls get_setting at import time).
+from engine.settings import override_config_parser
+
+override_config_parser(configparser.ConfigParser())
+
 
 @pytest.fixture
 def sample_session_id() -> UUID:
@@ -34,6 +42,15 @@ def sample_session(sample_session_id: UUID) -> SessionInfo:
         created_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
         updated_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
     )
+
+
+@pytest.fixture
+def persisted_session_with_context(
+    sample_session: SessionInfo, sample_context: ChatContext, persistence: Persistence
+):
+    persistence.save_session(sample_session)
+    persistence.save_context(sample_session.session_id, sample_context)
+    return sample_session
 
 
 @pytest.fixture

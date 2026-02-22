@@ -203,6 +203,7 @@ class ChatNotifier extends Notifier<ChatState> {
 
       // Retrieve credentials for authentication
       final password = await settingsNotifier.getPassword();
+      final apiKey = await settingsNotifier.getChatApiKey();
 
       // Get response from chat service
       final response = await getChatResponse(
@@ -213,6 +214,7 @@ class ChatNotifier extends Notifier<ChatState> {
         authType: settings.authType,
         basicAuthUsername: settings.username,
         basicAuthPassword: password,
+        apiKey: apiKey,
       );
 
       // Add assistant response
@@ -406,6 +408,7 @@ class ChatNotifier extends Notifier<ChatState> {
 
       // Retrieve credentials for authentication
       final password = await settingsNotifier.getPassword();
+      final apiKey = await settingsNotifier.getChatApiKey();
 
       // Get response from chat service
       final response = await getChatResponse(
@@ -416,6 +419,7 @@ class ChatNotifier extends Notifier<ChatState> {
         authType: settings.authType,
         basicAuthUsername: settings.username,
         basicAuthPassword: password,
+        apiKey: apiKey,
       );
 
       // Success - clear retry state and pending indicator

@@ -1,38 +1,39 @@
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from engine.api.helpers import check_secret_key
 from engine.constants import VERSION, WEB_DIR
 from engine.logging import get_logger, init_logging
-from engine.settings import get_setting, get_setting_int, reset_env
+from engine.settings import get_setting, get_setting_int
 
 from .instrumentation import init_app_instrumentation, init_global_instrumentation
 from .v1 import api_router
 
 logger = get_logger(__name__)
 
-reset_env()
 init_logging()
 init_global_instrumentation()
+check_secret_key()
 
 app = FastAPI(version=VERSION)
 app.include_router(api_router, prefix="/api/v1")
 init_app_instrumentation(app=app)
 
 
-@app.get("/status")
-async def status() -> dict[str, str]:
-    return {
-        "name": "relagent-engine",
-        "version": VERSION,
-        "status": "ok",
-    }
+@app.get("/health")
+async def health():
+    return "ok"
 
 
 # Serve Relagent web app if build directory exists
 if WEB_DIR.is_dir() and (WEB_DIR / "index.html").exists():
 
-    @app.get("/app/{path:path}")
+    @app.get("/", tags=["web-app"])
+    async def root_page() -> RedirectResponse:
+        return RedirectResponse(url="/app")
+
+    @app.get("/app/{path:path}", tags=["web-app"])
     async def serve_web_app(path: str) -> FileResponse:
         """Serve web app, falling back to index.html for single page routing."""
         file_path = WEB_DIR / path

@@ -239,6 +239,16 @@ void main() {
         expect(await service.getPassword(testUrl), null);
       });
 
+      test('clears api key alongside password', () async {
+        await service.storePassword(testUrl, 'password');
+        await service.storeApiKey(testUrl, 'apikey');
+
+        await service.clearCredentials(testUrl);
+
+        expect(await service.getPassword(testUrl), null);
+        expect(await service.getApiKey(testUrl), null);
+      });
+
       test('does not affect credentials for other URLs', () async {
         const url1 = 'http://example1.com';
         const url2 = 'http://example2.com';
@@ -261,6 +271,81 @@ void main() {
         await service.clearCredentials(testUrl);
 
         expect(await service.getPassword(testUrl), null);
+      });
+    });
+
+    group('API key storage', () {
+      const testUrl = 'http://example.com/api';
+      const testApiKey = 'sk-test-apikey-12345';
+
+      test('stores and retrieves API key', () async {
+        await service.storeApiKey(testUrl, testApiKey);
+        final retrieved = await service.getApiKey(testUrl);
+        expect(retrieved, testApiKey);
+      });
+
+      test('returns null for non-existent API key', () async {
+        final retrieved = await service.getApiKey('http://nonexistent.com');
+        expect(retrieved, null);
+      });
+
+      test('clears API key', () async {
+        await service.storeApiKey(testUrl, testApiKey);
+        await service.clearApiKey(testUrl);
+        final retrieved = await service.getApiKey(testUrl);
+        expect(retrieved, null);
+      });
+
+      test('API key has distinct namespace from password', () async {
+        await service.storePassword(testUrl, 'my-password');
+        await service.storeApiKey(testUrl, testApiKey);
+
+        // Verify each can be retrieved independently
+        expect(await service.getPassword(testUrl), 'my-password');
+        expect(await service.getApiKey(testUrl), testApiKey);
+
+        // Verify distinct storage keys in underlying storage
+        final passwordKey = 'auth_password_$testUrl';
+        final apiKeyKey = 'auth_api_key_$testUrl';
+        expect(passwordKey, isNot(equals(apiKeyKey)));
+        expect(await mockStorage.read(key: passwordKey), 'my-password');
+        expect(await mockStorage.read(key: apiKeyKey), testApiKey);
+      });
+
+      test('scopes API keys by URL', () async {
+        const url1 = 'http://server1.com';
+        const url2 = 'http://server2.com';
+        const key1 = 'key-for-server1';
+        const key2 = 'key-for-server2';
+
+        await service.storeApiKey(url1, key1);
+        await service.storeApiKey(url2, key2);
+
+        expect(await service.getApiKey(url1), key1);
+        expect(await service.getApiKey(url2), key2);
+      });
+
+      test('clearing API key for one URL does not affect another', () async {
+        const url1 = 'http://server1.com';
+        const url2 = 'http://server2.com';
+
+        await service.storeApiKey(url1, 'key1');
+        await service.storeApiKey(url2, 'key2');
+
+        await service.clearApiKey(url1);
+
+        expect(await service.getApiKey(url1), null);
+        expect(await service.getApiKey(url2), 'key2');
+      });
+
+      test('clearing API key does not affect password for same URL', () async {
+        await service.storePassword(testUrl, 'my-password');
+        await service.storeApiKey(testUrl, testApiKey);
+
+        await service.clearApiKey(testUrl);
+
+        expect(await service.getApiKey(testUrl), null);
+        expect(await service.getPassword(testUrl), 'my-password');
       });
     });
 

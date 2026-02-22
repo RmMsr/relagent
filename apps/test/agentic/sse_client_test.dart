@@ -10,9 +10,7 @@ import 'package:relagent/models/settings.dart';
 /// Creates a [MockClient] that captures the request and streams SSE data
 /// from the returned [StreamController].
 ({MockClient client, StreamController<List<int>> controller})
-    _createStreamingMock({
-  void Function(http.BaseRequest request)? onRequest,
-}) {
+_createStreamingMock({void Function(http.BaseRequest request)? onRequest}) {
   final controller = StreamController<List<int>>();
   final client = MockClient.streaming((request, bodyStream) async {
     onRequest?.call(request);
@@ -79,7 +77,7 @@ void main() {
       final mock = _createStreamingMock();
 
       final client = SseClient(
-        baseUrl: 'http://localhost:8000',
+        baseUrl: 'http://localhost:8000/',
         authType: AuthType.none,
         httpClient: mock.client,
       );
@@ -89,12 +87,14 @@ void main() {
 
       await client.connect();
 
-      mock.controller.add(utf8.encode(
-        'event: session.updated\n'
-        'id: 1\n'
-        'data: {"session_id": "abc"}\n'
-        '\n',
-      ));
+      mock.controller.add(
+        utf8.encode(
+          'event: session.updated\n'
+          'id: 1\n'
+          'data: {"session_id": "abc"}\n'
+          '\n',
+        ),
+      );
 
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
@@ -115,7 +115,7 @@ void main() {
       );
 
       final client = SseClient(
-        baseUrl: 'http://localhost:8000',
+        baseUrl: 'http://localhost:8000/',
         authType: AuthType.none,
         lastEventId: 42,
         httpClient: mock.client,
@@ -137,7 +137,7 @@ void main() {
       );
 
       final client = SseClient(
-        baseUrl: 'http://localhost:8000',
+        baseUrl: 'http://localhost:8000/',
         authType: AuthType.none,
         httpClient: mock.client,
       );
@@ -158,7 +158,7 @@ void main() {
       );
 
       final client = SseClient(
-        baseUrl: 'http://localhost:8000',
+        baseUrl: 'http://localhost:8000/',
         authType: AuthType.basic,
         username: 'user',
         password: 'pass',
@@ -181,7 +181,7 @@ void main() {
       final mock = _createStreamingMock();
 
       final client = SseClient(
-        baseUrl: 'http://localhost:8000',
+        baseUrl: 'http://localhost:8000/',
         authType: AuthType.none,
         httpClient: mock.client,
       );
@@ -190,12 +190,14 @@ void main() {
 
       await client.connect();
 
-      mock.controller.add(utf8.encode(
-        'event: session.updated\n'
-        'id: 5\n'
-        'data: {"session_id": "x"}\n'
-        '\n',
-      ));
+      mock.controller.add(
+        utf8.encode(
+          'event: session.updated\n'
+          'id: 5\n'
+          'data: {"session_id": "x"}\n'
+          '\n',
+        ),
+      );
 
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
@@ -209,7 +211,7 @@ void main() {
       final mock = _createStreamingMock();
 
       final client = SseClient(
-        baseUrl: 'http://localhost:8000',
+        baseUrl: 'http://localhost:8000/',
         authType: AuthType.none,
         httpClient: mock.client,
       );
@@ -219,14 +221,16 @@ void main() {
 
       await client.connect();
 
-      mock.controller.add(utf8.encode(
-        ': heartbeat\n'
-        '\n'
-        'event: session.updated\n'
-        'id: 1\n'
-        'data: {"session_id": "x"}\n'
-        '\n',
-      ));
+      mock.controller.add(
+        utf8.encode(
+          ': heartbeat\n'
+          '\n'
+          'event: session.updated\n'
+          'id: 1\n'
+          'data: {"session_id": "x"}\n'
+          '\n',
+        ),
+      );
 
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
@@ -241,7 +245,7 @@ void main() {
       final mock = _createStreamingMock();
 
       final client = SseClient(
-        baseUrl: 'http://localhost:8000',
+        baseUrl: 'http://localhost:8000/',
         authType: AuthType.none,
         httpClient: mock.client,
       );
@@ -252,11 +256,13 @@ void main() {
       await client.connect();
 
       // Event with missing data field
-      mock.controller.add(utf8.encode(
-        'event: session.updated\n'
-        'id: 1\n'
-        '\n',
-      ));
+      mock.controller.add(
+        utf8.encode(
+          'event: session.updated\n'
+          'id: 1\n'
+          '\n',
+        ),
+      );
 
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
@@ -272,7 +278,7 @@ void main() {
       final mock = _createStreamingMock();
 
       final client = SseClient(
-        baseUrl: 'http://localhost:8000',
+        baseUrl: 'http://localhost:8000/',
         authType: AuthType.none,
         httpClient: mock.client,
       );

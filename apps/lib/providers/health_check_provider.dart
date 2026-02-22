@@ -144,6 +144,7 @@ class HealthCheckNotifier extends Notifier<HealthCheckState> {
     try {
       final service = ApiHealthCheckService();
       final password = await settingsNotifier.getPassword();
+      final apiKey = await settingsNotifier.getChatApiKey();
 
       final result = await service.performHealthCheck(
         baseUrl: settings.simpleChatBaseUrl,
@@ -151,6 +152,7 @@ class HealthCheckNotifier extends Notifier<HealthCheckState> {
         authType: settings.authType,
         username: settings.username,
         password: password,
+        apiKey: apiKey,
       );
 
       // Auto-update authType if authentication is detected

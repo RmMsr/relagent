@@ -46,6 +46,12 @@ AuthDetectionResult detectAuthType(http.Response response) {
         );
       }
     }
+
+    // No WWW-Authenticate header + JSON content type → API key required
+    final contentType = response.headers['content-type'] ?? '';
+    if (contentType.contains('application/json')) {
+      return const AuthDetectionResult(authType: AuthType.apiKey);
+    }
   }
 
   // Default: no authentication or unknown scheme

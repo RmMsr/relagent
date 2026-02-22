@@ -128,6 +128,7 @@ class ApiHealthCheckService {
     AuthType authType = AuthType.none,
     String? username,
     String? password,
+    String? apiKey,
     Duration timeout = _defaultTimeout,
   }) async {
     // Return cached result if URL hasn't changed
@@ -152,7 +153,11 @@ class ApiHealthCheckService {
     // Build headers with authentication
     final headers = <String, String>{'content-type': 'application/json'};
 
-    if (authType == AuthType.basic && username != null && password != null) {
+    if (apiKey != null) {
+      headers['authorization'] = 'Bearer $apiKey';
+    } else if (authType == AuthType.basic &&
+        username != null &&
+        password != null) {
       final credentials = base64Encode(utf8.encode('$username:$password'));
       headers['authorization'] = 'Basic $credentials';
     }

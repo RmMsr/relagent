@@ -9,14 +9,15 @@ from server_build import build_with_framework
 
 
 def run_with_framework(framework: str, version: str) -> None:
+    home_app_dir = Path(".local") / "share" / "org.venkado.relagent-engine"
     command = [
         framework,
         "run",
         "--name=relagent",
         "--replace",
         "--read-only",
-        f"--volume={Path.home()}/.local/share/relagent/settings.ini:/app/.local/share/relagent/settings.ini:ro",
-        f"--volume={Path.home()}/.local/share/relagent/data:/app/.local/share/relagent/data:rw",
+        f"--volume={Path.home() / home_app_dir / 'settings.ini'}:{Path('/app') / home_app_dir / 'settings.ini'}:ro",
+        f"--volume={Path.home() / home_app_dir / 'data'}:{Path('/app') / home_app_dir / 'data'}:rw",
         "--publish=8000:8000",
         "--userns=keep-id:uid=1000,gid=1000",
         f"registry.gitlab.com/rmmsr/relagent:{version}",

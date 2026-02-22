@@ -7,8 +7,8 @@ AutoUpdate=registry
 PublishPort=8000:8000
 ReadOnly=true
 UserNS=keep-id:uid=1000,gid=1000
-Volume=%h/.local/share/relagent/settings.ini:/app/.local/share/relagent/settings.ini:ro
-Volume=%h/.local/share/relagent/data:/app/.local/share/relagent/data:rw
+Volume=%h/.local/share/org.venkado.relagent-engine/settings.ini:/app/.local/share/org.venkado.relagent-engine/settings.ini:ro
+Volume=%h/.local/share/org.venkado.relagent-engine/data:/app/.local/share/org.venkado.relagent-engine/data:rw
 
 [Install]
 WantedBy=default.target

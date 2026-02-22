@@ -13,10 +13,12 @@ wheels/
 # Temporary files
 data
 openapi-schema.json
+worktree.txt
 
 # Development tools
 .aider*
 .vscode
+.windsurfpyright
 
 # FVM Version Cache
 .fvm/

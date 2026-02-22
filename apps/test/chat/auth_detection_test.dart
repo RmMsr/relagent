@@ -67,6 +67,53 @@ void main() {
       expect(result.isSuccess, false);
       expect(result.errorMessage, contains('Unsupported'));
     });
+
+    test('detects API key requirement from 401 with JSON content-type and no WWW-Authenticate', () {
+      final response = http.Response(
+        '{"detail": "API key required"}',
+        401,
+        headers: {'content-type': 'application/json'},
+      );
+      final result = detectAuthType(response);
+
+      expect(result.authType, AuthType.apiKey);
+      expect(result.isSuccess, true);
+    });
+
+    test('detects API key from 401 with JSON content-type including charset', () {
+      final response = http.Response(
+        '{"error": "unauthorized"}',
+        401,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+      final result = detectAuthType(response);
+
+      expect(result.authType, AuthType.apiKey);
+      expect(result.isSuccess, true);
+    });
+
+    test('prefers WWW-Authenticate over JSON content-type for Basic Auth', () {
+      final response = http.Response(
+        '{"detail": "unauthorized"}',
+        401,
+        headers: {
+          'www-authenticate': 'Basic realm="Proxy"',
+          'content-type': 'application/json',
+        },
+      );
+      final result = detectAuthType(response);
+
+      // WWW-Authenticate takes precedence
+      expect(result.authType, AuthType.basic);
+      expect(result.realm, 'Proxy');
+    });
+
+    test('returns none for 401 without JSON content-type and without WWW-Authenticate', () {
+      final response = http.Response('Unauthorized', 401, headers: {});
+      final result = detectAuthType(response);
+
+      expect(result.authType, AuthType.none);
+    });
   });
 
   group('extractBasicAuthRealm', () {

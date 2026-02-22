@@ -82,6 +82,7 @@ class SseClient {
   final AuthType authType;
   final String? username;
   final String? password;
+  final String? apiKey;
 
   http.Client? _client;
   StreamSubscription<String>? _subscription;
@@ -107,6 +108,7 @@ class SseClient {
     required this.authType,
     this.username,
     this.password,
+    this.apiKey,
     int lastEventId = 0,
     http.Client? httpClient,
   }) : _lastEventId = lastEventId,
@@ -188,6 +190,10 @@ class SseClient {
     if (authType == AuthType.basic && username != null && password != null) {
       final credentials = base64Encode(utf8.encode('$username:$password'));
       headers['Authorization'] = 'Basic $credentials';
+    }
+
+    if (apiKey != null) {
+      headers['X-API-Key'] = apiKey!;
     }
 
     return headers;

@@ -140,6 +140,7 @@ class SseNotifier extends Notifier<SseState> {
     _messageDedup.reset();
 
     final password = await settingsNotifier.getEnginePassword();
+    final apiKey = await settingsNotifier.getEngineApiKey();
     final lastEventId = prefs.getInt(_lastEventIdKey) ?? 0;
     Logger.debug('SSE: Persisted lastEventId=$lastEventId');
 
@@ -148,6 +149,7 @@ class SseNotifier extends Notifier<SseState> {
       authType: settings.engineAuthType,
       username: settings.engineUsername,
       password: password,
+      apiKey: apiKey,
       lastEventId: lastEventId,
     );
 
@@ -173,6 +175,7 @@ class SseNotifier extends Notifier<SseState> {
           final settings = ref.read(settingsProvider);
           final settingsNotifier = ref.read(settingsProvider.notifier);
           final password = await settingsNotifier.getEnginePassword();
+          final apiKey = await settingsNotifier.getEngineApiKey();
 
           final sessionInfo = await getSessionInfo(
             baseUrl: settings.engineBaseUrl,
@@ -180,6 +183,7 @@ class SseNotifier extends Notifier<SseState> {
             authType: settings.engineAuthType,
             username: settings.engineUsername,
             password: password,
+            apiKey: apiKey,
           );
 
           ref.read(sessionsProvider.notifier).addSession(sessionInfo);
@@ -219,6 +223,7 @@ class SseNotifier extends Notifier<SseState> {
           final settings = ref.read(settingsProvider);
           final settingsNotifier = ref.read(settingsProvider.notifier);
           final password = await settingsNotifier.getEnginePassword();
+          final apiKey = await settingsNotifier.getEngineApiKey();
 
           final sessionInfo = await getSessionInfo(
             baseUrl: settings.engineBaseUrl,
@@ -226,6 +231,7 @@ class SseNotifier extends Notifier<SseState> {
             authType: settings.engineAuthType,
             username: settings.engineUsername,
             password: password,
+            apiKey: apiKey,
           );
 
           ref.read(sessionsProvider.notifier).updateSession(sessionInfo);

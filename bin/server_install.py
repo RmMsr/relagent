@@ -3,12 +3,12 @@
 import shutil
 from pathlib import Path
 
-from _util import ensure_registry_login, run_subprocess
+from _util import run_subprocess
 
-APP_DIR = Path.home() / ".local" / "share" / "relagent"
+APP_DIR = Path.home() / ".local" / "share" / "org.venkado.relagent-engine"
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 SYSTEMD_CONTAINER_DIR = Path.home() / ".config" / "containers" / "systemd"
-SERVICE_NAME = "relagent.service"
+SERVICE_NAME = "relagent-engine.service"
 AUTO_UPDATE_TIMER = "podman-auto-update.timer"
 
 
@@ -17,8 +17,8 @@ def main() -> None:
 
     # Copy container systemd unit
     copy_file(
-        project_root / "run" / "relagent.container",
-        SYSTEMD_CONTAINER_DIR / "relagent.container",
+        project_root / "run" / "relagent-engine.container",
+        SYSTEMD_CONTAINER_DIR / "relagent-engine.container",
     )
 
     # Copy settings file
@@ -33,10 +33,10 @@ def main() -> None:
         unit_name=AUTO_UPDATE_TIMER,
         override_src=project_root / "run" / "podman-auto-update.override.conf",
     )
-    start_service(AUTO_UPDATE_TIMER)
 
-    # Reload and start service
+    # Reload and restart services
     reload_systemd()
+    start_service(AUTO_UPDATE_TIMER)
     start_service(SERVICE_NAME)
 
     print(
