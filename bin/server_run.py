@@ -13,7 +13,7 @@ def run_with_framework(framework: str, version: str) -> None:
     command = [
         framework,
         "run",
-        "--name=relagent",
+        "--name=relagent-engine",
         "--replace",
         "--read-only",
         f"--volume={Path.home() / home_app_dir / 'settings.ini'}:{Path('/app') / home_app_dir / 'settings.ini'}:ro",

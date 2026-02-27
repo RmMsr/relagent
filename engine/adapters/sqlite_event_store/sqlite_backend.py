@@ -35,6 +35,11 @@ class SqliteEventStoreAdapter(EventStore):
 
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = sqlite3.connect(
+            db_path, timeout=30.0, check_same_thread=False
+        )
+        self._conn.row_factory = sqlite3.Row
         self._ensure_schema()
 
     def publish(self, event: Event) -> None:
@@ -42,19 +47,18 @@ class SqliteEventStoreAdapter(EventStore):
             raise ValueError(f"Cannot publish event that already has id={event.id}")
 
         data = event.model_dump_json()
-        with self._get_connection() as conn:
-            cursor = conn.execute(
-                "INSERT INTO events (event_name, created_at, data) VALUES (?, ?, ?)",
-                (
-                    event.event_name.value,
-                    event.created_at.isoformat(),
-                    data,
-                ),
-            )
-            conn.commit()
-            event_id = cursor.lastrowid
-            if event_id is None:
-                raise RuntimeError("Failed to get lastrowid after insert")
+        cursor = self._conn.execute(
+            "INSERT INTO events (event_name, created_at, data) VALUES (?, ?, ?)",
+            (
+                event.event_name.value,
+                event.created_at.isoformat(),
+                data,
+            ),
+        )
+        self._conn.commit()
+        event_id = cursor.lastrowid
+        if event_id is None:
+            raise RuntimeError("Failed to get lastrowid after insert")
 
         event.id = event_id
         logger.info("Published event (#%d): %s", event_id, event.event_name.value)
@@ -63,18 +67,17 @@ class SqliteEventStoreAdapter(EventStore):
             self.prune_old_events()
 
     def get_events_after(self, last_id: int = 0, limit: int = 100) -> list[Event]:
-        with self._get_connection() as conn:
-            cursor = conn.execute(
-                """
-                SELECT * FROM (
-                    SELECT id, event_name, created_at, data
-                    FROM events WHERE id > ? ORDER BY id DESC LIMIT ?
-                ) AS sub
-                ORDER BY id ASC
-                """,
-                (last_id, limit),
-            )
-            rows = cursor.fetchall()
+        cursor = self._conn.execute(
+            """
+            SELECT * FROM (
+                SELECT id, event_name, created_at, data
+                FROM events WHERE id > ? ORDER BY id DESC LIMIT ?
+            ) AS sub
+            ORDER BY id ASC
+            """,
+            (last_id, limit),
+        )
+        rows = cursor.fetchall()
 
         events = list[Event]()
         for current in rows:
@@ -87,13 +90,12 @@ class SqliteEventStoreAdapter(EventStore):
     def prune_old_events(self, max_age_hours: int = 72) -> int:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
 
-        with self._get_connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM events WHERE created_at < ?",
-                (cutoff.isoformat(),),
-            )
-            conn.commit()
-            deleted = cursor.rowcount
+        cursor = self._conn.execute(
+            "DELETE FROM events WHERE created_at < ?",
+            (cutoff.isoformat(),),
+        )
+        self._conn.commit()
+        deleted = cursor.rowcount
 
         if deleted > 0:
             logger.info("Pruned %d events older than %d hours", deleted, max_age_hours)
@@ -126,23 +128,19 @@ class SqliteEventStoreAdapter(EventStore):
 
             await asyncio.sleep(POLL_INTERVAL)
 
-    def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30.0)
-        conn.row_factory = sqlite3.Row
-        return conn
+    def close(self) -> None:
+        self._conn.close()
 
     def _ensure_schema(self) -> None:
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._get_connection() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    event_name TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    data TEXT NULL
-                )
-            """)
-            conn.commit()
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                data TEXT NULL
+            )
+        """)
+        self._conn.commit()
 
     def _build_event_from_row(self, row: dict[str, str | int]) -> Event | None:
         try:

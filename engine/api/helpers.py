@@ -1,11 +1,16 @@
-from fastapi import Depends, HTTPException
+from functools import cache
+from typing import AsyncGenerator
+
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.concurrency import asynccontextmanager
 from fastapi.security import APIKeyHeader
+
 from engine.adapters.pydantic_ai_execution.pydantic_execution import (
     PydanticAgentAdapter,
 )
 from engine.adapters.sqlite_event_store.sqlite_backend import SqliteEventStoreAdapter
 from engine.adapters.yaml_persistence.yaml_adapter import YamlPersistenceAdapter
-from engine.constants import DATA_DIR, DEBUG_DUMPS, SECRET_ACCESS_KEY
+from engine.constants import DATA_DIR, DEBUG_DUMPS, SECRET_ACCESS_KEY, WEB_DIR
 from engine.domain.ports.events import EventStore
 from engine.domain.services import ChatService
 from engine.logging import get_logger
@@ -21,15 +26,10 @@ def dependency_chat_service() -> ChatService:
     )
 
 
+@cache
 def dependency_event_store() -> EventStore:
     """Creates and preserves a single EventStore instance."""
-    if hasattr(dependency_event_store, "_instance") and isinstance(
-        event_store := getattr(dependency_event_store, "_instance"), EventStore
-    ):
-        return event_store
-    event_store = SqliteEventStoreAdapter(db_path=DATA_DIR / "events.db")
-    setattr(dependency_event_store, "_instance", event_store)
-    return event_store
+    return SqliteEventStoreAdapter(db_path=DATA_DIR / "events.db")
 
 
 header_scheme = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -57,3 +57,20 @@ def check_secret_key():
         logger.warning(
             "!!! Empty server.secret_access_key (env SERVER_SECRET_ACCESS_KEY) detected. Please secure the API endpoints."
         )
+
+
+@cache
+def is_web_available() -> bool:
+    if WEB_DIR.is_dir() and (WEB_DIR / "index.html").exists():
+        logger.info("Serving web app from %s at /app/", WEB_DIR)
+        return True
+    return False
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    yield
+    event_store = dependency_event_store()
+    if event_store:
+        event_store.close()
+        logger.info("Closed event store")

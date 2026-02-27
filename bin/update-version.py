@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).parent.parent
 VERSION_FILE = REPO_ROOT / "VERSION"
 PYPROJECT_FILE = REPO_ROOT / "pyproject.toml"
 PUBSPEC_FILE = REPO_ROOT / "apps" / "pubspec.yaml"
-CONTAINER_FILE = REPO_ROOT / "run" / "relagent.container"
+CONTAINER_FILE = REPO_ROOT / "run" / "relagent-engine.container"
 
 # Semver regex: MAJOR.MINOR.PATCH with optional pre-release
 SEMVER_PATTERN = re.compile(

@@ -22,7 +22,7 @@ def main() -> None:
     )
 
     # Copy settings file
-    copy_file(project_root / "settings.ini.template", APP_DIR / "settings.ini")
+    copy_file(project_root / "run" / "settings-template.ini", APP_DIR / "settings.ini")
 
     # Ensure default data_dir exists
     (APP_DIR / "data").mkdir(exist_ok=True)

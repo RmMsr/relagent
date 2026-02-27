@@ -70,19 +70,21 @@ def init_app_instrumentation(app: FastAPI):
 
     def client_request_hook(span: Span, scope: dict[str, Any], message: dict[str, Any]):
         if span and span.is_recording():
-            if "body" in message:
-                span.set_attribute(
-                    "client_request.message.body", message.get("body", "")
-                )
+            body = message.get("body")
+            if body is not None:
+                if isinstance(body, bytes):
+                    body = body.decode("utf-8", errors="replace")
+                span.set_attribute("client_request.message.body", body)
 
     def client_response_hook(
         span: Span, scope: dict[str, Any], message: dict[str, Any]
     ):
         if span and span.is_recording():
-            if "body" in message:
-                span.set_attribute(
-                    "client_response.message.body", message.get("body", "")
-                )
+            body = message.get("body")
+            if body is not None:
+                if isinstance(body, bytes):
+                    body = body.decode("utf-8", errors="replace")
+                span.set_attribute("client_response.message.body", body)
 
     FastAPIInstrumentor.instrument_app(
         app,

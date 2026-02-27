@@ -117,6 +117,9 @@ def reset_env():
         "INSTRUMENTATION_OTLP_ENDPOINT",
         "INSTRUMENTATION_GEN_AI_COLLECTOR_ENABLED",
         "LOG_LEVEL",
+        "PROVIDER_API_BASE",
+        "PROVIDER_API_KEY",
+        "PROVIDER_DEFAULT_MODEL",
         "PWD",
         "SERVER_SECRET_ACCESS_KEY",
     ]

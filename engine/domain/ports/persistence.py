@@ -6,6 +6,13 @@ from engine.domain.models import ChatContext, SessionInfo
 
 
 class Persistence(ABC):
+    def close(self) -> None:
+        """
+        Release any resources held by the persistence layer
+
+        Implement in subclass if needed.
+        """
+
     @abstractmethod
     def load_session(self, session_id: UUID) -> SessionInfo:
         """

@@ -56,6 +56,13 @@ Event = (
 
 
 class EventStore(ABC):
+    def close(self) -> None:
+        """
+        Release any resources held by the event store
+
+        Implement in subclass if needed.
+        """
+
     @abstractmethod
     def publish(self, event: Event) -> None:
         """Publish an event"""

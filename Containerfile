@@ -1,4 +1,4 @@
-FROM ghcr.io/cirruslabs/flutter:latest as flutter-builder
+FROM ghcr.io/cirruslabs/flutter:latest AS flutter-builder
 
 RUN chown -R ubuntu:ubuntu /sdks/flutter && \
   mkdir /app && chown ubuntu:ubuntu /app
@@ -24,7 +24,7 @@ FROM ghcr.io/astral-sh/uv:debian-slim
 
 RUN useradd --home-dir=/app --no-create-home --shell=/usr/bin/sh app
 
-RUN mkdir /app && chown app:app /app
+RUN mkdir /app && mkdir -p /app/.local/share/uv && chown -R app:app /app
 
 WORKDIR /app
 
@@ -39,6 +39,8 @@ RUN apt-get update && \
   apt-get install ca-certificates -y && \
   apt-get clean
 
+ADD run/settings-container.ini /app/.local/share/org.venkado.relagent-engine/settings.ini
+
 ADD pyproject.toml uv.lock VERSION ./
 
 USER app
@@ -47,6 +49,6 @@ RUN uv sync --locked --no-dev --no-cache
 
 ADD engine ./engine
 
-COPY --from=flutter-builder /app/build/web ./web
+COPY --chown=root:root --from=flutter-builder /app/build/web ./web
 
 CMD [ "python", "-m", "engine.api.run" ]
