@@ -23,8 +23,8 @@ class InfoPage extends ConsumerWidget {
     final activeBaseUrl = isEngine
         ? settings.engineBaseUrl
         : settings.simpleChatBaseUrl;
-    final backendVersion = isEngine &&
-            engineHealthState.lastResult?.isSuccess == true
+    final backendVersion =
+        isEngine && engineHealthState.lastResult?.isSuccess == true
         ? engineHealthState.lastResult!.engineVersion
         : null;
 
@@ -45,7 +45,7 @@ class InfoPage extends ConsumerWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: Image.asset(
-                    'assets/icon/app_icon.png',
+                    'assets/icon/app-icon.png',
                     width: 80,
                     height: 80,
                   ),

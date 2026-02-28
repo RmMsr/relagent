@@ -1,8 +1,11 @@
 # agentic-chat Specification
 
 ## Purpose
+
 TBD - created by archiving change add-agentic-chat. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: Agentic Chat Page
 
 The system SHALL provide an Agentic Chat page as the primary frontend for the Relagent engine.
@@ -191,28 +194,33 @@ Each message in a session SHALL have a unique, incrementing ID within that sessi
 The about/info page SHALL display the app icon at the top, followed by the active chat backend type, configured base URL, and engine version when available.
 
 #### Scenario: App icon displayed
+
 - **WHEN** the user opens the About page
-- **THEN** the app icon (minion) from `assets/icon/app_icon.png` SHALL be displayed prominently at the top of the page
+- **THEN** the app icon (minion) from `assets/icon/app-icon.png` SHALL be displayed prominently at the top of the page
 
 #### Scenario: OpenAI-compatible backend info
+
 - **GIVEN** the selected backend is OpenAI-compatible
 - **WHEN** the user opens the About page
 - **THEN** the page SHALL show "OpenAI-compatible" as the chat backend
 - **AND** the page SHALL show the configured simple chat base URL
 
 #### Scenario: Relagent Engine backend info
+
 - **GIVEN** the selected backend is Relagent Engine
 - **WHEN** the user opens the About page
 - **THEN** the page SHALL show "Relagent Engine" as the chat backend
 - **AND** the page SHALL show the configured engine base URL
 
 #### Scenario: Engine version displayed when available
+
 - **GIVEN** the selected backend is Relagent Engine
 - **AND** a successful engine health check has been performed
 - **WHEN** the user opens the About page
 - **THEN** the page SHALL show the engine version from the health check result
 
 #### Scenario: Engine version not shown when unavailable
+
 - **GIVEN** no successful engine health check has been performed
 - **WHEN** the user opens the About page
 - **THEN** the engine version field SHALL NOT be displayed
@@ -222,16 +230,19 @@ The about/info page SHALL display the app icon at the top, followed by the activ
 The router SHALL provide a single `/chat` route that displays the correct chat page based on the selected backend setting.
 
 #### Scenario: Route to simple chat
+
 - **GIVEN** the selected backend is OpenAI-compatible
 - **WHEN** the user navigates to `/chat`
 - **THEN** the simple chat page SHALL be displayed
 
 #### Scenario: Route to agentic chat
+
 - **GIVEN** the selected backend is Relagent Engine
 - **WHEN** the user navigates to `/chat`
 - **THEN** the agentic chat page SHALL be displayed
 
 #### Scenario: Splash page navigates to unified route
+
 - **GIVEN** the app is starting up
 - **WHEN** the splash screen completes
 - **THEN** navigation SHALL go to `/chat` regardless of the selected backend
@@ -241,8 +252,8 @@ The router SHALL provide a single `/chat` route that displays the correct chat p
 The Android adaptive icon SHALL use the foreground drawable without additional inset, relying on Android's built-in safe-zone handling for adaptive icons.
 
 #### Scenario: No extra inset on Android icon
+
 - **GIVEN** the Android adaptive icon configuration
 - **WHEN** the app icon is rendered on Android
 - **THEN** the foreground drawable SHALL NOT have an additional 16% inset
 - **AND** the icon SHALL use `<foreground android:drawable="@drawable/ic_launcher_foreground"/>` directly
-

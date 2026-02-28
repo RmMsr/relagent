@@ -5,6 +5,7 @@ The app currently has two separate chat pages (`/simple` and `/agentic`) exposed
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Material NavigationDrawer replacing PopupMenuButton for chat page navigation
 - Single "Chat" navigation entry that loads the correct page based on `selectedBackend`
 - Only run health checks for the currently active backend
@@ -18,6 +19,7 @@ The app currently has two separate chat pages (`/simple` and `/agentic`) exposed
 - Engine base URL change resets engine-related state (sessions, SSE, health checks, session ID)
 
 **Non-Goals:**
+
 - Merging the two chat page implementations into one (they can remain separate)
 - Changing the settings data model (fields are already properly separated)
 - Adding new settings or configuration options
@@ -56,7 +58,8 @@ The root cause of the value swap: `Autocomplete`'s `fieldViewBuilder` is called 
 
 ### 5. About page enhancement
 
-Add `ConsumerWidget` to `InfoPage` to read `settingsProvider` and `engineHealthCheckProvider`. Show the app icon (from `assets/icon/app_icon.png`) at the top, followed by cards:
+Add `ConsumerWidget` to `InfoPage` to read `settingsProvider` and `engineHealthCheckProvider`. Show the app icon (from `assets/icon/app-icon.png`) at the top, followed by cards:
+
 - Chat Backend: "OpenAI-compatible" or "Relagent Engine"
 - Base URL: the configured URL for the active backend
 - Engine Version: from `EngineHealthResult.engineVersion` (only when engine backend is active and health check succeeded)
@@ -76,6 +79,7 @@ Currently the model name field has `onEditingComplete: _saveSettings()`, which t
 ### 8. Engine base URL change resets engine state
 
 When `updateEngineBaseUrl` detects the URL has actually changed, it should also:
+
 1. Clear `agenticSessionId` (the session belongs to the old engine)
 2. Clear the persisted SSE `lastEventId` (events are engine-specific)
 3. Clear the engine health check result
@@ -88,6 +92,7 @@ This prevents stale session data from the previous engine being shown after swit
 ### 9. Health check recovery triggers data reload
 
 When the health check transitions from a failure state to success (detected via `ref.listen` on the health check provider), the chat page should:
+
 - Dismiss the connection error banner
 - For agentic chat: trigger `loadHistory()` and SSE `reconnect()` to pick up any missed data
 - For simple chat: no additional action needed (messages are not persisted server-side)

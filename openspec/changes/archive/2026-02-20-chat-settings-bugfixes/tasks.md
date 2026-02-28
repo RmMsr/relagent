@@ -33,7 +33,7 @@
 - [x] 6.2 Add "Chat Backend" card showing "OpenAI-compatible" or "Relagent Engine" based on `selectedBackend`
 - [x] 6.3 Add "Base URL" card showing the active backend's configured URL
 - [x] 6.4 Add "Engine Version" card (only when engine backend is active and `engineHealthCheckProvider` has a successful result with `engineVersion`)
-- [x] 6.5 Add app icon (minion) from `assets/icon/app_icon.png` at the top of the about page, consistent with splash screen style
+- [x] 6.5 Add app icon (minion) from `assets/icon/app-icon.png` at the top of the about page, consistent with splash screen style
 
 ## 7. Consistent Settings Save Behavior
 

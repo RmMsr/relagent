@@ -33,7 +33,7 @@ What you need:
 
 1. **Container runtime**: [Podman](https://podman.io/getting-started/installation) or [Docker](https://docs.docker.com/get-docker/) to run the containerized application.
 2. **LLM service**: Access to an OpenAI compatible inference service (API URL and optional API Key). For example:
-   - Running locally. For example using [LM Studio](https://lmstudio.ai/), [Lemonade-Server](https://lemonade-server.ai/) or [Ollama](https://ollama.com/download).
+   - Running locally. For example using [LM Studio](https://lmstudio.ai/), [Ollama](https://ollama.com/download) or [Lemonade-Server](https://lemonade-server.ai/).
    - Using a 3rd party provider who will run the LLM for you. Any provider that supports the OpenAI v1 API should work.
 3. **LLM Model**: Please choose a text generating large language model (LLM) available at your inference service. The model needs to support so called tool or function calling. For example `gpt-oss` or `olmo3` should give you a solid start.
 4. **Secret Access Key**: A secret only you know to protect access to your service.

@@ -55,7 +55,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: Image.asset(
-                  'assets/icon/app_icon.png',
+                  'assets/icon/app-icon.png',
                   width: 120,
                   height: 120,
                   fit: BoxFit.cover,

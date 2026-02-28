@@ -42,7 +42,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icon/app_icon.png
+    - assets/icon/app-icon.png
     - assets/config.json
     - assets/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06/
     - assets/kokoro-en-v0_19/
@@ -50,18 +50,10 @@ flutter:
     - assets/kokoro-en-v0_19/espeak-ng-data/lang/gmw/
 
 flutter_launcher_icons:
+  image_path: assets/icon/app-icon.png
   android: true
   ios: true
+  linux: true
   web:
     generate: true
-    image_path: "assets/icon/app_icon.png"
-  image_path: "assets/icon/app_icon.png"
-
-  # Android adaptive icon configuration
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/icon/app_icon.png"
-
-  # Linux icon configuration
-  linux:
-    generate: true
-    image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
