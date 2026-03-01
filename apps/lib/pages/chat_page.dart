@@ -230,26 +230,28 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     onSpeak: !voiceCapabilities.isTtsAvailable
                         ? null
                         : (text, messageId) {
-                      final status = ttsState.getMessageState(messageId).status;
-                      final ttsNotifier = ref.read(ttsProvider.notifier);
+                            final status = ttsState
+                                .getMessageState(messageId)
+                                .status;
+                            final ttsNotifier = ref.read(ttsProvider.notifier);
 
-                      switch (status) {
-                        case MessagePlaybackStatus.playing:
-                          // Pause if currently playing
-                          ttsNotifier.pause();
-                        case MessagePlaybackStatus.paused:
-                          // Resume if paused
-                          ttsNotifier.resume();
-                        case MessagePlaybackStatus.idle:
-                        case MessagePlaybackStatus.completed:
-                        case MessagePlaybackStatus.error:
-                          // Play from beginning
-                          ttsNotifier.playNow(text, messageId);
-                        case MessagePlaybackStatus.generating:
-                          // Do nothing while generating
-                          break;
-                      }
-                    },
+                            switch (status) {
+                              case MessagePlaybackStatus.playing:
+                                // Pause if currently playing
+                                ttsNotifier.pause();
+                              case MessagePlaybackStatus.paused:
+                                // Resume if paused
+                                ttsNotifier.resume();
+                              case MessagePlaybackStatus.idle:
+                              case MessagePlaybackStatus.completed:
+                              case MessagePlaybackStatus.error:
+                                // Play from beginning
+                                ttsNotifier.playNow(text, messageId);
+                              case MessagePlaybackStatus.generating:
+                                // Do nothing while generating
+                                break;
+                            }
+                          },
                     getMessagePlaybackStatus: (messageId) =>
                         ttsState.getMessageState(messageId).status,
                   ),

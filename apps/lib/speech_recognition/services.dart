@@ -11,7 +11,18 @@ import '/speech_recognition/sherpa_streaming_asr.dart';
 import '/speech_recognition/utils.dart';
 import '../../utils/logger.dart';
 
-class ASR {
+/// Common interface for ASR service implementations (online and offline).
+abstract class AsrService {
+  AsrModelMetadata? get modelMetadata;
+  void init();
+  Future<void> start();
+  Future<void> stop();
+  Future<void> pause();
+  Future<void> resume();
+  void dispose();
+}
+
+class ASR implements AsrService {
   AudioRecorder? _audioRecorder;
   bool _isAudioRecorderInitialized = false;
 
@@ -33,6 +44,10 @@ class ASR {
   final ValueChanged<Object>? onStreamError;
   final VoidCallback? onStreamDone;
 
+  /// Optional metadata for a downloaded ASR model. Null uses bundled asset model.
+  @override
+  final AsrModelMetadata? modelMetadata;
+
   RecordState get recordState => _recordState;
 
   ASR({
@@ -43,8 +58,10 @@ class ASR {
     this.onAmplitudeChanged,
     this.onStreamError,
     this.onStreamDone,
+    this.modelMetadata,
   });
 
+  @override
   void init() {
     if (_isAudioRecorderInitialized) return;
 
@@ -67,6 +84,7 @@ class ASR {
     _isAudioRecorderInitialized = true;
   }
 
+  @override
   Future<void> start() async {
     if (!_isInitialized) {
       developer.Timeline.startSync('ASR_Initialization');
@@ -76,7 +94,9 @@ class ASR {
         developer.Timeline.finishSync();
 
         developer.Timeline.startSync('ASR_CreateRecognizer');
-        _recognizer = await createOnlineRecognizer();
+        _recognizer = modelMetadata != null
+            ? await createOnlineRecognizerFromMetadata(modelMetadata!)
+            : await createOnlineRecognizer();
         developer.Timeline.finishSync();
 
         _isInitialized = true;
@@ -123,7 +143,6 @@ class ASR {
           audioInterruption: AudioInterruptionMode.pauseResume,
         );
 
-        Logger.debug('ASR: Starting recording with Bluetooth SCO mode');
         Logger.debug('ASR: Starting recording with Bluetooth SCO mode');
         final stream = await _audioRecorder!.startStream(config);
         String? lastText;
@@ -178,6 +197,7 @@ class ASR {
     }
   }
 
+  @override
   Future<void> stop() async {
     Logger.debug('ASR: Stopping recording...');
 
@@ -199,8 +219,10 @@ class ASR {
     Logger.debug('ASR: Recording stop completed');
   }
 
+  @override
   Future<void> pause() => _audioRecorder!.pause();
 
+  @override
   Future<void> resume() => _audioRecorder!.resume();
 
   void _updateRecordState(RecordState recordState) {
@@ -225,6 +247,7 @@ class ASR {
     return isSupported;
   }
 
+  @override
   void dispose() {
     _recordSub?.cancel();
     _amplitudeSub?.cancel();

@@ -175,6 +175,7 @@ class AudioBackgroundService : Service() {
                     Log.d(TAG, "Mode idle - keeping service alive during transition")
                     releaseWakeLock()
                     stopNotificationUpdates()
+                    resetAudioMode()
                     // Update notification for idle mode instead of removing
                     val idleNotification = createNotification("Ready")
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -228,8 +229,7 @@ class AudioBackgroundService : Service() {
                     releaseWakeLock() // No wake lock needed for playback
                     stopNotificationUpdates()
 
-                    // Set audio mode to IN_COMMUNICATION for Bluetooth SCO routing
-                    setAudioModeForSpeech()
+                    resetAudioMode()
 
                     val notification = createNotification("Speaking...")
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

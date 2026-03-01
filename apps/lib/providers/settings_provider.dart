@@ -279,4 +279,30 @@ class SettingsNotifier extends Notifier<Settings> {
     state = state.copyWith(selectedBackend: backend);
     return await _persistenceManager.saveSettings(state);
   }
+
+  Future<bool> updateSelectedAsrModelId(String? modelId) async {
+    state = state.copyWith(selectedAsrModelId: modelId);
+    return await _persistenceManager.saveSettings(state);
+  }
+
+  Future<bool> updateSelectedTtsModelId(String? modelId) async {
+    state = state.copyWith(selectedTtsModelId: modelId);
+    return await _persistenceManager.saveSettings(state);
+  }
+
+  Future<bool> clearModelSelection(String modelId) async {
+    bool changed = false;
+    if (state.selectedAsrModelId == modelId) {
+      state = state.copyWith(selectedAsrModelId: null);
+      changed = true;
+    }
+    if (state.selectedTtsModelId == modelId) {
+      state = state.copyWith(selectedTtsModelId: null);
+      changed = true;
+    }
+    if (changed) {
+      return await _persistenceManager.saveSettings(state);
+    }
+    return true;
+  }
 }

@@ -155,31 +155,36 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                     messages: chatState.messages,
                     showAssistantPending: chatState.showAssistantPending,
                     engineHealthResult: healthCheckState.lastResult,
-                    isVoiceAvailable: ref.watch(voiceCapabilitiesProvider).isAsrAvailable,
+                    isVoiceAvailable: ref
+                        .watch(voiceCapabilitiesProvider)
+                        .isAsrAvailable,
                     onRetry: () {
                       ref
                           .read(agenticChatProvider.notifier)
                           .retryFailedMessages();
                     },
-                    onSpeak: !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
+                    onSpeak:
+                        !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
                         ? null
                         : (text, messageId) {
-                      final status = ttsState.getMessageState(messageId).status;
-                      final ttsNotifier = ref.read(ttsProvider.notifier);
+                            final status = ttsState
+                                .getMessageState(messageId)
+                                .status;
+                            final ttsNotifier = ref.read(ttsProvider.notifier);
 
-                      switch (status) {
-                        case MessagePlaybackStatus.playing:
-                          ttsNotifier.pause();
-                        case MessagePlaybackStatus.paused:
-                          ttsNotifier.resume();
-                        case MessagePlaybackStatus.idle:
-                        case MessagePlaybackStatus.completed:
-                        case MessagePlaybackStatus.error:
-                          ttsNotifier.playNow(text, messageId);
-                        case MessagePlaybackStatus.generating:
-                          break;
-                      }
-                    },
+                            switch (status) {
+                              case MessagePlaybackStatus.playing:
+                                ttsNotifier.pause();
+                              case MessagePlaybackStatus.paused:
+                                ttsNotifier.resume();
+                              case MessagePlaybackStatus.idle:
+                              case MessagePlaybackStatus.completed:
+                              case MessagePlaybackStatus.error:
+                                ttsNotifier.playNow(text, messageId);
+                              case MessagePlaybackStatus.generating:
+                                break;
+                            }
+                          },
                     getMessagePlaybackStatus: (messageId) =>
                         ttsState.getMessageState(messageId).status,
                   ),

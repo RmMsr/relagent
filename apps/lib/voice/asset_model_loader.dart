@@ -10,6 +10,19 @@ import '/voice/model_loader.dart';
 /// Loads models from bundled Flutter assets by copying them to the cache directory.
 class AssetModelLoader implements ModelLoader {
   @override
+  Future<bool> isModelAvailable(String modelName) async {
+    try {
+      final assetManifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      final assets = assetManifest.listAssets().where(
+        (key) => key.startsWith('assets/$modelName/'),
+      );
+      return assets.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
   Future<String> loadModel(String modelName) async {
     final Directory cacheDirectory = await getApplicationCacheDirectory();
     return join(cacheDirectory.path, modelName);

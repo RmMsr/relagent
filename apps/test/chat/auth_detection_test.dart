@@ -57,8 +57,7 @@ void main() {
         '',
         401,
         headers: {
-          'www-authenticate':
-              'Digest realm="Test", qop="auth", nonce="123"',
+          'www-authenticate': 'Digest realm="Test", qop="auth", nonce="123"',
         },
       );
       final result = detectAuthType(response);

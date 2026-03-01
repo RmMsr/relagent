@@ -5,8 +5,7 @@ const Object _unset = Object();
 
 /// Platform-aware default engine base URL: empty on web (relative to origin),
 /// localhost on native platforms.
-String get _defaultEngineBaseUrl =>
-    kIsWeb ? '' : 'http://localhost:8000';
+String get _defaultEngineBaseUrl => kIsWeb ? '' : 'http://localhost:8000';
 
 enum VoiceMode {
   silent, // Dictation mode, no auto-playback
@@ -138,6 +137,9 @@ class Settings {
   // API key indicator fields (actual keys stored in secure storage)
   final bool engineHasApiKey;
   final bool simpleChatHasApiKey;
+  // Selected voice model IDs (null = use bundled asset model if available)
+  final String? selectedAsrModelId;
+  final String? selectedTtsModelId;
 
   const Settings({
     required this.simpleChatBaseUrl,
@@ -158,6 +160,8 @@ class Settings {
     required this.selectedBackend,
     this.engineHasApiKey = false,
     this.simpleChatHasApiKey = false,
+    this.selectedAsrModelId,
+    this.selectedTtsModelId,
   });
 
   factory Settings.defaults() {
@@ -200,6 +204,8 @@ class Settings {
     ChatBackendType? selectedBackend,
     bool? engineHasApiKey,
     bool? simpleChatHasApiKey,
+    Object? selectedAsrModelId = _unset,
+    Object? selectedTtsModelId = _unset,
   }) {
     return Settings(
       simpleChatBaseUrl: simpleChatBaseUrl ?? this.simpleChatBaseUrl,
@@ -223,6 +229,12 @@ class Settings {
       selectedBackend: selectedBackend ?? this.selectedBackend,
       engineHasApiKey: engineHasApiKey ?? this.engineHasApiKey,
       simpleChatHasApiKey: simpleChatHasApiKey ?? this.simpleChatHasApiKey,
+      selectedAsrModelId: selectedAsrModelId == _unset
+          ? this.selectedAsrModelId
+          : selectedAsrModelId as String?,
+      selectedTtsModelId: selectedTtsModelId == _unset
+          ? this.selectedTtsModelId
+          : selectedTtsModelId as String?,
     );
   }
 
@@ -253,6 +265,8 @@ class Settings {
       'selectedBackend': selectedBackend.name,
       'engineHasApiKey': engineHasApiKey,
       'simpleChatHasApiKey': simpleChatHasApiKey,
+      'selectedAsrModelId': selectedAsrModelId,
+      'selectedTtsModelId': selectedTtsModelId,
     };
   }
 
@@ -344,17 +358,19 @@ class Settings {
       authType: authType,
       username: json['username'] as String?,
       history: history,
-      engineBaseUrl: (json['engineBaseUrl'] as String?) ??
-          _defaultEngineBaseUrl,
+      engineBaseUrl:
+          (json['engineBaseUrl'] as String?) ?? _defaultEngineBaseUrl,
       engineAuthType: engineAuthType,
       engineUsername: json['engineUsername'] as String?,
       agenticSessionId: json['agenticSessionId'] as String?,
-      engineUrlHistory: (json['engineUrlHistory'] as List<dynamic>?)
-              ?.cast<String>() ??
+      engineUrlHistory:
+          (json['engineUrlHistory'] as List<dynamic>?)?.cast<String>() ??
           const [],
       selectedBackend: selectedBackend,
       engineHasApiKey: (json['engineHasApiKey'] as bool?) ?? false,
       simpleChatHasApiKey: (json['simpleChatHasApiKey'] as bool?) ?? false,
+      selectedAsrModelId: json['selectedAsrModelId'] as String?,
+      selectedTtsModelId: json['selectedTtsModelId'] as String?,
     );
   }
 
@@ -379,7 +395,9 @@ class Settings {
         _listEquals(other.engineUrlHistory, engineUrlHistory) &&
         other.selectedBackend == selectedBackend &&
         other.engineHasApiKey == engineHasApiKey &&
-        other.simpleChatHasApiKey == simpleChatHasApiKey;
+        other.simpleChatHasApiKey == simpleChatHasApiKey &&
+        other.selectedAsrModelId == selectedAsrModelId &&
+        other.selectedTtsModelId == selectedTtsModelId;
   }
 
   @override
@@ -402,6 +420,8 @@ class Settings {
     selectedBackend,
     engineHasApiKey,
     simpleChatHasApiKey,
+    selectedAsrModelId,
+    selectedTtsModelId,
   );
 
   // Helper for list equality

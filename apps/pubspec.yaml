@@ -1,7 +1,7 @@
 name: relagent
 description: "Relatable Agentic Minion - Privacy focused and open AI agent"
 publish_to: "none"
-version: 0.1.11
+version: 0.1.12-pre
 
 environment:
   sdk: ^3.9.2
@@ -29,6 +29,7 @@ dependencies:
   connectivity_plus: ^7.0.0
   flutter_secure_storage: ^9.2.4
   url_launcher: ^6.3.2
+  archive: ^4.0.7
 
 dev_dependencies:
   flutter_test:
@@ -44,10 +45,18 @@ flutter:
   assets:
     - assets/icon/app-icon.png
     - assets/config.json
-    - assets/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06/
-    - assets/kokoro-en-v0_19/
-    - assets/kokoro-en-v0_19/espeak-ng-data/
-    - assets/kokoro-en-v0_19/espeak-ng-data/lang/gmw/
+    - assets/silero_vad.onnx
+
+    # Optional bundled voice models
+    # Bundling a model ships it pre-installed, eliminating the first-run download
+    # at the cost of a larger app binary. Omitting is the recommended default for
+    # distribution builds — users download their preferred model via the in-app
+    # model manager. To bundle a model, uncomment its lines and place the
+    # directory under apps/assets/ (all subdirectories must be listed explicitly).
+    # - assets/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06/
+    # - assets/kokoro-en-v0_19/
+    # - assets/kokoro-en-v0_19/espeak-ng-data/
+    # - assets/kokoro-en-v0_19/espeak-ng-data/lang/gmw/
 
 flutter_launcher_icons:
   image_path: assets/icon/app-icon.png

@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '/speech_recognition/sherpa_streaming_asr.dart';
+import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 
 /// No-op voice service for platforms without native voice support (web).
@@ -30,6 +32,7 @@ class NoOpVoiceService extends VoiceService {
     ValueChanged<double>? onAmplitudeChanged,
     ValueChanged<Object>? onStreamError,
     VoidCallback? onStreamDone,
+    AsrModelMetadata? asrMetadata,
   }) async {}
 
   @override
@@ -47,7 +50,7 @@ class NoOpVoiceService extends VoiceService {
   Future<void> preCacheTtsModels() async {}
 
   @override
-  Future<void> initializeTts() async {}
+  Future<void> initializeTts({ResolvedTtsModel? resolvedTtsModel}) async {}
 
   @override
   Future<Uint8List?> generateSpeech(

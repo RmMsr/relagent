@@ -3,8 +3,11 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '/speech_recognition/sherpa_streaming_asr.dart';
+import '/voice/model_resolver.dart';
 import 'voice_service_stub.dart'
-    if (dart.library.io) 'voice_service_native.dart' as platform;
+    if (dart.library.io) 'voice_service_native.dart'
+    as platform;
 
 /// Replaces RecordState from package:record.
 /// Used by providers and widgets to track recording lifecycle.
@@ -39,6 +42,7 @@ abstract class VoiceService implements VoiceCapabilities {
   void initAudioRecorder();
 
   /// Initialize ASR model and start recording.
+  /// Pass [asrMetadata] to use a downloaded model instead of bundled.
   Future<void> startRecording({
     required ValueChanged<String> onTextRecognized,
     required VoidCallback onTextFinished,
@@ -47,6 +51,7 @@ abstract class VoiceService implements VoiceCapabilities {
     ValueChanged<double>? onAmplitudeChanged,
     ValueChanged<Object>? onStreamError,
     VoidCallback? onStreamDone,
+    AsrModelMetadata? asrMetadata,
   });
 
   Future<void> stopRecording();
@@ -59,7 +64,8 @@ abstract class VoiceService implements VoiceCapabilities {
   Future<void> preCacheTtsModels();
 
   /// Initialize TTS engine (may spawn background isolate).
-  Future<void> initializeTts();
+  /// Pass [resolvedTtsModel] to use a downloaded model instead of bundled.
+  Future<void> initializeTts({ResolvedTtsModel? resolvedTtsModel});
 
   /// Generate speech audio from text. Returns WAV bytes or null on failure.
   Future<Uint8List?> generateSpeech(

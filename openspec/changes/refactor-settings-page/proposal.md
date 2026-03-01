@@ -36,6 +36,10 @@ lib/widgets/settings/
     └── select_dialog.dart       # For dropdowns/enums
 ```
 
+## Partial Implementation (out of scope)
+
+The voice model selection tiles (Speech Recognition, Text-to-Speech) were added to `settings_page.dart` as inline `ListTile` widgets navigating to `/voice-models`. This is directionally aligned with the list-based pattern but is **not** part of this change — the full refactor (extracted widgets, tap-to-edit dialogs, page size reduction) remains pending.
+
 ## Impact
 
 - Affected specs: `user-settings` (UI behavior changes)

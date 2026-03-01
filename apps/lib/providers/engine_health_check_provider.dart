@@ -11,10 +11,7 @@ class EngineHealthCheckState {
   final EngineHealthResult? lastResult;
   final bool isChecking;
 
-  const EngineHealthCheckState({
-    this.lastResult,
-    this.isChecking = false,
-  });
+  const EngineHealthCheckState({this.lastResult, this.isChecking = false});
 
   EngineHealthCheckState copyWith({
     EngineHealthResult? lastResult,
@@ -29,8 +26,8 @@ class EngineHealthCheckState {
 
 final engineHealthCheckProvider =
     NotifierProvider<EngineHealthCheckNotifier, EngineHealthCheckState>(() {
-  return EngineHealthCheckNotifier();
-});
+      return EngineHealthCheckNotifier();
+    });
 
 class EngineHealthCheckNotifier extends Notifier<EngineHealthCheckState> {
   final _service = EngineHealthCheckService();
@@ -67,10 +64,7 @@ class EngineHealthCheckNotifier extends Notifier<EngineHealthCheckState> {
         apiKey: apiKey,
       );
 
-      state = EngineHealthCheckState(
-        lastResult: result,
-        isChecking: false,
-      );
+      state = EngineHealthCheckState(lastResult: result, isChecking: false);
 
       // Schedule periodic retry if check failed
       _scheduleRetryIfNeeded(result);

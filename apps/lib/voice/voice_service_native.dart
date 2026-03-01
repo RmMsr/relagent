@@ -2,19 +2,24 @@ import 'dart:async';
 
 import 'package:audio_session/audio_session.dart' as native_audio;
 import 'package:flutter/services.dart';
+import '/config/app_config.dart';
+import '/models/model_catalog.dart';
 import '/speech_recognition/services.dart' as asr;
+import '/speech_recognition/sherpa_streaming_asr.dart';
+import '/speech_recognition/sherpa_vad_asr.dart';
 import '/tts/sherpa_tts.dart' as native_tts;
 import '/tts/tts_isolate_worker.dart';
 import '/utils/logger.dart';
 import '/voice/asset_model_loader.dart';
 import '/voice/model_loader.dart';
+import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 import 'package:record/record.dart' as record_pkg;
 
 /// Native voice service wrapping sherpa_onnx, record, and audio_session.
 class NativeVoiceService extends VoiceService {
   final ModelLoader _modelLoader = AssetModelLoader();
-  asr.ASR? _asr;
+  asr.AsrService? _asr;
   TtsIsolateWorker? _ttsWorker;
   bool _ttsInitialized = false;
 
@@ -60,18 +65,44 @@ class NativeVoiceService extends VoiceService {
     ValueChanged<double>? onAmplitudeChanged,
     ValueChanged<Object>? onStreamError,
     VoidCallback? onStreamDone,
+    AsrModelMetadata? asrMetadata,
   }) async {
-    _asr ??= asr.ASR(
-      textRecognized: onTextRecognized,
-      textFinished: onTextFinished,
-      onRecordStateChanged: onStatusChanged != null
-          ? (state) => onStatusChanged(_mapRecordState(state))
-          : null,
-      onAudioDataReceived: onAudioDataReceived,
-      onAmplitudeChanged: onAmplitudeChanged,
-      onStreamError: onStreamError,
-      onStreamDone: onStreamDone,
-    );
+    // Recreate ASR if the model changed (compare by ID, not object reference)
+    if (_asr != null && _asr!.modelMetadata?.modelId != asrMetadata?.modelId) {
+      _asr!.dispose();
+      _asr = null;
+    }
+
+    if (_asr == null) {
+      final isOffline =
+          asrMetadata?.architecture == ModelArchitecture.offlineNemoTransducer;
+      if (isOffline) {
+        Logger.debug('NativeVoiceService: Using VAD-based offline ASR');
+        _asr = VadAsr(
+          textRecognized: onTextRecognized,
+          textFinished: onTextFinished,
+          onStatusChanged: onStatusChanged,
+          onAudioDataReceived: onAudioDataReceived,
+          onAmplitudeChanged: onAmplitudeChanged,
+          onStreamError: onStreamError,
+          onStreamDone: onStreamDone,
+          modelMetadata: asrMetadata!,
+        );
+      } else {
+        _asr = asr.ASR(
+          textRecognized: onTextRecognized,
+          textFinished: onTextFinished,
+          onRecordStateChanged: onStatusChanged != null
+              ? (state) => onStatusChanged(_mapRecordState(state))
+              : null,
+          onAudioDataReceived: onAudioDataReceived,
+          onAmplitudeChanged: onAmplitudeChanged,
+          onStreamError: onStreamError,
+          onStreamDone: onStreamDone,
+          modelMetadata: asrMetadata,
+        );
+      }
+    }
     _asr!.init();
     await _asr!.start();
   }
@@ -103,14 +134,30 @@ class NativeVoiceService extends VoiceService {
 
   @override
   Future<void> preCacheTtsModels() async {
+    if (AppConfig.ttsModelName == null) return;
     await native_tts.preCacheTtsModelFiles();
   }
 
+  ResolvedTtsModel? _currentResolvedTtsModel;
+
   @override
-  Future<void> initializeTts() async {
+  Future<void> initializeTts({ResolvedTtsModel? resolvedTtsModel}) async {
+    // Check if we need to reinitialize with a different model
+    if (_ttsInitialized && resolvedTtsModel != _currentResolvedTtsModel) {
+      Logger.debug('NativeVoiceService: TTS model changed, reinitializing');
+      disposeTts();
+    }
+
     if (_ttsInitialized) return;
+
+    // Need either a bundled model or a resolved downloaded model
+    if (AppConfig.ttsModelName == null && resolvedTtsModel == null) {
+      Logger.debug('NativeVoiceService: No TTS model available, skipping init');
+      return;
+    }
+    _currentResolvedTtsModel = resolvedTtsModel;
     _ttsWorker = TtsIsolateWorker();
-    await _ttsWorker!.initialize();
+    await _ttsWorker!.initialize(resolvedModel: resolvedTtsModel);
     _ttsInitialized = true;
   }
 
@@ -122,7 +169,7 @@ class NativeVoiceService extends VoiceService {
     double speed = 1.0,
   }) async {
     if (!_ttsInitialized || _ttsWorker == null) {
-      await initializeTts();
+      await initializeTts(resolvedTtsModel: _currentResolvedTtsModel);
     }
 
     try {
@@ -189,9 +236,7 @@ class NativeVoiceService extends VoiceService {
       final session = await native_audio.AudioSession.instance;
       await session.setActive(true);
     } catch (e) {
-      Logger.debug(
-        'NativeVoiceService: Failed to activate audio session: $e',
-      );
+      Logger.debug('NativeVoiceService: Failed to activate audio session: $e');
     }
   }
 
@@ -250,10 +295,9 @@ class NativeVoiceService extends VoiceService {
   @override
   Future<void> updateNotification(String message) async {
     try {
-      await _backgroundServiceChannel.invokeMethod(
-        'updateNotification',
-        {'message': message},
-      );
+      await _backgroundServiceChannel.invokeMethod('updateNotification', {
+        'message': message,
+      });
     } on PlatformException catch (e) {
       Logger.debug(
         'NativeVoiceService: Failed to update notification: ${e.message}',
@@ -269,9 +313,7 @@ class NativeVoiceService extends VoiceService {
         'message': message,
       });
     } catch (e) {
-      Logger.debug(
-        'NativeVoiceService: Failed to show error notification: $e',
-      );
+      Logger.debug('NativeVoiceService: Failed to show error notification: $e');
     }
   }
 

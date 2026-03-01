@@ -4,10 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '/agentic/health_check.dart';
+import '/config/app_config.dart';
+import '/models/model_catalog.dart';
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/services/api_health_check.dart';
+import '/voice/model_resolver.dart';
+import '/widgets/model_management_section.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -20,7 +24,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   late TextEditingController _baseUrlController;
   late TextEditingController _modelController;
   late TextEditingController _primeMessageController;
-  late TextEditingController _ttsSpeakerIdController;
+  late int _ttsSpeakerId;
   late TextEditingController _usernameController;
   late TextEditingController _passwordController;
   late double _ttsSpeed;
@@ -55,9 +59,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _primeMessageController = TextEditingController(
       text: settings.primeMessage,
     );
-    _ttsSpeakerIdController = TextEditingController(
-      text: settings.ttsSpeakerId.toString(),
-    );
+    _ttsSpeakerId = settings.ttsSpeakerId;
     _usernameController = TextEditingController(text: settings.username ?? '');
     _passwordController = TextEditingController();
     _chatBasicAuthEnabled = settings.username?.isNotEmpty ?? false;
@@ -97,7 +99,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _baseUrlController.dispose();
     _modelController.dispose();
     _primeMessageController.dispose();
-    _ttsSpeakerIdController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     _engineUrlController.dispose();
@@ -476,7 +477,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       simpleChatBaseUrl: _baseUrlController.text.trim(),
       simpleChatModel: _modelController.text.trim(),
       primeMessage: _primeMessageController.text.trim(),
-      ttsSpeakerId: int.parse(_ttsSpeakerIdController.text.trim()),
+      ttsSpeakerId: _ttsSpeakerId,
       ttsSpeed: _ttsSpeed,
       backgroundListeningDuration: _backgroundListeningDuration,
     );
@@ -595,19 +596,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  String _asrModelDisplayName(Settings settings) {
+    final id = settings.selectedAsrModelId;
+    if (id == null) {
+      final name = AppConfig.speechRecognitionStreamingAsrModelName;
+      return name != null ? 'Bundled: $name' : 'Bundled';
+    }
+    return ModelCatalog.findById(id)?.displayName ?? id;
+  }
+
+  String _ttsModelDisplayName(Settings settings) {
+    final id = settings.selectedTtsModelId;
+    if (id == null) {
+      final name = AppConfig.ttsModelName;
+      return name != null ? 'Bundled: $name' : 'Bundled';
+    }
+    return ModelCatalog.findById(id)?.displayName ?? id;
+  }
+
   Future<void> _resetToDefaults() async {
     final success = await ref.read(settingsProvider.notifier).resetToDefaults();
     final settings = ref.read(settingsProvider);
     _baseUrlController.text = settings.simpleChatBaseUrl;
     _modelController.text = settings.simpleChatModel;
     _primeMessageController.text = settings.primeMessage;
-    _ttsSpeakerIdController.text = settings.ttsSpeakerId.toString();
     _engineUrlController.text = settings.engineBaseUrl;
     _engineUsernameController.text = settings.engineUsername ?? '';
     _enginePasswordController.clear();
     _engineApiKeyController.clear();
     _chatApiKeyController.clear();
     setState(() {
+      _ttsSpeakerId = settings.ttsSpeakerId;
       _ttsSpeed = settings.ttsSpeed;
       _backgroundListeningDuration = settings.backgroundListeningDuration;
       _hasPassword = false;
@@ -979,55 +998,68 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onClear: _clearEngineCredentials,
               ),
             ],
+            if (!kIsWeb) ...[
+              const SizedBox(height: 32),
+              const ModelManagementSection(),
+            ],
             if (ref.read(voiceCapabilitiesProvider).isAsrAvailable ||
                 ref.read(voiceCapabilitiesProvider).isTtsAvailable) ...[
               const SizedBox(height: 32),
               const Text(
-                'Voice Settings',
+                'Voice',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              if (ref.read(voiceCapabilitiesProvider).isTtsAvailable) ...[
+              const SizedBox(height: 8),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.mic),
+                title: const Text('Speech Recognition'),
+                subtitle: Text(_asrModelDisplayName(settings)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/voice-models', extra: 0),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.record_voice_over),
+                title: const Text('Text-to-Speech'),
+                subtitle: Text(_ttsModelDisplayName(settings)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/voice-models', extra: 1),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'TTS Speed: ${_ttsSpeed.toStringAsFixed(2)}x',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Slider(
+                value: _ttsSpeed,
+                min: 0.5,
+                max: 2.0,
+                divisions: 30,
+                label: '${_ttsSpeed.toStringAsFixed(2)}x',
+                onChanged: (value) {
+                  setState(() {
+                    _ttsSpeed = value;
+                  });
+                },
+              ),
+              Text(
+                'Controls playback speed (0.5x - 2.0x)',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (getSelectedTtsSpeakerCount(settings) > 1) ...[
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _ttsSpeakerIdController,
-                  decoration: const InputDecoration(
-                    labelText: 'TTS Speaker ID',
-                    hintText: '0',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter a speaker ID';
-                    }
-                    final id = int.tryParse(value.trim());
-                    if (id == null || id < 0) {
-                      return 'Speaker ID must be a non-negative integer';
-                    }
-                    return null;
-                  },
+                Text(
+                  'TTS Speaker ID: $_ttsSpeakerId',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'TTS Speed: ${_ttsSpeed.toStringAsFixed(2)}x',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Slider(
-                      value: _ttsSpeed,
-                      min: 0.5,
-                      max: 2.0,
-                      divisions: 30,
-                      label: '${_ttsSpeed.toStringAsFixed(2)}x',
-                      onChanged: (value) {
-                        setState(() {
-                          _ttsSpeed = value;
-                        });
-                      },
-                    ),
-                  ],
+                Slider(
+                  value: _ttsSpeakerId.toDouble(),
+                  min: 0,
+                  max: (getSelectedTtsSpeakerCount(settings) - 1).toDouble(),
+                  divisions: getSelectedTtsSpeakerCount(settings) - 1,
+                  label: '$_ttsSpeakerId',
+                  onChanged: (v) => setState(() => _ttsSpeakerId = v.round()),
                 ),
               ],
               if (ref.read(voiceCapabilitiesProvider).isAsrAvailable) ...[

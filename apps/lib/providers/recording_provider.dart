@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
 import '/providers/audio_coordinator_provider.dart';
+import '/providers/model_download_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/speech_recognition/recording_target.dart';
+import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 import '../utils/logger.dart';
 
@@ -131,6 +133,22 @@ class RecordingNotifier extends Notifier<RecordingState> {
         Logger.debug(
           'RecordingProvider: Coordinator auto-resumed, restarting recording',
         );
+        await internalStart();
+      }
+    });
+
+    // Restart ASR when selected model finishes downloading (startup race fix)
+    ref.listen<ModelDownloadState>(modelDownloadProvider, (previous, next) async {
+      final selectedId = ref.read(settingsProvider).selectedAsrModelId;
+      if (selectedId != null &&
+          !(previous?.isDownloaded(selectedId) ?? false) &&
+          next.isDownloaded(selectedId) &&
+          state.isContinuous &&
+          state.isRecording) {
+        Logger.debug(
+          'RecordingProvider: Selected ASR model now downloaded, restarting...',
+        );
+        await internalStop();
         await internalStart();
       }
     });
@@ -428,10 +446,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
       Logger.debug('RecordingProvider: Error during internal stop: $e');
     } finally {
       _stoppingIntentionally = false;
-      state = state.copyWith(
-        isRecording: false,
-        amplitudeHistory: [],
-      );
+      state = state.copyWith(isRecording: false, amplitudeHistory: []);
       Logger.debug('RecordingProvider: Internal stop completed (state reset)');
     }
   }
@@ -461,7 +476,21 @@ class RecordingNotifier extends Notifier<RecordingState> {
   }
 
   Future<void> _startASR() async {
+    // Resolve selected ASR model (null = use bundled)
+    final settings = ref.read(settingsProvider);
+    final downloadState = ref.read(modelDownloadProvider);
+    final asrMetadata = await resolveAsrMetadata(settings, downloadState);
+
+    if (asrMetadata != null) {
+      Logger.debug(
+        'RecordingProvider: Using downloaded ASR model: ${asrMetadata.modelId}',
+      );
+    } else {
+      Logger.debug('RecordingProvider: Using bundled ASR model');
+    }
+
     await _voiceService.startRecording(
+      asrMetadata: asrMetadata,
       onTextRecognized: (text) {
         Logger.debug(
           'RecordingProvider: textRecognized - "$text" (continuous: ${state.isContinuous}, target: ${_activeTarget != null})',
@@ -486,14 +515,10 @@ class RecordingNotifier extends Notifier<RecordingState> {
             recognizedText: '',
             textToSubmit: () => textToSend,
           );
-          if (_activeTarget != null) {
-            _activeTarget!.onTextFinished();
-          } else {
-            Logger.debug(
-              'RecordingProvider: No active target for textFinished',
-            );
-          }
         }
+        // Always notify target: continuous mode submits, dictation mode
+        // commits the utterance to baseline so the next one appends to it.
+        _activeTarget?.onTextFinished();
       },
       onStatusChanged: (recordingStatus) {
         state = state.copyWith(recordingStatus: recordingStatus);

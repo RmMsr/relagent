@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '/pages/chat_router_page.dart';
 import '/pages/info_page.dart';
+import '/pages/model_selection_page.dart';
 import '/pages/sessions_page.dart';
 import '/pages/settings_page.dart';
 import '/pages/splash_page.dart';
@@ -31,6 +32,13 @@ final appRouter = GoRouter(
       path: '/info',
       name: 'info',
       pageBuilder: (context, state) => const MaterialPage(child: InfoPage()),
+    ),
+    GoRoute(
+      path: '/voice-models',
+      name: 'voiceModels',
+      pageBuilder: (context, state) => MaterialPage(
+        child: ModelSelectionPage(initialTab: state.extra as int? ?? 0),
+      ),
     ),
     GoRoute(
       path: '/sessions',

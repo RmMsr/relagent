@@ -2,10 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
+import '/providers/model_download_provider.dart';
 import '/providers/playback_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/tts/services.dart';
+import '/voice/model_resolver.dart';
 
 enum MessagePlaybackStatus {
   idle,
@@ -62,6 +64,9 @@ class TtsNotifier extends Notifier<TtsState> {
   // Track tasks to avoid overlapping generation for same message
   final Map<String, Future<void>> _pendingTasks = {};
 
+  // Deferred reinit: true when model became available while generation was busy
+  bool _pendingReinit = false;
+
   @override
   TtsState build() {
     ref.onDispose(() {
@@ -74,6 +79,10 @@ class TtsNotifier extends Notifier<TtsState> {
           previous?.ttsSpeed != next.ttsSpeed) {
         _handleSettingsChanged(next);
       }
+      // Reinitialize TTS when model selection changes
+      if (previous?.selectedTtsModelId != next.selectedTtsModelId) {
+        _handleTtsModelChanged();
+      }
     });
 
     // Listen to playback state to update our internal message states
@@ -81,21 +90,39 @@ class TtsNotifier extends Notifier<TtsState> {
       _handlePlaybackStateChange(prev, next);
     });
 
+    // Reinitialize when selected model finishes downloading (startup race fix).
+    // Defer if a generation is in progress to avoid killing the active isolate.
+    ref.listen<ModelDownloadState>(modelDownloadProvider, (previous, next) {
+      final selectedId = ref.read(settingsProvider).selectedTtsModelId;
+      if (selectedId != null &&
+          !(previous?.isDownloaded(selectedId) ?? false) &&
+          next.isDownloaded(selectedId)) {
+        if (_pendingTasks.isEmpty) {
+          _handleTtsModelChanged();
+        } else {
+          _pendingReinit = true;
+        }
+      }
+    });
+
     return TtsState.initial();
   }
 
   Future<void> initialize() async {
-    final service = _getService();
+    final service = await _getService();
     await service.initialize();
   }
 
-  TtsService _getService() {
+  Future<TtsService> _getService() async {
     if (_service == null) {
       final settings = ref.read(settingsProvider);
+      final downloadState = ref.read(modelDownloadProvider);
       final voiceService = ref.read(voiceServiceProvider);
+      final resolved = await resolveTtsModel(settings, downloadState);
       _service = TtsService(voiceService)
         ..speakerId = settings.ttsSpeakerId
-        ..speed = settings.ttsSpeed;
+        ..speed = settings.ttsSpeed
+        ..resolvedTtsModel = resolved;
     }
     return _service!;
   }
@@ -106,6 +133,15 @@ class TtsNotifier extends Notifier<TtsState> {
       service.speakerId = settings.ttsSpeakerId;
       service.speed = settings.ttsSpeed;
     }
+  }
+
+  Future<void> _handleTtsModelChanged() async {
+    if (_service == null) return;
+    final settings = ref.read(settingsProvider);
+    final downloadState = ref.read(modelDownloadProvider);
+    final resolved = await resolveTtsModel(settings, downloadState);
+    debugPrint('TtsProvider: TTS model changed, reinitializing...');
+    await _service!.reinitializeWithModel(resolved);
   }
 
   void onChatCleared() {
@@ -121,7 +157,7 @@ class TtsNotifier extends Notifier<TtsState> {
     if (_pendingTasks.containsKey(messageId)) return;
 
     // Start generation immediately
-    final service = _getService();
+    final service = await _getService();
     _updateMessageState(messageId, status: MessagePlaybackStatus.generating);
 
     // Create a shared future for the content
@@ -155,6 +191,10 @@ class TtsNotifier extends Notifier<TtsState> {
       await task;
     } finally {
       _pendingTasks.remove(messageId);
+      if (_pendingReinit && _pendingTasks.isEmpty) {
+        _pendingReinit = false;
+        _handleTtsModelChanged();
+      }
     }
   }
 
@@ -166,7 +206,7 @@ class TtsNotifier extends Notifier<TtsState> {
     if (_pendingTasks.containsKey(messageId)) return;
 
     // Start generation immediately
-    final service = _getService();
+    final service = await _getService();
     _updateMessageState(messageId, status: MessagePlaybackStatus.generating);
 
     // Create a shared future for the content
@@ -202,6 +242,10 @@ class TtsNotifier extends Notifier<TtsState> {
       await task;
     } finally {
       _pendingTasks.remove(messageId);
+      if (_pendingReinit && _pendingTasks.isEmpty) {
+        _pendingReinit = false;
+        _handleTtsModelChanged();
+      }
     }
   }
 

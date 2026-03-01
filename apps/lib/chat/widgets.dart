@@ -30,6 +30,7 @@ class ChatInputState extends ConsumerState<ChatInput>
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   String _textBeforeRecording = '';
+  bool _isUpdatingFromASR = false;
   // Cache notifier reference for use in dispose (ref is already disposed there)
   RecordingNotifier? _recordingNotifier;
 
@@ -57,6 +58,8 @@ class ChatInputState extends ConsumerState<ChatInput>
   @override
   void initState() {
     super.initState();
+    // Keep baseline in sync with user edits between ASR utterances
+    _controller.addListener(_onControllerChanged);
     // Register as recording target after widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (ref.read(voiceCapabilitiesProvider).isAsrAvailable) {
@@ -66,8 +69,15 @@ class ChatInputState extends ConsumerState<ChatInput>
     });
   }
 
+  void _onControllerChanged() {
+    if (!_isUpdatingFromASR) {
+      _textBeforeRecording = _controller.text;
+    }
+  }
+
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
     // Unregister using cached notifier (ref is already disposed here)
     _recordingNotifier?.unregisterTarget(this);
     _controller.dispose();
@@ -80,29 +90,19 @@ class ChatInputState extends ConsumerState<ChatInput>
   void onTextRecognized(String text) {
     if (text.isEmpty) return;
 
+    Logger.debug(
+      '[ChatInput] onTextRecognized: baseline="$_textBeforeRecording", text="$text"',
+    );
+
+    // Guard against listener updating baseline while ASR is writing
+    _isUpdatingFromASR = true;
     setState(() {
-      // In dictation mode: append each utterance to baseline
-      // In continuous mode: just show the current utterance
-      final recordingState = ref.read(recordingProvider);
-      final newText = _textBeforeRecording + text;
-
-      Logger.debug(
-        '[ChatInput] onTextRecognized: baseline="$_textBeforeRecording", text="$text", result="$newText"',
-      );
-
-      if (recordingState.isContinuous) {
-        // Continuous mode: show current utterance only
-        _controller.text = newText;
-      } else {
-        // Dictation mode: accumulate all utterances
-        // The baseline includes all previous utterances
-        _controller.text = newText;
-      }
-      // Move cursor to end
+      _controller.text = _textBeforeRecording + text;
       _controller.selection = TextSelection.fromPosition(
         TextPosition(offset: _controller.text.length),
       );
     });
+    _isUpdatingFromASR = false;
   }
 
   @override

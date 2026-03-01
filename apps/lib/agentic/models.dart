@@ -62,7 +62,8 @@ class AgentStats {
 }
 
 class AgenticMessage {
-  final int? id; // API message ID for synchronization (null for local-only messages)
+  final int?
+  id; // API message ID for synchronization (null for local-only messages)
   final String localId; // Internal ID for UI tracking (TTS, etc.)
   final String text;
   final AgenticRole role;

@@ -164,11 +164,12 @@ The app uses **Riverpod** for state management, providing:
 
 ## Configuration
 
-### Static Configuration (ASR Model)
+### Static Configuration (Optional Bundled Models)
 
-Located in `apps/assets/config.json` - loaded at app startup:
+Located in `apps/assets/config.json` — loaded at app startup:
 
-- **speech_recognition.streaming_asr_model**: Name of bundled Sherpa-ONNX ASR model directory (not user-editable)
+- **speech_recognition.streaming_asr_model**: *(optional)* Name of a Sherpa-ONNX ASR model directory bundled under `assets/`. Bundling ships the model pre-installed so the user skips the first-run download. Set to `null` or omit to require the user to download an ASR model via the in-app model manager.
+- **tts.model**: *(optional)* Name of a TTS model directory bundled under `assets/`. Same trade-off — bundling is a convenience shortcut that increases app size but eliminates the download step. Omit for distribution builds where users should choose their own model.
 
 ### User Settings (API Configuration & Voice Settings)
 

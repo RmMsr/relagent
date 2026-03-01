@@ -1,8 +1,10 @@
 {
   "speech_recognition": {
+    "_comment_streaming_asr_model": "Optional: name of a bundled ASR model directory under assets/. Bundling pre-installs the model so the user skips the first-run download. Set to null or omit the field to require in-app download.",
     "streaming_asr_model": "sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06"
   },
   "tts": {
+    "_comment_model": "Optional: name of a bundled TTS model directory under assets/. Same trade-off as ASR — bundling is a convenience shortcut, not a requirement. Set to null or omit to require in-app download.",
     "model": "kokoro-en-v0_19"
   }
 }

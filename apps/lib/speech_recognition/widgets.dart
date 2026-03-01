@@ -289,14 +289,15 @@ class RecorderButton extends ConsumerWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (recordingState.recordingStatus == AudioRecordingStatus.recording)
+            if (recordingState.isRecording &&
+                recordingState.barHeights.isNotEmpty)
               VolumeBarVisualizer(barHeights: recordingState.barHeights),
             Opacity(
               opacity:
-                  recordingState.recordingStatus ==
-                          AudioRecordingStatus.recording
-                      ? 0.3
-                      : 1.0,
+                  recordingState.isRecording &&
+                      recordingState.barHeights.isNotEmpty
+                  ? 0.3
+                  : 1.0,
               child: RecordingStateIndicator(
                 recordingState: recordingState,
                 voiceMode: voiceMode,

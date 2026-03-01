@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 
+import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 
 class TtsService {
@@ -18,13 +19,16 @@ class TtsService {
   int speakerId = 0;
   double speed = 1.0;
 
+  /// Resolved TTS model for downloaded models (null = bundled).
+  ResolvedTtsModel? resolvedTtsModel;
+
   TtsService(this._voiceService);
 
   Future<void> _init() async {
     if (!_isInitialized) {
       developer.Timeline.startSync('TTS_BackgroundInitialization');
       try {
-        await _voiceService.initializeTts();
+        await _voiceService.initializeTts(resolvedTtsModel: resolvedTtsModel);
         _isInitialized = true;
         debugPrint('TTS initialized via VoiceService');
       } catch (e) {
@@ -38,6 +42,18 @@ class TtsService {
 
   /// Public method to pre-initialize TTS in background
   Future<void> initialize() async {
+    await _init();
+  }
+
+  /// Reinitialize with a different model (disposes current, loads new).
+  Future<void> reinitializeWithModel(ResolvedTtsModel? model) async {
+    if (_isInitialized) {
+      _voiceService.disposeTts();
+      _isInitialized = false;
+      _audioCache.clear();
+      _cacheOrder.clear();
+    }
+    resolvedTtsModel = model;
     await _init();
   }
 

@@ -42,15 +42,17 @@ class AgenticChatState {
       isLoadingHistory: isLoadingHistory ?? this.isLoadingHistory,
       error: error,
       showAssistantPending: showAssistantPending ?? this.showAssistantPending,
-      sessionTitle: clearSessionTitle ? null : (sessionTitle ?? this.sessionTitle),
+      sessionTitle: clearSessionTitle
+          ? null
+          : (sessionTitle ?? this.sessionTitle),
     );
   }
 }
 
 final agenticChatProvider =
     NotifierProvider<AgenticChatNotifier, AgenticChatState>(() {
-  return AgenticChatNotifier();
-});
+      return AgenticChatNotifier();
+    });
 
 class AgenticChatNotifier extends Notifier<AgenticChatState> {
   @override
@@ -103,10 +105,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         );
       } else {
         // Full load - replace all messages
-        state = state.copyWith(
-          messages: messages,
-          isLoadingHistory: false,
-        );
+        state = state.copyWith(messages: messages, isLoadingHistory: false);
         Logger.debug(
           'AgenticChat: Loaded ${messages.length} messages for session $sessionId',
         );
@@ -125,7 +124,8 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final sessionId = settings.agenticSessionId; // May be null for first message
+    final sessionId =
+        settings.agenticSessionId; // May be null for first message
 
     // Add user message locally
     final userMessage = AgenticMessage.user(text);
@@ -177,8 +177,9 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       }
     } catch (e) {
       final errorText = e is EngineApiException ? e.userMessage : e.toString();
-      final technicalDetails =
-          e is EngineApiException ? e.technicalDetails : null;
+      final technicalDetails = e is EngineApiException
+          ? e.technicalDetails
+          : null;
 
       final errorMessage = AgenticMessage.error(
         errorText,

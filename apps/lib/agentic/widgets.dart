@@ -28,6 +28,7 @@ class _AgenticChatInputState extends ConsumerState<AgenticChatInput>
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   String _textBeforeRecording = '';
+  bool _isUpdatingFromASR = false;
   RecordingNotifier? _recordingNotifier;
 
   void _submitText() {
@@ -50,6 +51,8 @@ class _AgenticChatInputState extends ConsumerState<AgenticChatInput>
   @override
   void initState() {
     super.initState();
+    // Keep baseline in sync with user edits between ASR utterances
+    _controller.addListener(_onControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (ref.read(voiceCapabilitiesProvider).isAsrAvailable) {
         _recordingNotifier = ref.read(recordingProvider.notifier);
@@ -58,8 +61,15 @@ class _AgenticChatInputState extends ConsumerState<AgenticChatInput>
     });
   }
 
+  void _onControllerChanged() {
+    if (!_isUpdatingFromASR) {
+      _textBeforeRecording = _controller.text;
+    }
+  }
+
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
     _recordingNotifier?.unregisterTarget(this);
     _controller.dispose();
     _focusNode.dispose();
@@ -70,23 +80,18 @@ class _AgenticChatInputState extends ConsumerState<AgenticChatInput>
   void onTextRecognized(String text) {
     if (text.isEmpty) return;
 
+    Logger.debug(
+      '[AgenticChatInput] onTextRecognized: baseline="$_textBeforeRecording", text="$text"',
+    );
+
+    _isUpdatingFromASR = true;
     setState(() {
-      final recordingState = ref.read(recordingProvider);
-      final newText = _textBeforeRecording + text;
-
-      Logger.debug(
-        '[AgenticChatInput] onTextRecognized: baseline="$_textBeforeRecording", text="$text", result="$newText"',
-      );
-
-      if (recordingState.isContinuous) {
-        _controller.text = newText;
-      } else {
-        _controller.text = newText;
-      }
+      _controller.text = _textBeforeRecording + text;
       _controller.selection = TextSelection.fromPosition(
         TextPosition(offset: _controller.text.length),
       );
     });
+    _isUpdatingFromASR = false;
   }
 
   @override
@@ -116,9 +121,9 @@ class _AgenticChatInputState extends ConsumerState<AgenticChatInput>
   @override
   void onError(String error) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
     }
   }
 
@@ -352,8 +357,9 @@ class _AgenticMessageBubble extends StatelessWidget {
         bottom: isLastInGroup ? 8 : 2,
       ),
       child: Column(
-        crossAxisAlignment:
-            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           if (isFirstInGroup)
             Padding(
@@ -380,8 +386,7 @@ class _AgenticMessageBubble extends StatelessWidget {
                       )
                     : null,
               ),
-              child:
-                  isUser ? Text(message.text) : GptMarkdown(message.text),
+              child: isUser ? Text(message.text) : GptMarkdown(message.text),
             ),
           if (!isUser && !isError)
             Padding(
@@ -402,8 +407,10 @@ class _AgenticMessageBubble extends StatelessWidget {
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('Retry'),
                 style: TextButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
               ),
@@ -545,7 +552,8 @@ class _MessageActionsRowState extends State<_MessageActionsRow> {
                   _statsExpanded ? Icons.insights_outlined : Icons.insights,
                   size: 18,
                 ),
-                onPressed: () => setState(() => _statsExpanded = !_statsExpanded),
+                onPressed: () =>
+                    setState(() => _statsExpanded = !_statsExpanded),
                 tooltip: _statsExpanded ? 'Hide stats' : 'Show stats',
                 visualDensity: VisualDensity.compact,
                 style: IconButton.styleFrom(
@@ -611,7 +619,11 @@ class _StatsContent extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.smart_toy_outlined, size: iconSize, color: iconColor),
+                      Icon(
+                        Icons.smart_toy_outlined,
+                        size: iconSize,
+                        color: iconColor,
+                      ),
                       const SizedBox(width: 4),
                       Text('Agent: ${stats.agentName!}', style: textStyle),
                     ],
@@ -622,7 +634,10 @@ class _StatsContent extends StatelessWidget {
                     children: [
                       Icon(Icons.memory, size: iconSize, color: iconColor),
                       const SizedBox(width: 4),
-                      Text('Model: ${stats.answeringModelName!}', style: textStyle),
+                      Text(
+                        'Model: ${stats.answeringModelName!}',
+                        style: textStyle,
+                      ),
                     ],
                   ),
               ],
@@ -638,7 +653,10 @@ class _StatsContent extends StatelessWidget {
                 children: [
                   Icon(Icons.arrow_downward, size: iconSize, color: iconColor),
                   const SizedBox(width: 4),
-                  Text('${_formatNumber(stats.inputTokens!)} tokens in', style: textStyle),
+                  Text(
+                    '${_formatNumber(stats.inputTokens!)} tokens in',
+                    style: textStyle,
+                  ),
                 ],
               ),
             if (stats.outputTokens != null)
@@ -647,7 +665,10 @@ class _StatsContent extends StatelessWidget {
                 children: [
                   Icon(Icons.arrow_upward, size: iconSize, color: iconColor),
                   const SizedBox(width: 4),
-                  Text('${_formatNumber(stats.outputTokens!)} tokens out', style: textStyle),
+                  Text(
+                    '${_formatNumber(stats.outputTokens!)} tokens out',
+                    style: textStyle,
+                  ),
                 ],
               ),
             if (stats.toolCallsCount != null && stats.toolCallsCount! > 0)
@@ -674,7 +695,10 @@ class _StatsContent extends StatelessWidget {
                 children: [
                   Icon(Icons.timer_outlined, size: iconSize, color: iconColor),
                   const SizedBox(width: 4),
-                  Text(_formatDuration(stats.durationSeconds!), style: textStyle),
+                  Text(
+                    _formatDuration(stats.durationSeconds!),
+                    style: textStyle,
+                  ),
                 ],
               ),
           ],
@@ -721,10 +745,9 @@ class _SpeakerButton extends StatelessWidget {
 
     return IconButton(
       icon: Icon(icon, size: 18),
-      onPressed:
-          status == MessagePlaybackStatus.generating
-              ? null
-              : () => onSpeak(text, messageId),
+      onPressed: status == MessagePlaybackStatus.generating
+          ? null
+          : () => onSpeak(text, messageId),
       tooltip: tooltip,
       visualDensity: VisualDensity.compact,
       style: IconButton.styleFrom(
@@ -757,9 +780,10 @@ class _AssistantPendingPlaceholderState
       vsync: this,
     )..repeat(reverse: true);
 
-    _opacityAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _opacityAnimation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
