@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from fastapi import FastAPI
@@ -19,15 +20,7 @@ from engine.settings import get_setting
 logger = get_logger(__name__)
 
 
-_global_instrumentation_initialized: bool = False
-
-
 def init_global_instrumentation():
-    global _global_instrumentation_initialized
-    if _global_instrumentation_initialized:
-        logger.debug("Instrumentation already initialized, skipping")
-        return
-
     service_name = SERVICE_NAME
     resource = Resource.create(
         {
@@ -56,8 +49,6 @@ def init_global_instrumentation():
         exporter = OTLPSpanExporter(endpoint=endpoint)
         tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
 
-    _global_instrumentation_initialized = True
-
     logger.debug(
         "Tracing initialized. Endpoint: %s", endpoint if endpoint else "OTLP Default"
     )
@@ -65,26 +56,43 @@ def init_global_instrumentation():
 
 def init_app_instrumentation(app: FastAPI):
     def server_request_hook(span: Span, scope: dict[str, Any]):
+        span.set_attribute("trace.source", "server_request")
         if span and span.is_recording():
             span.set_attribute("openinference.span.kind", "CHAIN")
 
-    def client_request_hook(span: Span, scope: dict[str, Any], message: dict[str, Any]):
+    def client_request_hook(
+        span: Span, scope: dict[str, Any], message: dict[str, bytes]
+    ):
+        span.set_attribute("trace.source", "client_request")
         if span and span.is_recording():
-            body = message.get("body")
-            if body is not None:
-                if isinstance(body, bytes):
-                    body = body.decode("utf-8", errors="replace")
-                span.set_attribute("client_request.message.body", body)
+            if (b"content-type", b"application/json") in scope.get("headers", []):
+                body_raw = message.get("body", b"")
+                try:
+                    body = json.loads(body_raw)
+                    for key, value in _flatten_json(
+                        body, "client_request.body"
+                    ).items():
+                        span.set_attribute(key, value)
+                except json.JSONDecodeError:
+                    body_raw = body_raw.decode("utf-8", errors="replace")
+                    span.set_attribute("client_request.body_raw", body_raw[:500])
 
     def client_response_hook(
         span: Span, scope: dict[str, Any], message: dict[str, Any]
     ):
+        span.set_attribute("trace.source", "client_response")
         if span and span.is_recording():
-            body = message.get("body")
-            if body is not None:
-                if isinstance(body, bytes):
-                    body = body.decode("utf-8", errors="replace")
-                span.set_attribute("client_response.message.body", body)
+            if (b"content-type", b"application/json") in scope.get("headers", []):
+                body_raw = message.get("body", b"")
+                try:
+                    body = json.loads(body_raw)
+                    for key, value in _flatten_json(
+                        body, "client_response.body"
+                    ).items():
+                        span.set_attribute(key, value)
+                except json.JSONDecodeError:
+                    body_raw = body_raw.decode("utf-8", errors="replace")
+                    span.set_attribute("client_response.body_raw", body_raw[:500])
 
     FastAPIInstrumentor.instrument_app(
         app,
@@ -98,3 +106,36 @@ def init_app_instrumentation(app: FastAPI):
         http_capture_headers_server_response=["content-type"],
         excluded_urls="/health",
     )
+
+
+def _flatten_json(data: Any, prefix: str = "", max_depth: int = 5) -> dict[str, Any]:
+    """Flatten nested JSON into dot-notation attributes."""
+    if max_depth <= 0 or data is None:
+        return {}
+    if isinstance(data, dict):
+        result = {}
+        for key, value in data.items():
+            new_key = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict) and max_depth > 1:
+                result.update(_flatten_json(value, new_key, max_depth - 1))
+            elif isinstance(value, list) and max_depth > 1:
+                for i, item in enumerate(value[:10]):
+                    if isinstance(item, dict):
+                        result.update(
+                            _flatten_json(item, f"{new_key}[{i}]", max_depth - 1)
+                        )
+                    else:
+                        result[f"{new_key}[{i}]"] = item
+            else:
+                if isinstance(value, (str, int, float, bool)):
+                    result[new_key] = value
+                else:
+                    result[new_key] = str(value)
+        return result
+    if isinstance(data, list):
+        return (
+            {prefix: json.dumps(data)[:500]} if len(str(data)) > 500 else {prefix: data}
+        )
+    if isinstance(data, (str, int, float, bool)):
+        return {prefix: data}
+    return {prefix: str(data)[:500]}

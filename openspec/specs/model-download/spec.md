@@ -1,3 +1,9 @@
+## Purpose
+
+Enable downloading, extracting, and managing sherpa-onnx models from remote URLs with progress tracking, verification, and storage management.
+
+## Requirements
+
 ### Requirement: Model Archive Download
 The system SHALL download model archives from remote URLs to a temporary location with progress tracking.
 

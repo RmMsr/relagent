@@ -1,3 +1,9 @@
+## Purpose
+
+Enable voice input through a unified VoiceService abstraction with target-based routing, model selection support (CTC/transducer architectures), and resilient lazy initialization.
+
+## Requirements
+
 ### Requirement: Target-Based Speech Recognition
 The system SHALL bind speech recognition to specific input targets, ensuring only one target receives speech input at a time. Speech recognition SHALL operate through the `VoiceService` abstraction rather than directly using the `ASR` class or native dependencies.
 
@@ -93,3 +99,40 @@ The ASR system SHALL use the model selected by the user (or bundled fallback) ra
 - **WHEN** no ASR model is selected and no bundled assets are available
 - **THEN** the voice service SHALL report that speech recognition is unavailable
 - **AND** the recording provider SHALL NOT attempt to start recording
+
+### Requirement: ASR Model Identity Comparison
+The system SHALL compare ASR model identity by model ID string, not by object reference. The sherpa-onnx recognizer SHALL be reused across recordings when the selected model has not changed, and recreated only when the model ID actually differs.
+
+#### Scenario: Recognizer reused on second recording start
+- **GIVEN** a recording session has completed with model "model-a"
+- **WHEN** a new recording starts with the same model "model-a"
+- **THEN** the existing sherpa-onnx recognizer SHALL be reused
+- **AND** recording SHALL start immediately without model reload
+
+#### Scenario: Recognizer recreated when model changes
+- **GIVEN** a recording session has completed with model "model-a"
+- **WHEN** a new recording starts with model "model-b"
+- **THEN** the previous recognizer SHALL be disposed
+- **AND** a new recognizer SHALL be initialized with model "model-b"
+- **AND** recording SHALL start after model initialization completes
+
+### Requirement: Lazy Initialization Resilience for ASR
+The `RecordingProvider` SHALL handle the case where the selected ASR model is not yet available at initialization time. When the selected model becomes available after initial startup, the provider SHALL reinitialize ASR with the correct model without requiring user action.
+
+#### Scenario: ASR starts with bundled model while scan is in progress
+- **WHEN** `RecordingProvider.checkAutoStart()` is called
+- **AND** `ModelDownloadState.downloadedModels` is still empty (scan in progress)
+- **THEN** ASR SHALL start using the bundled model as fallback
+- **AND** recording SHALL function normally with the bundled model
+
+#### Scenario: ASR restarts when selected model becomes available during recording
+- **WHEN** the selected ASR model's download status transitions to downloaded
+- **AND** continuous recording is currently active
+- **THEN** ASR recording SHALL stop and restart using the newly available model
+- **AND** listening SHALL resume without user action
+
+#### Scenario: No ASR restart when not recording
+- **WHEN** the selected ASR model becomes available in the download state
+- **AND** continuous recording is NOT currently active
+- **THEN** the system SHALL NOT start recording
+- **AND** the correct model SHALL be used when recording next starts

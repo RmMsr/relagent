@@ -21,6 +21,7 @@ _(none — this is a refactor, all new behavior is within existing capabilities)
 ### Modified Capabilities
 
 - `model-loading`: Remove `AssetModelLoader` as a runtime loader; add a startup seeding step that extracts bundled `.tar.bz2` assets into download storage; unify all runtime model loading through `DownloadModelLoader`
+- `user-settings`: Settings page warns when the selected ASR or TTS model is not loaded and therefore unusable
 
 ## Impact
 

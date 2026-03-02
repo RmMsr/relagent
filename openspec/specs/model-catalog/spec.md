@@ -1,3 +1,9 @@
+## Purpose
+
+Provide users with a curated catalog of recommended ASR and TTS models with filtering by language and download status tracking.
+
+## Requirements
+
 ### Requirement: Curated Model Registry
 The system SHALL provide a hardcoded catalog of recommended sherpa-onnx models for ASR and TTS.
 

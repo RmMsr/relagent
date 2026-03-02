@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '/speech_recognition/sherpa_streaming_asr.dart';
+import '/speech_recognition/asr_metadata.dart';
 import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 

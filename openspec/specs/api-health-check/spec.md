@@ -1,4 +1,8 @@
-## MODIFIED Requirements
+## Purpose
+
+Provide a reliable mechanism for the app to verify backend connectivity and authentication status before attempting resource-consuming operations like chat requests.
+
+## Requirements
 
 ### Requirement: Health Check Request Construction
 

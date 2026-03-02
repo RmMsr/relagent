@@ -1,7 +1,7 @@
 import '/models/model_catalog.dart';
 import '/models/settings.dart';
 import '/providers/model_download_provider.dart';
-import '/speech_recognition/sherpa_streaming_asr.dart';
+import '/speech_recognition/asr_metadata.dart';
 import '/voice/download_model_loader.dart';
 
 /// Resolved TTS model with absolute file paths (safe for isolate transfer).

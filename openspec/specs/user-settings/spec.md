@@ -1,3 +1,9 @@
+## Purpose
+
+Provide a settings UI for configuring backend connections, managing API key credentials, and selecting/managing ASR and TTS voice models.
+
+## Requirements
+
 ### Requirement: API Key Indicator Fields in Settings
 
 The system SHALL persist a boolean indicator for each backend's API key status in SharedPreferences. These indicators reflect whether an API key is stored in secure storage for the current URL, without exposing the key itself.

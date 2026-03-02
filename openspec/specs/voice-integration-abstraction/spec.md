@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Define a unified `VoiceService` interface that abstracts all voice-related dependencies (ASR, TTS, audio recording, background services), enabling platform-specific implementations with a web stub.
+
+## Requirements
 
 ### Requirement: Voice Service Interface
 The system SHALL define an abstract `VoiceService` interface that encapsulates all voice-related platform dependencies (ASR, TTS, audio recording, audio session management, background service).

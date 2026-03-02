@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Allow users to securely configure and store API keys for both the Relagent Engine and OpenAI-compatible backends, with automatic header injection on requests.
+
+## Requirements
 
 ### Requirement: API Key Configuration for Relagent Engine
 

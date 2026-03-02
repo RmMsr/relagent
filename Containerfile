@@ -17,6 +17,7 @@ ADD apps/lib ./lib
 ADD apps/web ./web
 ADD apps/assets/config.web.json ./assets/config.json
 ADD apps/assets/icon ./assets/icon
+ADD apps/assets/silero_vad.onnx ./assets/
 
 RUN flutter build web --release --base-href=/app/
 

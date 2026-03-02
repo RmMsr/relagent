@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Enable the Flutter app to build and run on web browsers with full chat functionality while hiding voice-related features that require native platform capabilities.
+
+## Requirements
 
 ### Requirement: Web Build Compiles and Runs
 The Flutter app SHALL compile for web (`flutter build web`) without errors and run in modern browsers (Chrome, Firefox, Safari, Edge).
@@ -7,6 +11,12 @@ The Flutter app SHALL compile for web (`flutter build web`) without errors and r
 - **WHEN** `flutter build web` is executed
 - **THEN** the build SHALL complete without compilation errors
 - **AND** the output SHALL be a functional web application
+
+#### Scenario: Web build succeeds with native-only packages
+- **WHEN** new code imports packages that require `dart:ffi` (e.g., sherpa_onnx)
+- **THEN** the imports SHALL use conditional import pattern (`if (dart.library.io)`)
+- **OR** the functionality SHALL be moved to a stub/native file pair
+- **AND** the web build SHALL complete without errors
 
 #### Scenario: App loads in browser
 - **WHEN** the web build is served and opened in a modern browser

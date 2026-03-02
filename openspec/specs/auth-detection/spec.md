@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Automatically detect when a backend requires API key authentication by analyzing HTTP 401 responses, enabling the app to prompt users for credentials.
+
+## Requirements
 
 ### Requirement: API Key Auth Detection
 

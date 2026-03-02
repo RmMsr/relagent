@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Store API keys securely using platform-specific secure storage (Keychain, Keystore, Secret Service) with URL-scoped access and protection against logging.
+
+## Requirements
 
 ### Requirement: API Key Storage for Relagent Engine
 
