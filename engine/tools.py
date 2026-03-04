@@ -31,7 +31,7 @@ async def web_search(ctx: RunContext, query: str) -> list[dict[str, str]]:
     Searches the web for the given query.
     """
 
-    return DDGS().text(query, backend="duckduckgo")
+    return DDGS().text(query, backend="auto")
 
 
 web_search_tool = Tool(web_search)

@@ -14,16 +14,18 @@
 
 Artificial Intelligence can be very helpful and inspiring to use. But too often it appears as a black box that consumes and produces data without the needed transparency. This project aims to fix that and give back control to users.
 
-The goal of the Relagent project is an accessible solution for agentic AI services with full control over your data. Setting up your own installation should be within reach without considerable technical knowledge or financial investment.
+The goal of the Relagent project is an accessible solution for agentic AI services with full control over your data. Setting up your own installation should be within reach without considerable technical knowledge or financial investment. The software is designed to be resource-efficient without any hidden costs.
 
 ## Current features
 
 - 🗨️ Chat interface
-- 📱 Mobile apps, 🖥️ Desktop apps and 🌐 Web interface fully synchronized
-- 💽 Local data storage
+- 📱 Mobile apps, 🖥️ Desktop apps and 🌐 Web interface - all fully synchronized
+- 💽 Pure local execution and data storage
 - 🧰 Agentic tools (e.g. web search)
-- 🎤 Speech input (Automatic Speech Recognition) and output (Text To Speech) on the device (mobile and desktop)
-- 📑 Multiple parallel sessions
+- 🎤 Speech Integration: Input and Output on device (mobile and desktop)
+- 📑 Unlimited parallel sessions
+
+![Screenshots: App, Web, Desktop](docs/media/screenshots-0.1.12.png "Use Relagent anywhere - on your mobile, desktop or via a browser")
 
 ## Quick start
 
@@ -122,9 +124,9 @@ Those are some very relevant topics that we would love to spend time on:
 Several aspects are on purpose out of scope at the moment:
 
 - The mobile and desktop **apps are not yet published in appstores**. Follow the instructions to build them yourself.
-- Only **English has full language support**. Other languages have experimental support for voice integration. The interface is not yet localized.
-- **Dependency on OpenAI compatible endpoint**. Performing LLM inference directly is not needed for the current featureset. You can choose from many self-hosting options to run your own inference server.
-- **Just one user per installation**. No multi user support. You can run multiple instances of Relagent with the same LLM provider.
+- Only **English has full language support**. Other languages can be used, but most LLMs will regularely fall back to English.
+- **Dependency on OpenAI compatible endpoint**. Performing LLM inference directly within Relagent is not needed for the current featureset. You can choose from many self-hosting options to run your own inference server.
+- **Just one user per installation**. No multi user support. You can run multiple instances of the Relagent Engine with the same APP and LLM provider.
 - **No arbitrary context extension** using MCP (Model Context Protocol). There is currently no way to control which data would be sent to 3rd party services.
 - Use of a **shared secret** among devices. No per device authentication and access revocation yet.
 - Only marginally tested setup and update routines with **focus on Linux**.
