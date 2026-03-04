@@ -8,8 +8,8 @@ class ModelDownloadState {
   /// IDs of fully downloaded models.
   final Set<String> downloadedModels;
 
-  /// Active download progress (null if no download in progress).
-  final DownloadProgress? activeDownload;
+  /// Per-model download progress. Empty when no downloads are active.
+  final Map<String, DownloadProgress> activeDownloads;
 
   /// Error message from last failed operation.
   final String? error;
@@ -17,31 +17,45 @@ class ModelDownloadState {
   /// Total storage used by downloaded models in bytes.
   final int totalStorageBytes;
 
+  /// Display name of the most recently completed download, or null if none.
+  /// Consumed once by the UI via [ModelDownloadNotifier.clearCompletedNotification].
+  final String? lastCompletedModelName;
+
+  /// Whether the initial filesystem scan is still in progress.
+  final bool isScanning;
+
   const ModelDownloadState({
     this.downloadedModels = const {},
-    this.activeDownload,
+    this.activeDownloads = const {},
     this.error,
     this.totalStorageBytes = 0,
+    this.lastCompletedModelName,
+    this.isScanning = false,
   });
 
   ModelDownloadState copyWith({
     Set<String>? downloadedModels,
-    DownloadProgress? Function()? activeDownload,
+    Map<String, DownloadProgress>? activeDownloads,
     String? Function()? error,
     int? totalStorageBytes,
+    String? Function()? lastCompletedModelName,
+    bool? isScanning,
   }) {
     return ModelDownloadState(
       downloadedModels: downloadedModels ?? this.downloadedModels,
-      activeDownload: activeDownload != null
-          ? activeDownload()
-          : this.activeDownload,
+      activeDownloads: activeDownloads ?? this.activeDownloads,
       error: error != null ? error() : this.error,
       totalStorageBytes: totalStorageBytes ?? this.totalStorageBytes,
+      lastCompletedModelName: lastCompletedModelName != null
+          ? lastCompletedModelName()
+          : this.lastCompletedModelName,
+      isScanning: isScanning ?? this.isScanning,
     );
   }
 
   bool isDownloaded(String modelId) => downloadedModels.contains(modelId);
-  bool get isDownloading => activeDownload != null;
+  bool isDownloadingModel(String modelId) => activeDownloads.containsKey(modelId);
+  DownloadProgress? progressFor(String modelId) => activeDownloads[modelId];
 }
 
 final modelDownloadServiceProvider = Provider<ModelDownloadService>((ref) {
@@ -59,64 +73,65 @@ class ModelDownloadNotifier extends Notifier<ModelDownloadState> {
   @override
   ModelDownloadState build() {
     _service = ref.watch(modelDownloadServiceProvider);
-    // Scan for downloaded models on initialization
-    _refreshDownloadedModels();
-    return const ModelDownloadState();
+    _refreshDownloadedModels(initialScan: true);
+    return const ModelDownloadState(isScanning: true);
   }
 
-  Future<void> _refreshDownloadedModels() async {
+  Future<void> _refreshDownloadedModels({bool initialScan = false}) async {
     final downloaded = await _service.listDownloadedModels();
     final storage = await _service.totalStorageUsed();
     state = state.copyWith(
       downloadedModels: downloaded,
       totalStorageBytes: storage,
+      isScanning: initialScan ? false : null,
     );
   }
 
-  /// Start downloading a model from the catalog.
+  /// Start downloading a model. Multiple downloads can run concurrently.
   Future<void> downloadModel(String modelId) async {
     final entry = ModelCatalog.findById(modelId);
     if (entry == null) {
-      state = state.copyWith(
-        error: () => 'Model $modelId not found in catalog',
-      );
+      state = state.copyWith(error: () => 'Model $modelId not found in catalog');
       return;
     }
 
-    if (state.isDownloading) {
-      state = state.copyWith(error: () => 'A download is already in progress');
-      return;
-    }
+    if (state.isDownloadingModel(modelId)) return;
 
-    state = state.copyWith(
-      activeDownload: () =>
-          DownloadProgress(modelId: modelId, bytesReceived: 0, totalBytes: 0),
-      error: () => null,
-    );
+    _updateProgress(modelId, DownloadProgress(
+      modelId: modelId,
+      bytesReceived: 0,
+      totalBytes: 0,
+    ));
+    state = state.copyWith(error: () => null);
 
     try {
       await _service.downloadModel(
         entry,
-        onProgress: (progress) {
-          state = state.copyWith(activeDownload: () => progress);
-        },
+        onProgress: (progress) => _updateProgress(modelId, progress),
       );
 
-      // Download complete - refresh model list
-      state = state.copyWith(activeDownload: () => null);
+      // Signal extracting phase while scanning filesystem.
+      _updateProgress(modelId, DownloadProgress(
+        modelId: modelId,
+        bytesReceived: 0,
+        totalBytes: 0,
+        isExtracting: true,
+      ));
       await _refreshDownloadedModels();
-    } catch (e) {
+      _removeProgress(modelId);
       state = state.copyWith(
-        activeDownload: () => null,
-        error: () => 'Download failed: $e',
+        lastCompletedModelName: () => entry.displayName,
       );
+    } catch (e) {
+      _removeProgress(modelId);
+      state = state.copyWith(error: () => 'Download failed: $e');
     }
   }
 
-  /// Cancel the active download.
+  /// Cancel a specific download.
   void cancelDownload(String modelId) {
     _service.cancelDownload(modelId);
-    state = state.copyWith(activeDownload: () => null);
+    _removeProgress(modelId);
   }
 
   /// Delete a downloaded model.
@@ -132,5 +147,22 @@ class ModelDownloadNotifier extends Notifier<ModelDownloadState> {
   /// Clear the current error.
   void clearError() {
     state = state.copyWith(error: () => null);
+  }
+
+  /// Consume the last completed download notification.
+  void clearCompletedNotification() {
+    state = state.copyWith(lastCompletedModelName: () => null);
+  }
+
+  void _updateProgress(String modelId, DownloadProgress progress) {
+    final updated = Map<String, DownloadProgress>.from(state.activeDownloads);
+    updated[modelId] = progress;
+    state = state.copyWith(activeDownloads: updated);
+  }
+
+  void _removeProgress(String modelId) {
+    final updated = Map<String, DownloadProgress>.from(state.activeDownloads);
+    updated.remove(modelId);
+    state = state.copyWith(activeDownloads: updated);
   }
 }

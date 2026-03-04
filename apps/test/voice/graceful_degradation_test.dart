@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:relagent/models/model_catalog.dart';
 import 'package:relagent/models/settings.dart';
@@ -10,6 +12,12 @@ import 'package:relagent/voice/model_resolver.dart';
 /// is configured (AppConfig returns null), the resolver returns null and the
 /// app should enter the "model unavailable" state without crashing.
 void main() {
+  setUpAll(() async {
+    final fixture =
+        await File('test/fixtures/voice-models.json').readAsString();
+    await ModelCatalog.init(jsonOverride: fixture);
+  });
+
   group('Graceful degradation — no models available', () {
     test('resolveAsrMetadata returns null with default settings (no selection)',
         () async {
@@ -60,8 +68,8 @@ void main() {
     });
 
     test('ModelCatalog.entries is non-empty even without bundled assets', () {
-      // The catalog is hardcoded — it should always have entries regardless of
-      // whether any models are bundled in assets or downloaded.
+      // The catalog loads from voice-models.json — entries are available after
+      // init() regardless of whether any models are bundled or downloaded.
       expect(ModelCatalog.entries, isNotEmpty);
     });
 

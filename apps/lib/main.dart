@@ -6,6 +6,7 @@ import '/models/app_info.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '/config/app_config.dart';
+import '/models/model_catalog.dart';
 import '/providers/background_service_provider.dart';
 import '/providers/health_check_provider.dart';
 import '/providers/settings_provider.dart';
@@ -23,6 +24,9 @@ void main() async {
 
   // Load static app config (ASR model, etc.)
   await AppConfig.load();
+
+  // Load voice model catalog from bundled JSON asset
+  await ModelCatalog.init();
 
   // Pre-cache TTS model files on native platforms (don't block app startup)
   final voiceService = createVoiceService();
@@ -66,7 +70,7 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: AppInfo.data.toString(),
-      debugShowCheckedModeBanner: AppInfo.data.isDebug,
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent),
       ),

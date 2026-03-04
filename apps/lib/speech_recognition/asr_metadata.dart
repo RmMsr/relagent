@@ -1,5 +1,5 @@
 import '/models/model_catalog.dart';
-import '/voice/model_loader.dart';
+import 'package:sherpa_voice/model_loader.dart';
 
 class AsrModelMetadata {
   final ModelArchitecture architecture;

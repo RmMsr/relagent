@@ -18,14 +18,6 @@ class VersionInfoWidget extends StatelessWidget {
           ),
           textAlign: TextAlign.center,
         ),
-        if (AppInfo.data.isDebug) ...[
-          const SizedBox(height: 8),
-          Chip(
-            label: const Text('Debug Build'),
-            avatar: const Icon(Icons.bug_report, size: 16),
-            backgroundColor: theme.colorScheme.errorContainer,
-          ),
-        ],
       ],
     );
   }

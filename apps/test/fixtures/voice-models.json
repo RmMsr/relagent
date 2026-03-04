@@ -1,0 +1,165 @@
+[
+  {
+    "id": "zipformer-en-kroko",
+    "displayName": "English - Zipformer",
+    "type": "asr",
+    "architecture": "transducer",
+    "languages": ["en"],
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06.tar.bz2",
+    "downloadSizeMb": 55,
+    "fileStructure": {
+      "encoder": "encoder.onnx",
+      "decoder": "decoder.onnx",
+      "joiner": "joiner.onnx",
+      "tokens": "tokens.txt"
+    },
+    "origin": "Next-gen Kaldi / k2-fsa",
+    "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx",
+    "license": "Apache-2.0",
+    "speakerCount": 0,
+    "releaseDate": "2025-08",
+    "status": "approved",
+    "recommended": true,
+    "notes": ""
+  },
+  {
+    "id": "zipformer-fr-kroko",
+    "displayName": "French - Zipformer",
+    "type": "asr",
+    "architecture": "transducer",
+    "languages": ["fr"],
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-fr-kroko-2025-08-06.tar.bz2",
+    "downloadSizeMb": 55,
+    "fileStructure": {
+      "encoder": "encoder.onnx",
+      "decoder": "decoder.onnx",
+      "joiner": "joiner.onnx",
+      "tokens": "tokens.txt"
+    },
+    "origin": "Next-gen Kaldi / k2-fsa",
+    "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx",
+    "license": "Apache-2.0",
+    "speakerCount": 0,
+    "releaseDate": "2025-08",
+    "status": "approved",
+    "recommended": true,
+    "notes": ""
+  },
+  {
+    "id": "zipformer-de-kroko",
+    "displayName": "German - Zipformer",
+    "type": "asr",
+    "architecture": "transducer",
+    "languages": ["de"],
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-de-kroko-2025-08-06.tar.bz2",
+    "downloadSizeMb": 55,
+    "fileStructure": {
+      "encoder": "encoder.onnx",
+      "decoder": "decoder.onnx",
+      "joiner": "joiner.onnx",
+      "tokens": "tokens.txt"
+    },
+    "origin": "Next-gen Kaldi / k2-fsa",
+    "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx",
+    "license": "Apache-2.0",
+    "speakerCount": 0,
+    "releaseDate": "2025-08",
+    "status": "approved",
+    "recommended": true,
+    "notes": ""
+  },
+  {
+    "id": "nemo-parakeet-tdt-0.6b-v3-int8",
+    "displayName": "Multilingual - Parakeet TDT (25 languages)",
+    "type": "asr",
+    "architecture": "offlineNemoTransducer",
+    "languages": [
+      "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de",
+      "el", "hu", "it", "lv", "lt", "mt", "pl", "pt", "ro", "sk",
+      "sl", "es", "sv", "ru", "uk"
+    ],
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+    "downloadSizeMb": 465,
+    "fileStructure": {
+      "encoder": "encoder.int8.onnx",
+      "decoder": "decoder.int8.onnx",
+      "joiner": "joiner.int8.onnx",
+      "tokens": "tokens.txt"
+    },
+    "origin": "NVIDIA NeMo / k2-fsa",
+    "sourceUrl": "https://github.com/NVIDIA/NeMo",
+    "license": "Apache-2.0",
+    "speakerCount": 0,
+    "releaseDate": "2025-08",
+    "status": "approved",
+    "recommended": true,
+    "notes": ""
+  },
+  {
+    "id": "kokoro-en-v0_19-int8",
+    "displayName": "English - Kokoro",
+    "type": "tts",
+    "architecture": "kokoro",
+    "languages": ["en"],
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-en-v0_19.tar.bz2",
+    "downloadSizeMb": 99,
+    "fileStructure": {
+      "model": "model.int8.onnx",
+      "voices": "voices.bin",
+      "tokens": "tokens.txt",
+      "dataDir": "espeak-ng-data"
+    },
+    "origin": "Kokoro / Hexgrad",
+    "sourceUrl": "https://github.com/hexgrad/kokoro",
+    "license": "Apache-2.0",
+    "speakerCount": 54,
+    "releaseDate": "2025-01",
+    "status": "approved",
+    "recommended": true,
+    "notes": ""
+  },
+  {
+    "id": "piper-en-lessac-medium-int8",
+    "displayName": "English - Lessac",
+    "type": "tts",
+    "architecture": "vitsPiper",
+    "languages": ["en"],
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium-int8.tar.bz2",
+    "downloadSizeMb": 20,
+    "fileStructure": {
+      "model": "en_US-lessac-medium.onnx",
+      "tokens": "tokens.txt",
+      "dataDir": "espeak-ng-data"
+    },
+    "origin": "Piper / Rhasspy",
+    "sourceUrl": "https://github.com/rhasspy/piper",
+    "license": "MIT",
+    "speakerCount": 1,
+    "releaseDate": "2024-06",
+    "status": "approved",
+    "recommended": true,
+    "notes": ""
+  },
+  {
+    "id": "piper-de-thorsten-medium-int8",
+    "displayName": "German - Thorsten",
+    "type": "tts",
+    "architecture": "vitsPiper",
+    "languages": ["de"],
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-de_DE-thorsten-medium-int8.tar.bz2",
+    "downloadSizeMb": 20,
+    "fileStructure": {
+      "model": "de_DE-thorsten-medium.onnx",
+      "tokens": "tokens.txt",
+      "dataDir": "espeak-ng-data"
+    },
+    "origin": "Piper / Rhasspy",
+    "sourceUrl": "https://github.com/rhasspy/piper",
+    "license": "MIT",
+    "speakerCount": 1,
+    "releaseDate": "2024-06",
+    "status": "approved",
+    "recommended": true,
+    "notes": ""
+  }
+]

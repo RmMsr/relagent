@@ -16,6 +16,12 @@ class _FakeCachePathProvider extends PathProviderPlatform {
 }
 
 void main() {
+  setUpAll(() async {
+    final fixture =
+        await File('test/fixtures/voice-models.json').readAsString();
+    await ModelCatalog.init(jsonOverride: fixture);
+  });
+
   group('ModelDownloadService — lifecycle', () {
     late Directory tempDir;
     late ModelDownloadService service;

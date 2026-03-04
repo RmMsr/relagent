@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:sherpa_voice/model_archive.dart';
 
 import '/models/model_catalog.dart';
 import '/utils/logger.dart';
@@ -15,10 +15,15 @@ class DownloadProgress {
   final int bytesReceived;
   final int totalBytes;
 
+  /// True while the archive is being extracted after the HTTP download
+  /// completes. During this phase there is no byte progress to show.
+  final bool isExtracting;
+
   const DownloadProgress({
     required this.modelId,
     required this.bytesReceived,
     required this.totalBytes,
+    this.isExtracting = false,
   });
 
   double get fraction => totalBytes > 0 ? bytesReceived / totalBytes : 0;
@@ -145,61 +150,9 @@ class ModelDownloadService {
   /// Extract a .tar.bz2 archive to the model directory.
   Future<void> _extract(File archiveFile, CatalogEntry entry) async {
     Logger.info('Extracting ${entry.id}...');
-
     final dir = await _modelDir(entry);
-    await dir.create(recursive: true);
-
-    final bytes = await archiveFile.readAsBytes();
-    final decompressed = BZip2Decoder().decodeBytes(bytes);
-    final archive = TarDecoder().decodeBytes(decompressed);
-
-    // Sherpa-onnx archives typically have a top-level directory.
-    // We strip it so files go directly into our model directory.
-    final topLevelPrefix = _findTopLevelPrefix(archive);
-    Logger.debug('Archive prefix to strip: $topLevelPrefix');
-
-    for (final file in archive) {
-      if (file.isFile) {
-        var filePath = file.name;
-        if (topLevelPrefix != null && filePath.startsWith(topLevelPrefix)) {
-          filePath = filePath.substring(topLevelPrefix.length);
-        }
-        if (filePath.isEmpty) continue;
-
-        Logger.debug('Extracting: $filePath');
-        final outFile = File(p.join(dir.path, filePath));
-        await outFile.parent.create(recursive: true);
-        await outFile.writeAsBytes(file.content as List<int>);
-      }
-    }
-
-    // Write completion marker
-    final marker = File(p.join(dir.path, _completeMarker));
-    await marker.writeAsString(DateTime.now().toIso8601String());
-
+    await extractModelArchive(archiveFile, dir.path);
     Logger.info('Extracted ${entry.id} to ${dir.path}');
-  }
-
-  /// Find the common top-level directory prefix in a tar archive.
-  String? _findTopLevelPrefix(Archive archive) {
-    if (archive.isEmpty) return null;
-
-    // Log first few entries for debugging
-    final sampleEntries = archive.take(5).map((f) => f.name).toList();
-    Logger.debug('Archive entries (first 5): $sampleEntries');
-
-    final firstName = archive.first.name;
-    final slashIndex = firstName.indexOf('/');
-    if (slashIndex < 0) return null;
-
-    final prefix = firstName.substring(0, slashIndex + 1);
-
-    // Check if all entries share this prefix
-    for (final file in archive) {
-      if (!file.name.startsWith(prefix)) return null;
-    }
-
-    return prefix;
   }
 
   /// Cancel an active download.

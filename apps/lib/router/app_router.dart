@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '/pages/chat_router_page.dart';
 import '/pages/info_page.dart';
-import '/pages/model_selection_page.dart';
+import '/models/model_catalog.dart';
+import '/widgets/model_management_section.dart';
 import '/pages/sessions_page.dart';
 import '/pages/settings_page.dart';
 import '/pages/splash_page.dart';
@@ -36,9 +37,14 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/voice-models',
       name: 'voiceModels',
-      pageBuilder: (context, state) => MaterialPage(
-        child: ModelSelectionPage(initialTab: state.extra as int? ?? 0),
-      ),
+      pageBuilder: (context, state) {
+        final tab = state.extra as int? ?? 0;
+        return MaterialPage(
+          child: ModelCatalogBrowser(
+            initialType: tab == 0 ? ModelType.asr : ModelType.tts,
+          ),
+        );
+      },
     ),
     GoRoute(
       path: '/sessions',

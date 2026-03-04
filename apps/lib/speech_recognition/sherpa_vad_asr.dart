@@ -7,7 +7,7 @@ import 'package:record/record.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
 import '/speech_recognition/services.dart';
-import '/speech_recognition/sherpa_streaming_asr.dart';
+import '/speech_recognition/asr_metadata.dart';
 import '/speech_recognition/utils.dart';
 import '/utils/files.dart';
 import '/utils/logger.dart';

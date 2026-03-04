@@ -218,4 +218,3 @@ When transitioning to TTS playback or idle mode, the Android audio mode SHALL be
 - **WHEN** the audio background service receives a `MODE_RECORDING` signal
 - **THEN** the Android audio mode SHALL be set to `IN_COMMUNICATION`
 - **AND** the microphone SHALL route through the communication path
-

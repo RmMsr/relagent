@@ -6,97 +6,6 @@ import '/providers/model_download_provider.dart';
 import '/providers/settings_provider.dart';
 import '/voice/model_download_service.dart';
 
-/// Voice Models section for the settings page.
-/// Shows current selections and provides access to the model catalog browser.
-class ModelManagementSection extends ConsumerWidget {
-  const ModelManagementSection({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider);
-    final downloadState = ref.watch(modelDownloadProvider);
-
-    final activeAsr = settings.selectedAsrModelId != null
-        ? ModelCatalog.findById(settings.selectedAsrModelId!)
-        : null;
-    final activeTts = settings.selectedTtsModelId != null
-        ? ModelCatalog.findById(settings.selectedTtsModelId!)
-        : null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Voice Models',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        _ModelStatusTile(
-          label: 'Speech Recognition',
-          model: activeAsr,
-          fallbackLabel: 'Bundled model',
-          onBrowse: () => _openCatalogBrowser(context, ModelType.asr),
-        ),
-        _ModelStatusTile(
-          label: 'Text-to-Speech',
-          model: activeTts,
-          fallbackLabel: 'Bundled model',
-          onBrowse: () => _openCatalogBrowser(context, ModelType.tts),
-        ),
-        if (downloadState.totalStorageBytes > 0) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Storage used: ${_formatBytes(downloadState.totalStorageBytes)}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ],
-    );
-  }
-
-  void _openCatalogBrowser(BuildContext context, ModelType type) {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (context) => ModelCatalogBrowser(initialType: type),
-      ),
-    );
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    }
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-}
-
-class _ModelStatusTile extends StatelessWidget {
-  final String label;
-  final CatalogEntry? model;
-  final String fallbackLabel;
-  final VoidCallback onBrowse;
-
-  const _ModelStatusTile({
-    required this.label,
-    required this.model,
-    required this.fallbackLabel,
-    required this.onBrowse,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(label),
-      subtitle: Text(model?.displayName ?? fallbackLabel),
-      trailing: TextButton(
-        onPressed: onBrowse,
-        child: const Text('Browse'),
-      ),
-    );
-  }
-}
-
 /// Full-screen catalog browser for downloading and selecting models.
 class ModelCatalogBrowser extends ConsumerStatefulWidget {
   final ModelType initialType;
@@ -111,6 +20,9 @@ class ModelCatalogBrowser extends ConsumerStatefulWidget {
 class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late TextEditingController _searchController;
+  String _searchQuery = '';
+  bool _downloadedOnly = false;
 
   @override
   void initState() {
@@ -120,16 +32,31 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
       vsync: this,
       initialIndex: widget.initialType == ModelType.asr ? 0 : 1,
     );
+    _searchController = TextEditingController();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<ModelDownloadState>(modelDownloadProvider, (prev, next) {
+      final name = next.lastCompletedModelName;
+      if (name != null && name != prev?.lastCompletedModelName) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$name downloaded'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        ref.read(modelDownloadProvider.notifier).clearCompletedNotification();
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Voice Models'),
@@ -141,49 +68,185 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _ModelList(type: ModelType.asr),
-          _ModelList(type: ModelType.tts),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Filter by name, language…',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                FilterChip(
+                  label: const Text('Downloaded'),
+                  selected: _downloadedOnly,
+                  onSelected: (v) => setState(() => _downloadedOnly = v),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _ModelList(type: ModelType.asr, filterQuery: _searchQuery, downloadedOnly: _downloadedOnly),
+                _ModelList(type: ModelType.tts, filterQuery: _searchQuery, downloadedOnly: _downloadedOnly),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _ModelList extends ConsumerWidget {
+class _ModelList extends ConsumerStatefulWidget {
   final ModelType type;
+  final String filterQuery;
+  final bool downloadedOnly;
 
-  const _ModelList({required this.type});
+  const _ModelList({required this.type, this.filterQuery = '', this.downloadedOnly = false});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final entries = ModelCatalog.byType(type);
-    final downloadState = ref.watch(modelDownloadProvider);
-    final settings = ref.watch(settingsProvider);
+  ConsumerState<_ModelList> createState() => _ModelListState();
+}
 
-    final selectedId = type == ModelType.asr
+class _ModelListState extends ConsumerState<_ModelList> {
+  late final ScrollController _scrollController;
+
+  // Approximate height of a single model card including its vertical margin.
+  static const double _cardHeight = 148.0;
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = ref.read(settingsProvider);
+    final selectedId = widget.type == ModelType.asr
         ? settings.selectedAsrModelId
         : settings.selectedTtsModelId;
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        final isDownloaded = downloadState.isDownloaded(entry.id);
-        final isSelected = selectedId == entry.id;
-        final isDownloading = downloadState.activeDownload?.modelId == entry.id;
+    double initialOffset = 0;
+    if (selectedId != null) {
+      final index = ModelCatalog.byType(widget.type)
+          .indexWhere((e) => e.id == selectedId);
+      if (index > 0) initialOffset = index * _cardHeight;
+    }
 
-        return _ModelEntryCard(
-          entry: entry,
-          isDownloaded: isDownloaded,
-          isSelected: isSelected,
-          isDownloading: isDownloading,
-          progress: isDownloading ? downloadState.activeDownload : null,
-        );
-      },
+    _scrollController = ScrollController(initialScrollOffset: initialOffset);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  List<CatalogEntry> _applyFilter(
+    List<CatalogEntry> all,
+    ModelDownloadState downloadState,
+  ) {
+    var results = all;
+    if (widget.downloadedOnly) {
+      results = results
+          .where((e) =>
+              downloadState.isDownloaded(e.id) ||
+              downloadState.isDownloadingModel(e.id))
+          .toList();
+    }
+    if (widget.filterQuery.isEmpty) return results;
+    final q = widget.filterQuery.toLowerCase();
+    return results
+        .where(
+          (e) =>
+              e.displayName.toLowerCase().contains(q) ||
+              e.languages.any((l) => l.toLowerCase().contains(q)) ||
+              e.id.toLowerCase().contains(q),
+        )
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final downloadState = ref.watch(modelDownloadProvider);
+    final settings = ref.watch(settingsProvider);
+    final entries = _applyFilter(ModelCatalog.byType(widget.type), downloadState);
+
+    final selectedId = widget.type == ModelType.asr
+        ? settings.selectedAsrModelId
+        : settings.selectedTtsModelId;
+
+    if (downloadState.isScanning) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: entries.length,
+            itemBuilder: (context, index) {
+              final entry = entries[index];
+              final isDownloaded = downloadState.isDownloaded(entry.id);
+              final isSelected = selectedId == entry.id;
+              final isDownloading = downloadState.isDownloadingModel(entry.id);
+
+              return _ModelEntryCard(
+                entry: entry,
+                isDownloaded: isDownloaded,
+                isSelected: isSelected,
+                isDownloading: isDownloading,
+                progress: downloadState.progressFor(entry.id),
+              );
+            },
+          ),
+        ),
+        _StorageFooter(totalBytes: downloadState.totalStorageBytes),
+      ],
+    );
+  }
+}
+
+class _StorageFooter extends StatelessWidget {
+  final int totalBytes;
+
+  const _StorageFooter({required this.totalBytes});
+
+  @override
+  Widget build(BuildContext context) {
+    if (totalBytes <= 0) return const SizedBox.shrink();
+
+    final label = totalBytes < 1024 * 1024
+        ? '${(totalBytes / 1024).toStringAsFixed(1)} KB'
+        : '${(totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Text(
+        'Total storage used by voice models: $label',
+        style: Theme.of(context).textTheme.bodySmall,
+        textAlign: TextAlign.center,
+      ),
     );
   }
 }
@@ -203,9 +266,22 @@ class _ModelEntryCard extends ConsumerWidget {
     this.progress,
   });
 
+  String? _modeLabel() {
+    if (entry.type == ModelType.tts) return null;
+    if (entry.supportsStreaming) return 'mode: live';
+    if (entry.architecture == ModelArchitecture.offlineNemoTransducer) {
+      return 'mode: chunked';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final modeLabel = _modeLabel();
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -219,6 +295,15 @@ class _ModelEntryCard extends ConsumerWidget {
             children: [
               Row(
                 children: [
+                  if (entry.recommended)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Icon(
+                        Icons.star,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
                   Expanded(
                     child: Text(
                       entry.displayName,
@@ -229,72 +314,88 @@ class _ModelEntryCard extends ConsumerWidget {
                   ),
                   if (isSelected)
                     Icon(Icons.check_circle, color: theme.colorScheme.primary),
-                  if (entry.supportsStreaming)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Chip(
-                        label: const Text('Live'),
-                        labelStyle: theme.textTheme.labelSmall,
-                        padding: EdgeInsets.zero,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
                 ],
               ),
+              const SizedBox(height: 2),
+              Text(entry.id, style: muted),
               const SizedBox(height: 4),
               Text(
                 entry.languages.join(', '),
                 style: theme.textTheme.bodySmall,
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text(
+              if (isDownloading && progress != null)
+                // Download in progress: full-width progress bar, no meta text.
+                if (progress!.isExtracting)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('Preparing…', style: muted),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: LinearProgressIndicator(
+                          value: progress!.fraction,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('${progress!.percent}%',
+                          style: theme.textTheme.bodySmall),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () => _cancelDownload(ref),
+                        visualDensity: VisualDensity.compact,
+                        tooltip: 'Cancel',
+                      ),
+                    ],
+                  )
+              else ...[
+                // Meta info and action button on separate lines to avoid
+                // overflow when the button is wide relative to card width.
+                Text(
+                  [
                     '${entry.downloadSizeMb.round()} MB',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (isDownloading && progress != null) ...[
-                    Expanded(
-                      flex: 2,
-                      child: LinearProgressIndicator(
-                        value: progress!.fraction,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text('${progress!.percent}%',
-                        style: theme.textTheme.bodySmall),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => _cancelDownload(ref),
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Cancel',
-                    ),
-                  ] else if (isDownloaded) ...[
-                    if (!isSelected)
-                      TextButton(
-                        onPressed: () => _selectModel(ref),
-                        child: const Text('Select'),
-                      ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 20),
-                      onPressed: () => _deleteModel(context, ref),
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Delete',
-                    ),
-                  ] else ...[
-                    FilledButton.tonalIcon(
-                      onPressed: () => _downloadModel(ref),
-                      icon: const Icon(Icons.download, size: 18),
-                      label: const Text('Download'),
-                    ),
-                  ],
-                ],
-              ),
+                    ?modeLabel,
+                  ].join(' · '),
+                  style: muted,
+                ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: isDownloaded
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!isSelected)
+                              TextButton(
+                                onPressed: () => _selectModel(ref),
+                                child: const Text('Select'),
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 20),
+                              onPressed: () => _deleteModel(context, ref),
+                              visualDensity: VisualDensity.compact,
+                              tooltip: 'Delete',
+                            ),
+                          ],
+                        )
+                      : FilledButton.tonalIcon(
+                          onPressed: () => _downloadModel(ref),
+                          icon: const Icon(Icons.download, size: 18),
+                          label: const Text('Download'),
+                        ),
+                ),
+              ],
             ],
           ),
         ),

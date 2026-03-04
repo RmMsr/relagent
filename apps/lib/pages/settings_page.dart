@@ -11,7 +11,6 @@ import '/providers/settings_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/services/api_health_check.dart';
 import '/voice/model_resolver.dart';
-import '/widgets/model_management_section.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -596,22 +595,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  String _asrModelDisplayName(Settings settings) {
-    final id = settings.selectedAsrModelId;
+  Widget _modelSubtitle(BuildContext context, String? id, String? bundledName) {
+    final muted = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        );
     if (id == null) {
-      final name = AppConfig.speechRecognitionStreamingAsrModelName;
-      return name != null ? 'Bundled: $name' : 'Bundled';
+      final label = bundledName != null ? 'Bundled: $bundledName' : 'Bundled';
+      return Text(label);
     }
-    return ModelCatalog.findById(id)?.displayName ?? id;
-  }
-
-  String _ttsModelDisplayName(Settings settings) {
-    final id = settings.selectedTtsModelId;
-    if (id == null) {
-      final name = AppConfig.ttsModelName;
-      return name != null ? 'Bundled: $name' : 'Bundled';
-    }
-    return ModelCatalog.findById(id)?.displayName ?? id;
+    final entry = ModelCatalog.findById(id);
+    if (entry == null) return Text(id);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('${entry.displayName} · ${entry.downloadSizeMb.round()} MB'),
+        Text(id, style: muted),
+      ],
+    );
   }
 
   Future<void> _resetToDefaults() async {
@@ -998,10 +998,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onClear: _clearEngineCredentials,
               ),
             ],
-            if (!kIsWeb) ...[
-              const SizedBox(height: 32),
-              const ModelManagementSection(),
-            ],
             if (ref.read(voiceCapabilitiesProvider).isAsrAvailable ||
                 ref.read(voiceCapabilitiesProvider).isTtsAvailable) ...[
               const SizedBox(height: 32),
@@ -1014,7 +1010,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.mic),
                 title: const Text('Speech Recognition'),
-                subtitle: Text(_asrModelDisplayName(settings)),
+                subtitle: _modelSubtitle(
+                  context,
+                  settings.selectedAsrModelId,
+                  AppConfig.speechRecognitionStreamingAsrModelName,
+                ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/voice-models', extra: 0),
               ),
@@ -1022,7 +1022,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.record_voice_over),
                 title: const Text('Text-to-Speech'),
-                subtitle: Text(_ttsModelDisplayName(settings)),
+                subtitle: _modelSubtitle(
+                  context,
+                  settings.selectedTtsModelId,
+                  AppConfig.ttsModelName,
+                ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/voice-models', extra: 1),
               ),

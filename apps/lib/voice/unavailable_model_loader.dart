@@ -1,4 +1,4 @@
-import '/voice/model_loader.dart';
+import 'package:sherpa_voice/model_loader.dart';
 
 /// Model loader for platforms that cannot load local models (web).
 /// All methods throw UnsupportedError.

@@ -1,7 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:relagent/models/model_catalog.dart';
 
 void main() {
+  setUpAll(() async {
+    final fixture = await File('test/fixtures/voice-models.json').readAsString();
+    await ModelCatalog.init(jsonOverride: fixture);
+  });
+
   group('ModelCatalog', () {
     test('entries is not empty', () {
       expect(ModelCatalog.entries, isNotEmpty);
@@ -139,12 +146,12 @@ void main() {
         }
       });
 
-      test('all entries have non-empty license', () {
+      test('all entries have non-empty sourceUrl', () {
         for (final entry in ModelCatalog.entries) {
           expect(
-            entry.license,
+            entry.sourceUrl,
             isNotEmpty,
-            reason: '${entry.id} has empty license',
+            reason: '${entry.id} has empty sourceUrl',
           );
         }
       });
@@ -246,6 +253,35 @@ void main() {
             isFalse,
             reason: '${model.id} should not support streaming',
           );
+        }
+      });
+    });
+
+    group('recommended flag', () {
+      test('all approved seed entries are recommended', () {
+        for (final entry in ModelCatalog.entries) {
+          expect(
+            entry.recommended,
+            isTrue,
+            reason: '${entry.id} should be recommended',
+          );
+        }
+      });
+
+      test('recommended entries sort before non-recommended', () {
+        // This is verified by the alphabetical sort test when all are
+        // recommended. Verify that the sort comparator works correctly
+        // by checking the entries list ordering is stable.
+        for (final type in ModelType.values) {
+          final entries = ModelCatalog.byType(type);
+          var seenNonRecommended = false;
+          for (final entry in entries) {
+            if (!entry.recommended) seenNonRecommended = true;
+            if (seenNonRecommended) {
+              expect(entry.recommended, isFalse,
+                  reason: 'Recommended entries must come before non-recommended');
+            }
+          }
         }
       });
     });

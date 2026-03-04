@@ -5,7 +5,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '/utils/logger.dart';
-import '/voice/model_loader.dart';
+import 'package:sherpa_voice/model_loader.dart';
 
 /// Loads models from bundled Flutter assets by copying them to the cache directory.
 class AssetModelLoader implements ModelLoader {

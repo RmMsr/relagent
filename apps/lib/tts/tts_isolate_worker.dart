@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
@@ -29,7 +30,17 @@ class InitializeTtsMessage extends TtsWorkerMessage {
   /// If non-null, use resolved downloaded model instead of bundled assets.
   final ResolvedTtsModel? resolvedModel;
 
-  InitializeTtsMessage(this.responsePort, this.modelName, {this.resolvedModel});
+  /// Absolute path to a reference WAV file for voice-cloning models (Pocket TTS).
+  /// When set the isolate loads the audio after bindings are initialized and
+  /// uses [sherpa_onnx.OfflineTts.generateWithConfig] for generation.
+  final String? referenceWavPath;
+
+  InitializeTtsMessage(
+    this.responsePort,
+    this.modelName, {
+    this.resolvedModel,
+    this.referenceWavPath,
+  });
 }
 
 class GenerateAudioMessage extends TtsWorkerMessage {
@@ -78,6 +89,8 @@ sherpa_onnx.OfflineTtsModelConfig _buildConfigFromResolvedPaths(
           voices: paths['voices']!,
           tokens: paths['tokens']!,
           dataDir: paths['dataDir']!,
+          // Multilingual Kokoro v1.0+ requires a lexicon file.
+          lexicon: paths['lexicon'] ?? '',
         ),
         numThreads: 2,
         debug: false,
@@ -89,6 +102,21 @@ sherpa_onnx.OfflineTtsModelConfig _buildConfigFromResolvedPaths(
           model: paths['model']!,
           tokens: paths['tokens']!,
           dataDir: paths['dataDir']!,
+        ),
+        numThreads: 2,
+        debug: false,
+      );
+
+    case ModelArchitecture.pocket:
+      return sherpa_onnx.OfflineTtsModelConfig(
+        pocket: sherpa_onnx.OfflineTtsPocketModelConfig(
+          lmFlow: paths['lmFlow']!,
+          lmMain: paths['lmMain']!,
+          encoder: paths['encoder']!,
+          decoder: paths['decoder']!,
+          textConditioner: paths['textConditioner']!,
+          vocabJson: paths['vocabJson']!,
+          tokenScoresJson: paths['tokenScoresJson']!,
         ),
         numThreads: 2,
         debug: false,
@@ -112,6 +140,9 @@ void _ttsWorkerIsolate(_IsolateTask task) {
   sherpa_onnx.OfflineTts? tts;
   bool isInitialized = false;
   String? modelName;
+  // Reference audio for voice-cloning models (Pocket TTS).
+  Float32List? referenceAudio;
+  int referenceSampleRate = 0;
 
   receivePort.listen((message) async {
     try {
@@ -131,6 +162,17 @@ void _ttsWorkerIsolate(_IsolateTask task) {
               Logger.debug(
                 '[TTS Worker] Sherpa-ONNX bindings initialized (${bindingsStopwatch.elapsedMilliseconds}ms)',
               );
+
+              // Load reference audio for voice-cloning models after bindings
+              // are initialized so readWave() can use the native library.
+              if (message.referenceWavPath != null) {
+                final wave = sherpa_onnx.readWave(message.referenceWavPath!);
+                referenceAudio = wave.samples;
+                referenceSampleRate = wave.sampleRate;
+                Logger.debug(
+                  '[TTS Worker] Loaded reference audio: ${wave.samples.length} samples @ ${wave.sampleRate} Hz',
+                );
+              }
 
               final modelStopwatch = Stopwatch()..start();
               Logger.debug('[TTS Worker] Creating TTS model...');
@@ -189,11 +231,23 @@ void _ttsWorkerIsolate(_IsolateTask task) {
           );
 
           final generateStopwatch = Stopwatch()..start();
-          final audio = tts!.generate(
-            text: message.text,
-            sid: message.speakerId,
-            speed: message.speed,
-          );
+          // Voice-cloning models (Pocket TTS) require generateWithConfig with
+          // a reference audio; standard models use the simpler generate() API.
+          final audio = referenceAudio != null
+              ? tts!.generateWithConfig(
+                  text: message.text,
+                  config: sherpa_onnx.OfflineTtsGenerationConfig(
+                    referenceAudio: referenceAudio,
+                    referenceSampleRate: referenceSampleRate,
+                    speed: message.speed,
+                    sid: message.speakerId,
+                  ),
+                )
+              : tts!.generate(
+                  text: message.text,
+                  sid: message.speakerId,
+                  speed: message.speed,
+                );
           generateStopwatch.stop();
 
           if (audio.samples.isEmpty) {
@@ -272,6 +326,9 @@ class TtsIsolateWorker {
       await preCacheTtsModelFiles(modelName: modelName);
     }
 
+    // Pocket TTS (voice cloning) uses a reference WAV bundled with the model.
+    final referenceWavPath = resolvedModel?.resolvedPaths['referenceWav'];
+
     Logger.debug('[TTS Manager] Spawning worker isolate...');
     final receivePort = ReceivePort();
 
@@ -303,6 +360,7 @@ class TtsIsolateWorker {
         initResponsePort.sendPort,
         effectiveModelName,
         resolvedModel: resolvedModel,
+        referenceWavPath: referenceWavPath,
       ),
     );
 

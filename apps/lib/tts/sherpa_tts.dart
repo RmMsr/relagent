@@ -1,10 +1,11 @@
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
+import 'package:sherpa_voice/tts_config.dart';
 
 import '/config/app_config.dart';
 import '/models/model_catalog.dart';
 import '/utils/files.dart';
 import '/utils/logger.dart';
-import '/voice/model_loader.dart';
+import 'package:sherpa_voice/model_loader.dart';
 
 /// Metadata needed to configure the TTS engine.
 class TtsModelMetadata {
@@ -44,17 +45,13 @@ Future<void> preCacheTtsModelFiles({String? modelName}) async {
 Future<sherpa_onnx.OfflineTts> createOfflineTtsFromMetadata(
   TtsModelMetadata metadata,
 ) async {
-  final modelConfig = await _buildModelConfig(metadata);
-
   Logger.debug('[TTS] Creating OfflineTts with ${metadata.architecture.name}');
-
-  final config = sherpa_onnx.OfflineTtsConfig(
-    model: modelConfig,
-    ruleFsts: '',
-    maxNumSenetences: 1,
+  return buildTtsEngine(
+    metadata.architecture,
+    metadata.fileStructure,
+    metadata.loader,
+    metadata.modelId,
   );
-
-  return sherpa_onnx.OfflineTts(config);
 }
 
 /// Create an OfflineTts using a model bundled in assets (asset shortcut path).
@@ -79,44 +76,6 @@ Future<sherpa_onnx.OfflineTts> createOfflineTts({String? modelName}) async {
   );
 
   return sherpa_onnx.OfflineTts(config);
-}
-
-Future<sherpa_onnx.OfflineTtsModelConfig> _buildModelConfig(
-  TtsModelMetadata metadata,
-) async {
-  final files = metadata.fileStructure;
-  final loader = metadata.loader;
-  final modelId = metadata.modelId;
-
-  switch (metadata.architecture) {
-    case ModelArchitecture.kokoro:
-      return sherpa_onnx.OfflineTtsModelConfig(
-        kokoro: sherpa_onnx.OfflineTtsKokoroModelConfig(
-          model: await loader.loadModelFile(modelId, files['model']!),
-          voices: await loader.loadModelFile(modelId, files['voices']!),
-          tokens: await loader.loadModelFile(modelId, files['tokens']!),
-          dataDir: await loader.loadModelDirectory(modelId, files['dataDir']!),
-        ),
-        numThreads: 2,
-        debug: false,
-      );
-
-    case ModelArchitecture.vitsPiper:
-      return sherpa_onnx.OfflineTtsModelConfig(
-        vits: sherpa_onnx.OfflineTtsVitsModelConfig(
-          model: await loader.loadModelFile(modelId, files['model']!),
-          tokens: await loader.loadModelFile(modelId, files['tokens']!),
-          dataDir: await loader.loadModelDirectory(modelId, files['dataDir']!),
-        ),
-        numThreads: 2,
-        debug: false,
-      );
-
-    default:
-      throw ArgumentError(
-        'Unsupported TTS architecture: ${metadata.architecture}',
-      );
-  }
 }
 
 /// Asset shortcut: build config from a Kokoro model bundled in assets.

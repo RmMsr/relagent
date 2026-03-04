@@ -1,3 +1,10 @@
+import 'dart:convert';
+
+import 'package:flutter/services.dart';
+import 'package:sherpa_voice/model_architecture.dart';
+
+export 'package:sherpa_voice/model_architecture.dart';
+
 /// A model available for download in the curated catalog.
 class CatalogEntry {
   /// Unique identifier (used for storage and selection).
@@ -16,7 +23,7 @@ class CatalogEntry {
   final ModelArchitecture architecture;
 
   /// Whether this ASR model supports streaming/live recognition.
-  /// Always false for TTS models.
+  /// Always false for TTS models. Derived from [architecture] in fromJson.
   final bool supportsStreaming;
 
   /// Direct download URL for the .tar.bz2 archive.
@@ -33,14 +40,17 @@ class CatalogEntry {
   /// Origin project or organization (e.g., "Next-gen Kaldi / k2-fsa").
   final String origin;
 
-  /// License identifier (e.g., "Apache-2.0", "MIT").
-  final String license;
+  /// URL to the upstream repository so users can verify licensing themselves.
+  final String sourceUrl;
 
   /// Number of speaker voices (0 for ASR, 1 for single-speaker TTS, 54 for Kokoro).
   final int speakerCount;
 
   /// Release date in "YYYY-MM" format.
   final String releaseDate;
+
+  /// Whether this is the recommended pick for its language+type combination.
+  final bool recommended;
 
   const CatalogEntry({
     required this.id,
@@ -53,267 +63,150 @@ class CatalogEntry {
     required this.downloadSizeMb,
     required this.fileStructure,
     required this.origin,
-    required this.license,
+    required this.sourceUrl,
     this.speakerCount = 0,
     required this.releaseDate,
+    this.recommended = false,
   });
+
+  factory CatalogEntry.fromJson(Map<String, dynamic> json) {
+    String require(String key) {
+      final value = json[key] as String?;
+      if (value == null) throw FormatException('Missing required field: $key');
+      return value;
+    }
+
+    final typeStr = require('type');
+    final type = ModelType.values.firstWhere(
+      (e) => e.name == typeStr,
+      orElse: () => throw FormatException('Unknown model type: $typeStr'),
+    );
+
+    final archStr = require('architecture');
+    final architecture = ModelArchitecture.values.firstWhere(
+      (e) => e.name == archStr,
+      orElse: () => throw FormatException('Unknown architecture: $archStr'),
+    );
+
+    // Derived from architecture per spec: live architectures support streaming.
+    final supportsStreaming = architecture == ModelArchitecture.transducer ||
+        architecture == ModelArchitecture.ctc ||
+        architecture == ModelArchitecture.onlineNemoCtc;
+
+    final languagesRaw = json['languages'];
+    if (languagesRaw == null) {
+      throw const FormatException('Missing required field: languages');
+    }
+    final languages = List<String>.from(languagesRaw as List);
+
+    final fileStructureRaw = json['fileStructure'];
+    if (fileStructureRaw == null) {
+      throw const FormatException('Missing required field: fileStructure');
+    }
+    final fileStructure = Map<String, String>.from(fileStructureRaw as Map);
+
+    final downloadSizeMbRaw = json['downloadSizeMb'];
+    if (downloadSizeMbRaw == null) {
+      throw const FormatException('Missing required field: downloadSizeMb');
+    }
+
+    return CatalogEntry(
+      id: require('id'),
+      displayName: require('displayName'),
+      type: type,
+      languages: languages,
+      architecture: architecture,
+      supportsStreaming: supportsStreaming,
+      downloadUrl: require('downloadUrl'),
+      downloadSizeMb: (downloadSizeMbRaw as num).toDouble(),
+      fileStructure: fileStructure,
+      origin: require('origin'),
+      sourceUrl: json['sourceUrl'] as String? ?? '',
+      speakerCount: (json['speakerCount'] as int?) ?? 0,
+      releaseDate: require('releaseDate'),
+      recommended: (json['recommended'] as bool?) ?? false,
+    );
+  }
 }
 
-/// Architecture/engine of the model, determines how to configure sherpa-onnx.
-enum ModelArchitecture {
-  /// Zipformer transducer: encoder + decoder + joiner
-  transducer,
-
-  /// CTC: encoder only (e.g., omnilingual model)
-  ctc,
-
-  /// Piper VITS: model.onnx + tokens.txt + espeak-ng-data
-  vitsPiper,
-
-  /// Kokoro: model.onnx + voices.bin + tokens.txt + espeak-ng-data
-  kokoro,
-
-  /// Nemo CTC: model.onnx + tokens.txt
-  onlineNemoCtc,
-
-  /// NeMo offline transducer: encoder + decoder + joiner (VAD-simulated streaming)
-  offlineNemoTransducer,
-}
-
-/// The curated model catalog.
+/// The curated model catalog, loaded from assets/voice-models.json at startup.
 class ModelCatalog {
-  static const _ghRelease =
-      'https://github.com/k2-fsa/sherpa-onnx/releases/download';
+  static List<CatalogEntry> _entries = [];
 
-  // Entries sorted alphabetically by displayName within each type.
-  static const List<CatalogEntry> entries = [
-    // --- ASR Models (alphabetical) ---
-    CatalogEntry(
-      id: 'zipformer-en-kroko',
-      displayName: 'English - Zipformer',
-      type: ModelType.asr,
-      languages: ['en'],
-      architecture: ModelArchitecture.transducer,
-      supportsStreaming: true,
-      downloadUrl:
-          '$_ghRelease/asr-models/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06.tar.bz2',
-      downloadSizeMb: 55,
-      fileStructure: {
-        'encoder': 'encoder.onnx',
-        'decoder': 'decoder.onnx',
-        'joiner': 'joiner.onnx',
-        'tokens': 'tokens.txt',
-      },
-      origin: 'Next-gen Kaldi / k2-fsa',
-      license: 'Apache-2.0',
-      releaseDate: '2025-08',
-    ),
+  /// All approved catalog entries. Populated by [init] at app startup.
+  static List<CatalogEntry> get entries => List.unmodifiable(_entries);
 
-    CatalogEntry(
-      id: 'zipformer-fr-kroko',
-      displayName: 'French - Zipformer',
-      type: ModelType.asr,
-      languages: ['fr'],
-      architecture: ModelArchitecture.transducer,
-      supportsStreaming: true,
-      downloadUrl:
-          '$_ghRelease/asr-models/sherpa-onnx-streaming-zipformer-fr-kroko-2025-08-06.tar.bz2',
-      downloadSizeMb: 55,
-      fileStructure: {
-        'encoder': 'encoder.onnx',
-        'decoder': 'decoder.onnx',
-        'joiner': 'joiner.onnx',
-        'tokens': 'tokens.txt',
-      },
-      origin: 'Next-gen Kaldi / k2-fsa',
-      license: 'Apache-2.0',
-      releaseDate: '2025-08',
-    ),
-
-    CatalogEntry(
-      id: 'zipformer-de-kroko',
-      displayName: 'German - Zipformer',
-      type: ModelType.asr,
-      languages: ['de'],
-      architecture: ModelArchitecture.transducer,
-      supportsStreaming: true,
-      downloadUrl:
-          '$_ghRelease/asr-models/sherpa-onnx-streaming-zipformer-de-kroko-2025-08-06.tar.bz2',
-      downloadSizeMb: 55,
-      fileStructure: {
-        'encoder': 'encoder.onnx',
-        'decoder': 'decoder.onnx',
-        'joiner': 'joiner.onnx',
-        'tokens': 'tokens.txt',
-      },
-      origin: 'Next-gen Kaldi / k2-fsa',
-      license: 'Apache-2.0',
-      releaseDate: '2025-08',
-    ),
-
-    CatalogEntry(
-      id: 'nemo-parakeet-tdt-0.6b-v3-int8',
-      displayName: 'Multilingual - Parakeet TDT (25 languages)',
-      type: ModelType.asr,
-      languages: [
-        'bg',
-        'hr',
-        'cs',
-        'da',
-        'nl',
-        'en',
-        'et',
-        'fi',
-        'fr',
-        'de',
-        'el',
-        'hu',
-        'it',
-        'lv',
-        'lt',
-        'mt',
-        'pl',
-        'pt',
-        'ro',
-        'sk',
-        'sl',
-        'es',
-        'sv',
-        'ru',
-        'uk',
-      ],
-      architecture: ModelArchitecture.offlineNemoTransducer,
-      supportsStreaming: true,
-      downloadUrl:
-          '$_ghRelease/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2',
-      downloadSizeMb: 465,
-      fileStructure: {
-        'encoder': 'encoder.int8.onnx',
-        'decoder': 'decoder.int8.onnx',
-        'joiner': 'joiner.int8.onnx',
-        'tokens': 'tokens.txt',
-      },
-      origin: 'NVIDIA NeMo / k2-fsa',
-      license: 'Apache-2.0',
-      releaseDate: '2025-08',
-    ),
-
-    // Omnilingual CTC model (omnilingual-ctc-v2-int8) removed:
-    // This is an offline-only model (no streaming support). Our app uses
-    // OnlineRecognizer for real-time streaming ASR. The model crashes with
-    // "'encoder_dims' does not exist in the metadata" because it's not a
-    // zipformer2 CTC model. Re-add when offline ASR support is implemented.
-
-    // --- TTS Models (alphabetical) ---
-    CatalogEntry(
-      id: 'kokoro-en-v0_19-int8',
-      displayName: 'English - Kokoro',
-      type: ModelType.tts,
-      languages: ['en'],
-      architecture: ModelArchitecture.kokoro,
-      downloadUrl: '$_ghRelease/tts-models/kokoro-int8-en-v0_19.tar.bz2',
-      downloadSizeMb: 99,
-      fileStructure: {
-        'model': 'model.int8.onnx',
-        'voices': 'voices.bin',
-        'tokens': 'tokens.txt',
-        'dataDir': 'espeak-ng-data',
-      },
-      origin: 'Kokoro / Hexgrad',
-      license: 'Apache-2.0',
-      speakerCount: 54,
-      releaseDate: '2025-01',
-    ),
-
-    CatalogEntry(
-      id: 'piper-en-lessac-medium-int8',
-      displayName: 'English - Lessac',
-      type: ModelType.tts,
-      languages: ['en'],
-      architecture: ModelArchitecture.vitsPiper,
-      downloadUrl:
-          '$_ghRelease/tts-models/vits-piper-en_US-lessac-medium-int8.tar.bz2',
-      downloadSizeMb: 20,
-      fileStructure: {
-        'model': 'en_US-lessac-medium.onnx',
-        'tokens': 'tokens.txt',
-        'dataDir': 'espeak-ng-data',
-      },
-      origin: 'Piper / Rhasspy',
-      license: 'MIT',
-      speakerCount: 1,
-      releaseDate: '2024-06',
-    ),
-
-    // tts-models/vits-piper-fr_FR-siwis-medium-int8.tar.bz2 removed because it crashes
-    // tts-models/vits-piper-fr_FR-tom-medium-int8.tar.bz2 removed because it crashes
-    CatalogEntry(
-      id: 'piper-de-thorsten-medium-int8',
-      displayName: 'German - Thorsten',
-      type: ModelType.tts,
-      languages: ['de'],
-      architecture: ModelArchitecture.vitsPiper,
-      downloadUrl:
-          '$_ghRelease/tts-models/vits-piper-de_DE-thorsten-medium-int8.tar.bz2',
-      downloadSizeMb: 20,
-      fileStructure: {
-        'model': 'de_DE-thorsten-medium.onnx',
-        'tokens': 'tokens.txt',
-        'dataDir': 'espeak-ng-data',
-      },
-      origin: 'Piper / Rhasspy',
-      license: 'MIT',
-      speakerCount: 1,
-      releaseDate: '2024-06',
-    ),
-
-    // Norwegian Piper model (piper-no-talesyntese-medium-int8) removed:
-    // Crashes with "Failed to set eSpeak-ng voice" during audio generation.
-    // The eSpeak-ng library bundled in sherpa-onnx 1.12.25 does not support
-    // the Norwegian Bokmal voice code "nb". Re-add when sherpa-onnx fixes this.
-
-    // vits-piper-ru_RU-dmitri-medium-int8.tar.bz2 removed because it crashes
-    // vits-piper-ru_RU-irina-medium-int8.tar.bz2 removed because it crashes
-    // vits-piper-sv_SE-nst-medium-int8.tar.bz2 removed because it crashes
-  ];
+  /// Load and parse voice-models.json, caching only approved entries.
+  ///
+  /// Must be called once before any catalog queries. Accepts an optional
+  /// [jsonOverride] string for testing without the Flutter asset bundle.
+  static Future<void> init({String? jsonOverride}) async {
+    final jsonString =
+        jsonOverride ?? await rootBundle.loadString('assets/voice-models.json');
+    final rawList = jsonDecode(jsonString) as List<dynamic>;
+    _entries = rawList
+        .cast<Map<String, dynamic>>()
+        .where((e) {
+          final status = e['status'] as String?;
+          return status == 'approved';
+        })
+        .expand((e) {
+          try {
+            return [CatalogEntry.fromJson(e)];
+          } catch (_) {
+            return <CatalogEntry>[];
+          }
+        })
+        .toList();
+  }
 
   /// All unique language codes in the catalog.
   static Set<String> get availableLanguages {
     final languages = <String>{};
-    for (final entry in entries) {
+    for (final entry in _entries) {
       languages.addAll(entry.languages);
     }
     return languages;
   }
 
-  /// Get entries matching a language code.
+  /// Get entries matching a language code, recommended entries first.
   static List<CatalogEntry> byLanguage(String languageCode) {
-    return entries.where((e) => e.languages.contains(languageCode)).toList();
+    return _entries
+        .where((e) => e.languages.contains(languageCode))
+        .toList()
+      ..sort(_recommendedFirst);
   }
 
-  /// Get all entries of a specific type.
+  /// Get all entries of a specific type, recommended entries first.
   static List<CatalogEntry> byType(ModelType type) {
-    return entries.where((e) => e.type == type).toList();
+    return _entries.where((e) => e.type == type).toList()
+      ..sort(_recommendedFirst);
   }
 
-  /// Get entries matching a type and language.
+  /// Get entries matching a type and language, recommended entries first.
   static List<CatalogEntry> byTypeAndLanguage(
     ModelType type,
     String languageCode,
   ) {
-    return entries
+    return _entries
         .where((e) => e.type == type && e.languages.contains(languageCode))
-        .toList();
+        .toList()
+      ..sort(_recommendedFirst);
   }
 
   /// Find a catalog entry by its ID.
   static CatalogEntry? findById(String id) {
-    for (final entry in entries) {
+    for (final entry in _entries) {
       if (entry.id == id) return entry;
     }
     return null;
   }
+
+  static int _recommendedFirst(CatalogEntry a, CatalogEntry b) {
+    if (a.recommended != b.recommended) return a.recommended ? -1 : 1;
+    final nameCmp = a.displayName.compareTo(b.displayName);
+    if (nameCmp != 0) return nameCmp;
+    return a.id.compareTo(b.id);
+  }
 }
 
-/// Type of voice model.
-enum ModelType { asr, tts }

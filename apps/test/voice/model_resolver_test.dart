@@ -17,6 +17,12 @@ class _FakeCachePathProvider extends PathProviderPlatform {
 }
 
 void main() {
+  setUpAll(() async {
+    final fixture =
+        await File('test/fixtures/voice-models.json').readAsString();
+    await ModelCatalog.init(jsonOverride: fixture);
+  });
+
   // --- ASR fallback chain (task 10.5) ---
 
   group('resolveAsrMetadata — fallback chain', () {

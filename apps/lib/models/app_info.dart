@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -6,7 +5,6 @@ class AppInfo {
   final String name;
   final String version;
   final String buildNumber;
-  final bool isDebug;
 
   static AppInfo? _data;
 
@@ -14,7 +12,6 @@ class AppInfo {
     this.name = 'Not initialized',
     this.version = 'Not initialized',
     this.buildNumber = 'Not initialized',
-    this.isDebug = true,
   });
 
   static Future<void> initialize() async {
@@ -24,7 +21,6 @@ class AppInfo {
       name: packageInfo.appName,
       version: packageInfo.version,
       buildNumber: packageInfo.buildNumber,
-      isDebug: kDebugMode,
     );
   }
 
@@ -48,12 +44,5 @@ class AppInfo {
   }
 
   @override
-  String toString() {
-    var info = name;
-    if (isDebug) {
-      info += ' 🐞';
-    }
-    info += ' $versionInfo';
-    return info;
-  }
+  String toString() => '$name $versionInfo';
 }

@@ -132,6 +132,8 @@ class TtsNotifier extends Notifier<TtsState> {
     if (service != null) {
       service.speakerId = settings.ttsSpeakerId;
       service.speed = settings.ttsSpeed;
+      // Cached audio was generated at the old speed/speaker — invalidate it.
+      service.clearCache();
     }
   }
 

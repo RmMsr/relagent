@@ -5,7 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '/models/model_catalog.dart';
 import '/utils/logger.dart';
-import '/voice/model_loader.dart';
+import 'package:sherpa_voice/model_loader.dart';
 
 /// Loads models from the cache storage directory (re-downloadable).
 ///

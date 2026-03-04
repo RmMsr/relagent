@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  sherpa_voice:
+    path: ../dart_packages/sherpa_voice
 
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.0.3
@@ -29,12 +31,12 @@ dependencies:
   connectivity_plus: ^7.0.0
   flutter_secure_storage: ^9.2.4
   url_launcher: ^6.3.2
-  archive: ^4.0.7
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  path_provider_platform_interface: ^2.1.2
   flutter_launcher_icons: ^0.14.4
   mockito: ^5.6.1
   build_runner: ^2.10.4
@@ -46,6 +48,7 @@ flutter:
     - assets/icon/app-icon.png
     - assets/config.json
     - assets/silero_vad.onnx
+    - assets/voice-models.json
 
     # Optional bundled voice models
     # Bundling a model ships it pre-installed, eliminating the first-run download

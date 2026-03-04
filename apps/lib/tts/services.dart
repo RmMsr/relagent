@@ -107,6 +107,11 @@ class TtsService {
     _audioCache[messageId] = audio;
   }
 
+  void clearCache() {
+    _audioCache.clear();
+    _cacheOrder.clear();
+  }
+
   void cleanup(Set<String> messageIdsToRemove) {
     for (final messageId in messageIdsToRemove) {
       _audioCache.remove(messageId);
