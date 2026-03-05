@@ -213,6 +213,13 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
 
   /// Sync the native service with the current AudioMode
   Future<void> _syncServiceWithAudioMode(AudioMode mode) async {
+    if (!ref.read(settingsProvider).continuousVoiceEnabled) {
+      Logger.debug(
+        'BackgroundServiceProvider: Continuous voice disabled, skipping service',
+      );
+      return;
+    }
+
     Logger.debug('BackgroundServiceProvider: Syncing service with mode: $mode');
 
     if (!state.isActive) {

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -426,7 +427,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _saveSettings() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_formKey.currentState != null && !_formKey.currentState!.validate()) return;
 
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final settings = ref.read(settingsProvider);
@@ -614,6 +615,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  Future<void> _confirmReset() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset All Settings'),
+        content: const Text(
+          'Reset all settings to defaults? Unsaved changes will be lost.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await _resetToDefaults();
+  }
+
   Future<void> _resetToDefaults() async {
     final success = await ref.read(settingsProvider.notifier).resetToDefaults();
     final settings = ref.read(settingsProvider);
@@ -691,6 +715,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final voiceCapabilities = ref.watch(voiceCapabilitiesProvider);
+    final hasVoice =
+        voiceCapabilities.isAsrAvailable || voiceCapabilities.isTtsAvailable;
+    final hasFeatures = voiceCapabilities.isBackgroundListeningAvailable;
     final urlSuggestions = settings.history
         .map((entry) => entry.url)
         .toSet()
@@ -700,9 +728,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         .toSet()
         .toList();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: Form(
+    final tabs = <Tab>[
+      const Tab(text: 'Connection'),
+      if (hasVoice) const Tab(text: 'Voice'),
+      if (hasFeatures) const Tab(text: 'Features'),
+    ];
+
+    final tabViews = <Widget>[
+      // Connection tab
+      Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16.0),
@@ -998,77 +1032,130 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onClear: _clearEngineCredentials,
               ),
             ],
-            if (ref.read(voiceCapabilitiesProvider).isAsrAvailable ||
-                ref.read(voiceCapabilitiesProvider).isTtsAvailable) ...[
-              const SizedBox(height: 32),
-              const Text(
-                'Voice',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ],
+        ),
+      ),
+      // Voice tab (conditional)
+      if (hasVoice)
+        ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.mic),
+              title: const Text('Speech Recognition'),
+              subtitle: _modelSubtitle(
+                context,
+                settings.selectedAsrModelId,
+                AppConfig.speechRecognitionStreamingAsrModelName,
               ),
-              const SizedBox(height: 8),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.mic),
-                title: const Text('Speech Recognition'),
-                subtitle: _modelSubtitle(
-                  context,
-                  settings.selectedAsrModelId,
-                  AppConfig.speechRecognitionStreamingAsrModelName,
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/voice-models', extra: 0),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/voice-models', extra: 0),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.record_voice_over),
+              title: const Text('Text-to-Speech'),
+              subtitle: _modelSubtitle(
+                context,
+                settings.selectedTtsModelId,
+                AppConfig.ttsModelName,
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.record_voice_over),
-                title: const Text('Text-to-Speech'),
-                subtitle: _modelSubtitle(
-                  context,
-                  settings.selectedTtsModelId,
-                  AppConfig.ttsModelName,
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/voice-models', extra: 1),
-              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/voice-models', extra: 1),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'TTS Speed: ${_ttsSpeed.toStringAsFixed(2)}x',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            Slider(
+              value: _ttsSpeed,
+              min: 0.5,
+              max: 2.0,
+              divisions: 30,
+              label: '${_ttsSpeed.toStringAsFixed(2)}x',
+              onChanged: (value) {
+                setState(() {
+                  _ttsSpeed = value;
+                });
+              },
+            ),
+            Text(
+              'Controls playback speed (0.5x - 2.0x)',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (getSelectedTtsSpeakerCount(settings) > 1) ...[
               const SizedBox(height: 16),
               Text(
-                'TTS Speed: ${_ttsSpeed.toStringAsFixed(2)}x',
+                'TTS Speaker ID: $_ttsSpeakerId',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               Slider(
-                value: _ttsSpeed,
-                min: 0.5,
-                max: 2.0,
-                divisions: 30,
-                label: '${_ttsSpeed.toStringAsFixed(2)}x',
-                onChanged: (value) {
-                  setState(() {
-                    _ttsSpeed = value;
-                  });
-                },
+                value: _ttsSpeakerId.toDouble(),
+                min: 0,
+                max: (getSelectedTtsSpeakerCount(settings) - 1).toDouble(),
+                divisions: getSelectedTtsSpeakerCount(settings) - 1,
+                label: '$_ttsSpeakerId',
+                onChanged: (v) => setState(() => _ttsSpeakerId = v.round()),
               ),
-              Text(
-                'Controls playback speed (0.5x - 2.0x)',
+            ],
+          ],
+        ),
+      // Features tab
+      if (hasFeatures) ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          if (voiceCapabilities.isBackgroundListeningAvailable) ...[
+            SwitchListTile(
+              title: Row(
+                children: [
+                  const Text('Continuous Voice'),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.tertiaryContainer,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Experimental',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onTertiaryContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              subtitle: const Text(
+                'Enables continuous recording and auto-playback modes',
+              ),
+              value: settings.continuousVoiceEnabled,
+              onChanged: (value) {
+                ref
+                    .read(settingsProvider.notifier)
+                    .updateContinuousVoiceEnabled(value);
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'This feature is experimental and may be unreliable. '
+                'Background service currently implemented on Android only.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-              if (getSelectedTtsSpeakerCount(settings) > 1) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'TTS Speaker ID: $_ttsSpeakerId',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                Slider(
-                  value: _ttsSpeakerId.toDouble(),
-                  min: 0,
-                  max: (getSelectedTtsSpeakerCount(settings) - 1).toDouble(),
-                  divisions: getSelectedTtsSpeakerCount(settings) - 1,
-                  label: '$_ttsSpeakerId',
-                  onChanged: (v) => setState(() => _ttsSpeakerId = v.round()),
-                ),
-              ],
-              if (ref.read(voiceCapabilitiesProvider).isAsrAvailable) ...[
-                const SizedBox(height: 16),
-                DropdownButtonFormField<BackgroundListeningDuration>(
+            ),
+            if (settings.continuousVoiceEnabled) ...[
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: DropdownButtonFormField<BackgroundListeningDuration>(
                   initialValue: _backgroundListeningDuration,
                   decoration: const InputDecoration(
                     labelText: 'Background Listening Duration',
@@ -1080,36 +1167,92 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       child: Text(duration.displayName),
                     );
                   }).toList(),
-                  onChanged: (BackgroundListeningDuration? newValue) {
+                  onChanged: (newValue) {
                     if (newValue != null) {
-                      setState(() {
-                        _backgroundListeningDuration = newValue;
-                      });
+                      setState(() => _backgroundListeningDuration = newValue);
+                      ref
+                          .read(settingsProvider.notifier)
+                          .updateBackgroundListeningDuration(newValue);
                     }
                   },
                 ),
-              ],
+              ),
             ],
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _resetToDefaults,
-                    child: const Text('Reset to Defaults'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _saveSettings,
-                    child: const Text('Save'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-              ],
-            ),
           ],
+        ],
+      ),
+    ];  // end tabViews
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final tabBar = TabBar(tabs: tabs);
+
+    return DefaultTabController(
+      length: tabs.length,
+      child: Focus(
+        autofocus: false,
+        skipTraversal: true,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.escape) {
+            context.pop();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Settings'),
+            automaticallyImplyLeading: false,
+            leading: ExcludeFocus(
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.pop(),
+              ),
+            ),
+            bottom: tabs.length > 1
+                ? PreferredSize(
+                    preferredSize: tabBar.preferredSize,
+                    child: tabBar,
+                  )
+                : null,
+          ),
+          body: TabBarView(children: tabViews),
+          bottomNavigationBar: ColoredBox(
+            color: colorScheme.surfaceContainer,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _confirmReset,
+                      child: const Text('Reset'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: FilledButton(
+                      style: ButtonStyle(
+                        side: WidgetStateProperty.resolveWith((states) {
+                          if (states.contains(WidgetState.focused)) {
+                            return BorderSide(
+                              color: colorScheme.onPrimary,
+                              width: 2,
+                            );
+                          }
+                          return null;
+                        }),
+                      ),
+                      onPressed: _saveSettings,
+                      child: const Text('Save'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
         ),
       ),
     );
@@ -1327,6 +1470,7 @@ class _AutocompleteWithFocusLossState<T extends Object>
   @override
   void dispose() {
     _internalFocusNode?.removeListener(_onFocusChange);
+    _internalFocusNode?.onKeyEvent = null;
     super.dispose();
   }
 
@@ -1354,8 +1498,27 @@ class _AutocompleteWithFocusLossState<T extends Object>
       fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
         if (_internalFocusNode != focusNode) {
           _internalFocusNode?.removeListener(_onFocusChange);
+          _internalFocusNode?.onKeyEvent = null;
           _internalFocusNode = focusNode;
           focusNode.addListener(_onFocusChange);
+          focusNode.onKeyEvent = (node, event) {
+            if (event is KeyDownEvent && _showOptions) {
+              if (event.logicalKey == LogicalKeyboardKey.escape) {
+                setState(() => _showOptions = false);
+                return KeyEventResult.handled;
+              }
+              if (event.logicalKey == LogicalKeyboardKey.tab) {
+                setState(() => _showOptions = false);
+                if (HardwareKeyboard.instance.isShiftPressed) {
+                  FocusScope.of(context).previousFocus();
+                } else {
+                  FocusScope.of(context).nextFocus();
+                }
+                return KeyEventResult.handled;
+              }
+            }
+            return KeyEventResult.ignored;
+          };
         }
         return GestureDetector(
           onTap: () {

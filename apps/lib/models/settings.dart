@@ -137,6 +137,9 @@ class Settings {
   // API key indicator fields (actual keys stored in secure storage)
   final bool engineHasApiKey;
   final bool simpleChatHasApiKey;
+  // Continuous voice mode opt-in (experimental)
+  final bool continuousVoiceEnabled;
+
   // Selected voice model IDs (null = use bundled asset model if available)
   final String? selectedAsrModelId;
   final String? selectedTtsModelId;
@@ -160,6 +163,7 @@ class Settings {
     required this.selectedBackend,
     this.engineHasApiKey = false,
     this.simpleChatHasApiKey = false,
+    this.continuousVoiceEnabled = false,
     this.selectedAsrModelId,
     this.selectedTtsModelId,
   });
@@ -171,7 +175,7 @@ class Settings {
       primeMessage: _defaultPrimeMessage,
       ttsSpeakerId: 0,
       ttsSpeed: 1.0,
-      voiceMode: VoiceMode.conversation, // Conversation mode by default
+      voiceMode: VoiceMode.silent,
       backgroundListeningDuration: BackgroundListeningDuration.oneHour,
       authType: AuthType.none,
       username: null,
@@ -182,6 +186,7 @@ class Settings {
       selectedBackend: ChatBackendType.relagentEngine,
       engineHasApiKey: false,
       simpleChatHasApiKey: false,
+      continuousVoiceEnabled: false,
     );
   }
 
@@ -204,6 +209,7 @@ class Settings {
     ChatBackendType? selectedBackend,
     bool? engineHasApiKey,
     bool? simpleChatHasApiKey,
+    bool? continuousVoiceEnabled,
     Object? selectedAsrModelId = _unset,
     Object? selectedTtsModelId = _unset,
   }) {
@@ -229,6 +235,8 @@ class Settings {
       selectedBackend: selectedBackend ?? this.selectedBackend,
       engineHasApiKey: engineHasApiKey ?? this.engineHasApiKey,
       simpleChatHasApiKey: simpleChatHasApiKey ?? this.simpleChatHasApiKey,
+      continuousVoiceEnabled:
+          continuousVoiceEnabled ?? this.continuousVoiceEnabled,
       selectedAsrModelId: selectedAsrModelId == _unset
           ? this.selectedAsrModelId
           : selectedAsrModelId as String?,
@@ -265,6 +273,7 @@ class Settings {
       'selectedBackend': selectedBackend.name,
       'engineHasApiKey': engineHasApiKey,
       'simpleChatHasApiKey': simpleChatHasApiKey,
+      'continuousVoiceEnabled': continuousVoiceEnabled,
       'selectedAsrModelId': selectedAsrModelId,
       'selectedTtsModelId': selectedTtsModelId,
     };
@@ -277,14 +286,22 @@ class Settings {
       final modeStr = json['voiceMode'] as String;
       mode = VoiceMode.values.firstWhere(
         (e) => e.name == modeStr,
-        orElse: () => VoiceMode.conversation,
+        orElse: () => VoiceMode.silent,
       );
     } else if (json.containsKey('ttsAutoQueue')) {
       // Migrate from old boolean setting
       final autoQueue = json['ttsAutoQueue'] as bool;
       mode = autoQueue ? VoiceMode.conversation : VoiceMode.listening;
     } else {
-      mode = VoiceMode.conversation;
+      mode = VoiceMode.silent;
+    }
+
+    // Clamp continuous modes when toggle is off
+    final continuousVoiceEnabled =
+        (json['continuousVoiceEnabled'] as bool?) ?? false;
+    if (!continuousVoiceEnabled &&
+        (mode == VoiceMode.listening || mode == VoiceMode.conversation)) {
+      mode = VoiceMode.silent;
     }
 
     // Parse backgroundListeningDuration
@@ -369,6 +386,7 @@ class Settings {
       selectedBackend: selectedBackend,
       engineHasApiKey: (json['engineHasApiKey'] as bool?) ?? false,
       simpleChatHasApiKey: (json['simpleChatHasApiKey'] as bool?) ?? false,
+      continuousVoiceEnabled: continuousVoiceEnabled,
       selectedAsrModelId: json['selectedAsrModelId'] as String?,
       selectedTtsModelId: json['selectedTtsModelId'] as String?,
     );
@@ -396,32 +414,38 @@ class Settings {
         other.selectedBackend == selectedBackend &&
         other.engineHasApiKey == engineHasApiKey &&
         other.simpleChatHasApiKey == simpleChatHasApiKey &&
+        other.continuousVoiceEnabled == continuousVoiceEnabled &&
         other.selectedAsrModelId == selectedAsrModelId &&
         other.selectedTtsModelId == selectedTtsModelId;
   }
 
   @override
   int get hashCode => Object.hash(
-    simpleChatBaseUrl,
-    simpleChatModel,
-    primeMessage,
-    ttsSpeakerId,
-    ttsSpeed,
-    voiceMode,
-    backgroundListeningDuration,
-    authType,
-    username,
-    Object.hashAll(history),
-    engineBaseUrl,
-    engineAuthType,
-    engineUsername,
-    agenticSessionId,
-    Object.hashAll(engineUrlHistory),
-    selectedBackend,
-    engineHasApiKey,
-    simpleChatHasApiKey,
-    selectedAsrModelId,
-    selectedTtsModelId,
+    Object.hash(
+      simpleChatBaseUrl,
+      simpleChatModel,
+      primeMessage,
+      ttsSpeakerId,
+      ttsSpeed,
+      voiceMode,
+      backgroundListeningDuration,
+      authType,
+      username,
+      Object.hashAll(history),
+    ),
+    Object.hash(
+      engineBaseUrl,
+      engineAuthType,
+      engineUsername,
+      agenticSessionId,
+      Object.hashAll(engineUrlHistory),
+      selectedBackend,
+      engineHasApiKey,
+      simpleChatHasApiKey,
+      continuousVoiceEnabled,
+      selectedAsrModelId,
+      selectedTtsModelId,
+    ),
   );
 
   // Helper for list equality

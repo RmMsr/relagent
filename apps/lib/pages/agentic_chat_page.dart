@@ -8,6 +8,7 @@ import '/providers/agentic_chat_provider.dart';
 import '/providers/audio_coordinator_provider.dart';
 import '/providers/engine_health_check_provider.dart';
 import '/providers/recording_provider.dart';
+import '/providers/settings_provider.dart';
 import '/providers/sse_provider.dart';
 import '/providers/tts_provider.dart';
 import '/providers/voice_service_provider.dart';
@@ -124,7 +125,8 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
               )
             : null,
         actions: [
-          if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable) ...[
+          if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable &&
+              ref.watch(settingsProvider).continuousVoiceEnabled) ...[
             const VoiceModeSelector(),
             const SizedBox(width: 8),
           ],

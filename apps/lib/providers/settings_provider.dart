@@ -89,7 +89,19 @@ class SettingsNotifier extends Notifier<Settings> {
     return await _persistenceManager.saveSettings(state);
   }
 
+  Future<bool> updateContinuousVoiceEnabled(bool enabled) async {
+    state = state.copyWith(continuousVoiceEnabled: enabled);
+    if (!enabled && state.isContinuousRecording) {
+      state = state.copyWith(voiceMode: VoiceMode.silent);
+    }
+    return await _persistenceManager.saveSettings(state);
+  }
+
   Future<bool> updateVoiceMode(VoiceMode mode) async {
+    if (!state.continuousVoiceEnabled &&
+        (mode == VoiceMode.listening || mode == VoiceMode.conversation)) {
+      return false;
+    }
     state = state.copyWith(voiceMode: mode);
     return await _persistenceManager.saveSettings(state);
   }

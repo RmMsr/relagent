@@ -164,9 +164,10 @@ class RecordingNotifier extends Notifier<RecordingState> {
   }
 
   void checkAutoStart() {
-    final currentMode = ref.read(settingsProvider).voiceMode;
-    if (currentMode == VoiceMode.listening ||
-        currentMode == VoiceMode.conversation) {
+    final settings = ref.read(settingsProvider);
+    if (!settings.continuousVoiceEnabled) return;
+    if (settings.voiceMode == VoiceMode.listening ||
+        settings.voiceMode == VoiceMode.conversation) {
       _startContinuous();
     }
   }
@@ -180,6 +181,14 @@ class RecordingNotifier extends Notifier<RecordingState> {
         oldMode == VoiceMode.listening || oldMode == VoiceMode.conversation;
     final isContinuous =
         newMode == VoiceMode.listening || newMode == VoiceMode.conversation;
+
+    if (!wasContinuous && isContinuous &&
+        !ref.read(settingsProvider).continuousVoiceEnabled) {
+      Logger.debug(
+        'RecordingProvider: Continuous voice disabled, ignoring mode change',
+      );
+      return;
+    }
 
     if (!wasContinuous && isContinuous) {
       if (state.isRecording && !state.isContinuous) {

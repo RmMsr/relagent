@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/model_catalog.dart';
@@ -57,9 +58,20 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
       }
     });
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Voice Models'),
+    return Focus(
+      autofocus: true,
+      skipTraversal: true,
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          Navigator.of(context).pop();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Voice Models'),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -115,6 +127,7 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
           ),
         ],
       ),
+    ),
     );
   }
 }

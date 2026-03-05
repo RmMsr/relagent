@@ -7,6 +7,7 @@ import '/providers/audio_coordinator_provider.dart';
 import '/providers/chat_provider.dart';
 import '/providers/health_check_provider.dart';
 import '/providers/recording_provider.dart';
+import '/providers/settings_provider.dart';
 import '/providers/tts_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/services/api_health_check.dart';
@@ -193,7 +194,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ),
       appBar: AppBar(
         actions: [
-          if (voiceCapabilities.isAsrAvailable) ...[
+          if (voiceCapabilities.isAsrAvailable &&
+              ref.watch(settingsProvider).continuousVoiceEnabled) ...[
             const VoiceModeSelector(),
             const SizedBox(width: 8),
           ],

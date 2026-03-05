@@ -3323,7 +3323,7 @@
     "speakerCount": 0,
     "releaseDate": "2025-08",
     "status": "approved",
-    "recommended": false,
+    "recommended": true,
     "notes": "note: empty ASR output; latency: 1423ms"
   },
   {
