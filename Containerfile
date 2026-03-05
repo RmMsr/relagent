@@ -25,7 +25,7 @@ ADD apps/assets/config.web.json ./assets/config.json
 ADD apps/assets/icon ./assets/icon
 ADD apps/assets/silero_vad.onnx apps/assets/voice-models.json ./assets/
 
-RUN flutter build web --release --base-href=/app/
+RUN flutter build web --release --wasm --base-href=/app/
 
 FROM ghcr.io/astral-sh/uv:debian-slim
 
