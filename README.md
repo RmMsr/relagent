@@ -19,7 +19,7 @@ The goal of the Relagent project is an accessible solution for agentic AI servic
 ## Current features
 
 - 🗨️ Chat interface
-- 📱 Mobile apps, 🖥️ Desktop apps and 🌐 Web interface - all fully synchronized
+- 📱 Mobile apps, 🖥️ Desktop apps and 🌐 Progressive Web app - all fully synchronized
 - 💽 Pure local execution and data storage
 - 🧰 Agentic tools (e.g. web search)
 - 🎤 Speech Integration: Input and Output on device (mobile and desktop)

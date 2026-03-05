@@ -21,7 +21,7 @@ init_global_instrumentation()
 check_secret_key()
 
 
-app = FastAPI(version=VERSION, lifespan=lifespan)
+app = FastAPI(version=VERSION, lifespan=lifespan, title="Relagent Engine API")
 app.include_router(api_router, prefix="/api/v1")
 init_app_instrumentation(app=app)
 

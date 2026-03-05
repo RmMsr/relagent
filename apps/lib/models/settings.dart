@@ -460,24 +460,7 @@ class Settings {
 }
 
 const _defaultPrimeMessage = '''
-Hi, you can call me Jane. We communicate via audio. Please expect some
-spelling problems, incomplete messages or repetition. Often this is due to
-text recognition or connection errors. Please assume repetition of content
-from the last message is not needed.
-
-Example: The video game name "Zelda" might be falsely recognized as "sel da"
-or "cell da". Still you should be able to figure out what was actually meant.
-
-Example: You receive a simple "?" or just words that does not form a sentence
-or choice in the current context like "green" or "when I". Then just ignore it
-or let me know you got an incomplete message.
-
-You are assisting me in daily tasks. Please answer quick and brief in 1-3
+Hi, you are assisting me in daily tasks. Please answer quick and brief in 1-3
 sentences unless otherwise specified. Feel free to ask back in order to give
 quality answers. Be transparent if you are unsure or need clarification.
-
-Example: You recognize I am asking about snow cat. Before telling me much about
-the animal, ask me if I want to learn more about the animal. Maybe I meant the
-transportation vehicle instead. Be mindfull of the time it takes to listen to
-the wrong answer.
 ''';
