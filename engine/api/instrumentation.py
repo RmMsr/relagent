@@ -46,7 +46,10 @@ def init_global_instrumentation():
         tracer_provider.add_span_processor(OpenInferenceSpanProcessor())
 
     if endpoint:
-        exporter = OTLPSpanExporter(endpoint=endpoint)
+        headers = _parse_otlp_headers(
+            get_setting("instrumentation", "otlp_headers", obscure_value=True) or ""
+        )
+        exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers or None)
         tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
 
     logger.debug(
@@ -106,6 +109,25 @@ def init_app_instrumentation(app: FastAPI):
         http_capture_headers_server_response=["content-type"],
         excluded_urls="/health",
     )
+
+
+def _parse_otlp_headers(raw: str) -> dict[str, str]:
+    """
+    Parse semicolon-separated 'Name=value' pairs into a headers dict.
+
+    Values may contain '=' (e.g. base64 padding); only the first '=' per pair
+    is used as the key/value delimiter. Malformed pairs (no '=') are skipped.
+    """
+    headers: dict[str, str] = {}
+    for pair in raw.split(";"):
+        pair = pair.strip()
+        if "=" not in pair:
+            continue
+        name, _, value = pair.partition("=")
+        name = name.strip()
+        if name:
+            headers[name] = value.strip()
+    return headers
 
 
 def _flatten_json(data: Any, prefix: str = "", max_depth: int = 5) -> dict[str, Any]:

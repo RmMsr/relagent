@@ -115,6 +115,7 @@ def reset_env():
     backup = dict[str, str]()
     keep = [
         "INSTRUMENTATION_OTLP_ENDPOINT",
+        "INSTRUMENTATION_OTLP_HEADERS",
         "INSTRUMENTATION_GEN_AI_COLLECTOR_ENABLED",
         "LOG_LEVEL",
         "PROVIDER_API_BASE",
