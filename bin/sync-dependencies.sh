@@ -1,7 +1,14 @@
 #!/usr/bin/env sh
 # Update all Python and Dart/Flutter dependencies in the repository.
+# Usage: sync-dependencies.sh [--major]
+#   --major  Also bump pubspec.yaml constraints to allow major version upgrades
 
 set -e
+
+MAJOR_FLAG=""
+if [ "$1" = "--major" ]; then
+  MAJOR_FLAG="--major-versions"
+fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -20,11 +27,11 @@ fi
 # Dart-only projects
 for pkg_dir in dart_packages/sherpa_voice tools/voice_catalog; do
   printf '\n=== Upgrading Dart dependencies in %s ===\n' "$pkg_dir"
-  (cd "$REPO_ROOT/$pkg_dir" && $DART pub upgrade)
+  (cd "$REPO_ROOT/$pkg_dir" && $DART pub upgrade $MAJOR_FLAG)
 done
 
 # Flutter project
 printf '\n=== Upgrading Flutter dependencies in apps ===\n'
-(cd "$REPO_ROOT/apps" && $FLUTTER pub upgrade)
+(cd "$REPO_ROOT/apps" && $FLUTTER pub upgrade $MAJOR_FLAG)
 
 printf '\nAll dependencies synced and up to date.\n'
