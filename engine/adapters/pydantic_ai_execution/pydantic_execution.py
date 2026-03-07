@@ -29,9 +29,9 @@ class PydanticAgentAdapter(AgentExecution):
     ) -> AssistantMessage:
         history = self._get_history_from_messages(context.messages)
 
-        start_time = time.time()
+        start_time = time.monotonic()
         ai_response = await discussion_agent.run(query, message_history=history)
-        agent_duration_seconds = time.time() - start_time
+        agent_duration_seconds = time.monotonic() - start_time
 
         answering_model_name = getattr(discussion_agent.model, "model_name", "") or None
 

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sse_starlette import EventSourceResponse
 
 from engine.api.helpers import (
+    dependency_agent_execution,
     dependency_chat_service,
     dependency_event_store,
     require_api_key,
@@ -26,8 +27,9 @@ from engine.domain.ports.events import (
     SessionMessagesAppendedEvent,
     SessionUpdatedEvent,
 )
-from engine.domain.services import ChatService
+from engine.domain.services import AgentExecution, ChatService
 from engine.logging import get_logger
+from engine.self_test import SelfTestResult, run_all_tests
 
 logger = get_logger(__name__)
 
@@ -36,6 +38,7 @@ api_router = APIRouter(tags=["api"], dependencies=[Depends(require_api_key)])
 
 ChatServiceDepends = Annotated[ChatService, Depends(dependency_chat_service)]
 EventStoreDepends = Annotated[EventStore, Depends(dependency_event_store)]
+AgentExecutionDepends = Annotated[AgentExecution, Depends(dependency_agent_execution)]
 
 
 @api_router.get("/status")
@@ -45,6 +48,11 @@ async def status() -> StatusResponse:
         version=VERSION,
         status="ok",
     )
+
+
+@api_router.get("/self-test")
+async def self_test(execution: AgentExecutionDepends) -> list[SelfTestResult]:
+    return await run_all_tests(execution)
 
 
 @api_router.post("/messages")

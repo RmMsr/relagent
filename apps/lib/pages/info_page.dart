@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '/models/app_info.dart';
+import '/models/self_test_result.dart';
 import '/models/settings.dart';
 import '/providers/engine_health_check_provider.dart';
+import '/providers/self_test_provider.dart';
 import '/providers/settings_provider.dart';
 
 class InfoPage extends ConsumerWidget {
@@ -17,6 +20,8 @@ class InfoPage extends ConsumerWidget {
     final appInfo = AppInfo.data;
     final settings = ref.watch(settingsProvider);
     final engineHealthState = ref.watch(engineHealthCheckProvider);
+
+    final selfTestState = ref.watch(selfTestProvider);
 
     final isEngine = settings.selectedBackend == ChatBackendType.relagentEngine;
     final backendLabel = isEngine ? 'Relagent Engine' : 'OpenAI-compatible';
@@ -77,6 +82,10 @@ class InfoPage extends ConsumerWidget {
             version: backendVersion,
           ),
           const SizedBox(height: 32),
+          _buildSectionHeader(context, 'Self-Test'),
+          const SizedBox(height: 12),
+          _buildSelfTestSection(context, ref, selfTestState),
+          const SizedBox(height: 32),
           _buildSectionHeader(context, 'About'),
           const SizedBox(height: 12),
           Text(
@@ -111,6 +120,106 @@ class InfoPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _copyResults(BuildContext context, List<SelfTestResult> results) {
+    final lines = StringBuffer('Relagent Self-Test\n');
+    for (final r in results) {
+      final label = switch (r.status) {
+        SelfTestStatus.ok => 'OK  ',
+        SelfTestStatus.warning => 'WARN',
+        SelfTestStatus.error => 'FAIL',
+        SelfTestStatus.running => 'RUN ',
+        SelfTestStatus.pending => '... ',
+      };
+      final detail = r.detail != null ? ' (${r.detail})' : '';
+      lines.writeln('$label  ${r.label}$detail');
+    }
+    Clipboard.setData(ClipboardData(text: lines.toString()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Results copied to clipboard')),
+    );
+  }
+
+  Widget _buildSelfTestSection(
+    BuildContext context,
+    WidgetRef ref,
+    SelfTestState selfTestState,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (selfTestState.results.isNotEmpty)
+          Card(
+            child: Column(
+              children: selfTestState.results
+                  .map((r) => _buildTestResultTile(context, r))
+                  .toList(),
+            ),
+          ),
+        if (selfTestState.results.isNotEmpty) const SizedBox(height: 12),
+        Row(
+          children: [
+            if (selfTestState.results.isNotEmpty &&
+                !selfTestState.isRunning) ...[
+              OutlinedButton.icon(
+                onPressed: () =>
+                    ref.read(selfTestProvider.notifier).clearResults(),
+                icon: const Icon(Icons.clear, size: 18),
+                label: const Text('Clear'),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () => _copyResults(context, selfTestState.results),
+                icon: const Icon(Icons.copy, size: 18),
+                label: const Text('Copy'),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: FilledButton.tonal(
+                onPressed: selfTestState.isRunning
+                    ? null
+                    : () => ref.read(selfTestProvider.notifier).runSelfTests(),
+                child: Text(
+                  selfTestState.isRunning ? 'Running…' : 'Run self-test',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTestResultTile(BuildContext context, SelfTestResult result) {
+    final theme = Theme.of(context);
+    final (icon, color) = switch (result.status) {
+      SelfTestStatus.pending => (
+        Icons.radio_button_unchecked,
+        theme.colorScheme.onSurfaceVariant,
+      ),
+      SelfTestStatus.running => (Icons.sync, theme.colorScheme.primary),
+      SelfTestStatus.ok => (Icons.check_circle, Colors.green),
+      SelfTestStatus.warning => (Icons.warning_amber, Colors.orange),
+      SelfTestStatus.error => (Icons.cancel, theme.colorScheme.error),
+    };
+
+    return ListTile(
+      dense: true,
+      leading: result.status == SelfTestStatus.running
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: theme.colorScheme.primary,
+              ),
+            )
+          : Icon(icon, color: color, size: 20),
+      title: Text(result.label),
+      subtitle: result.detail != null ? Text(result.detail!) : null,
     );
   }
 

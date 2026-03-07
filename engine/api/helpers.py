@@ -12,10 +12,16 @@ from engine.adapters.sqlite_event_store.sqlite_backend import SqliteEventStoreAd
 from engine.adapters.yaml_persistence.yaml_adapter import YamlPersistenceAdapter
 from engine.constants import DATA_DIR, DEBUG_DUMPS, SECRET_ACCESS_KEY, WEB_DIR
 from engine.domain.ports.events import EventStore
-from engine.domain.services import ChatService
+from engine.domain.services import AgentExecution, ChatService
 from engine.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+@cache
+def dependency_event_store() -> EventStore:
+    """Creates and preserves a single EventStore instance."""
+    return SqliteEventStoreAdapter(db_path=DATA_DIR / "events.db")
 
 
 def dependency_chat_service() -> ChatService:
@@ -26,13 +32,8 @@ def dependency_chat_service() -> ChatService:
     )
 
 
-@cache
-def dependency_event_store() -> EventStore:
-    """Creates and preserves a single EventStore instance."""
-    return SqliteEventStoreAdapter(db_path=DATA_DIR / "events.db")
-
-
-header_scheme = APIKeyHeader(name="X-API-Key", auto_error=False)
+def dependency_agent_execution() -> AgentExecution:
+    return PydanticAgentAdapter(debug_dumps=DEBUG_DUMPS)
 
 
 def validate_api_key(key_to_check: str | None) -> bool:
@@ -41,6 +42,9 @@ def validate_api_key(key_to_check: str | None) -> bool:
     elif key_to_check is not None and key_to_check == SECRET_ACCESS_KEY:
         return True
     return False
+
+
+header_scheme = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 async def require_api_key(
