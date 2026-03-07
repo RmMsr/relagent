@@ -228,6 +228,11 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
         ref.read(ttsProvider.notifier).initialize();
       }
       ref.read(sseProvider.notifier).connect();
+      final chatInputState =
+          _chatInputKey.currentState as AgenticChatInputState?;
+      if (chatInputState != null) {
+        chatInputState.requestFocus();
+      }
     });
   }
 
@@ -332,9 +337,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                 label: const Text('Retry'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: theme.colorScheme.onErrorContainer,
-                  side: BorderSide(
-                    color: theme.colorScheme.onErrorContainer,
-                  ),
+                  side: BorderSide(color: theme.colorScheme.onErrorContainer),
                 ),
               ),
               const SizedBox(width: 8),

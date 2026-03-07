@@ -4,6 +4,28 @@ Provide a settings UI for configuring backend connections, managing API key cred
 
 ## Requirements
 
+### Requirement: URL Change Clears Session State
+
+When a backend URL is changed, all session data associated with the previous URL becomes invalid and SHALL be cleared to prevent stale data or authentication errors.
+
+#### Scenario: Engine URL change clears session data
+- **GIVEN** the user has an active agentic session with messages
+- **WHEN** the user changes the engine URL to a different value and saves
+- **THEN** all session data SHALL be cleared
+- **AND** the active session ID SHALL be reset to null
+- **AND** all cached messages SHALL be cleared from memory
+
+#### Scenario: Simple chat URL change clears chat history
+- **GIVEN** the user has sent and received messages in simple chat
+- **WHEN** the user changes the simple chat base URL and saves
+- **THEN** all chat messages SHALL be cleared
+- **AND** any pending requests SHALL be cancelled
+
+#### Scenario: Engine URL change clears health check results
+- **GIVEN** the engine health check has been performed and cached
+- **WHEN** the user changes the engine URL to a different value and saves
+- **THEN** cached health check results SHALL be cleared
+
 ### Requirement: API Key Indicator Fields in Settings
 
 The system SHALL persist a boolean indicator for each backend's API key status in SharedPreferences. These indicators reflect whether an API key is stored in secure storage for the current URL, without exposing the key itself.

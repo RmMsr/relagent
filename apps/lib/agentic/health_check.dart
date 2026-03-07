@@ -121,7 +121,10 @@ class EngineHealthCheckService {
     final normalizedUrl = _normalizeBaseUrl(baseUrl);
     final uri = Uri.parse('$normalizedUrl/api/v1/status');
 
-    final headers = <String, String>{'content-type': 'application/json'};
+    final headers = <String, String>{
+      'content-type': 'application/json',
+      'accept': 'application/json',
+    };
 
     if (authType == AuthType.basic && username != null && password != null) {
       final credentials = base64Encode(utf8.encode('$username:$password'));

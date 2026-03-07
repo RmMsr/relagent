@@ -149,7 +149,11 @@ class AgenticMessage {
     };
   }
 
+  static int _localIdCounter = 0;
+
   static String _generateLocalId() {
-    return DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+    final timestamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    final counter = (_localIdCounter++).toRadixString(36);
+    return '$timestamp-$counter';
   }
 }

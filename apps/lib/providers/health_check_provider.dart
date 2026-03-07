@@ -56,6 +56,13 @@ class HealthCheckNotifier extends Notifier<HealthCheckState> {
 
   /// Trigger health check with debouncing
   void triggerHealthCheck() {
+    final settings = ref.read(settingsProvider);
+
+    // Don't run if OpenAI-compatible backend is not active
+    if (settings.selectedBackend != ChatBackendType.openAiCompatible) {
+      return;
+    }
+
     // Cancel existing timer
     _debounceTimer?.cancel();
 
@@ -73,6 +80,17 @@ class HealthCheckNotifier extends Notifier<HealthCheckState> {
   }
 
   Future<void> _performStartupHealthCheck() async {
+    final settings = ref.read(settingsProvider);
+
+    // Don't run if OpenAI-compatible backend is not active
+    if (settings.selectedBackend != ChatBackendType.openAiCompatible) {
+      return;
+    }
+
+    // Don't run if URL is empty or invalid
+    if (settings.simpleChatBaseUrl.trim().isEmpty) {
+      return;
+    }
     const maxRetries = 3;
     const retryDelays = [
       Duration.zero, // First attempt: immediate

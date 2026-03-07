@@ -20,16 +20,20 @@ class AgenticChatInput extends ConsumerStatefulWidget {
   const AgenticChatInput({super.key, required this.onSubmitted});
 
   @override
-  ConsumerState<AgenticChatInput> createState() => _AgenticChatInputState();
+  ConsumerState<AgenticChatInput> createState() => AgenticChatInputState();
 }
 
-class _AgenticChatInputState extends ConsumerState<AgenticChatInput>
+class AgenticChatInputState extends ConsumerState<AgenticChatInput>
     implements RecordingTarget {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   String _textBeforeRecording = '';
   bool _isUpdatingFromASR = false;
   RecordingNotifier? _recordingNotifier;
+
+  void requestFocus() {
+    _focusNode.requestFocus();
+  }
 
   void _submitText() {
     final text = _controller.text;

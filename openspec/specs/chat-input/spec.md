@@ -110,3 +110,22 @@ The ChatInput SHALL stop dictation mode when the user submits text, allowing sea
 - **AND** only the current text SHALL be submitted
 - **AND** listening SHALL continue for next input
 
+### Requirement: Input Focus on Chat Open
+The chat input SHALL receive focus automatically when a chat opens, allowing immediate text entry or voice input without manual input activation.
+
+#### Scenario: New chat receives focus
+- **GIVEN** user creates a new chat (via clear chat action or fresh session)
+- **WHEN** the chat page becomes visible
+- **THEN** the chat input field SHALL automatically receive focus
+
+#### Scenario: Existing chat receives focus
+- **GIVEN** user navigates to a chat with existing message history
+- **WHEN** the chat page becomes visible
+- **THEN** the chat input field SHALL automatically receive focus
+
+#### Scenario: Focus enables immediate input
+- **GIVEN** the chat input has received focus
+- **WHEN** user starts typing
+- **THEN** text SHALL appear immediately without requiring input field activation
+- **AND** voice input activation SHALL work without requiring input field tap
+

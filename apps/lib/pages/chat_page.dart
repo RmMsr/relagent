@@ -28,8 +28,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   void initState() {
     super.initState();
-    // Trigger auto-recording check once the page is ready
-    // This ensures we don't start recording during app initialization
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final capabilities = ref.read(voiceCapabilitiesProvider);
       if (capabilities.isAsrAvailable) {
@@ -37,6 +35,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       }
       if (capabilities.isTtsAvailable) {
         ref.read(ttsProvider.notifier).initialize();
+      }
+      final chatInputState = _chatInputKey.currentState as ChatInputState?;
+      if (chatInputState != null) {
+        chatInputState.requestFocus();
       }
     });
   }
@@ -366,9 +368,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 label: const Text('Retry'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: theme.colorScheme.onErrorContainer,
-                  side: BorderSide(
-                    color: theme.colorScheme.onErrorContainer,
-                  ),
+                  side: BorderSide(color: theme.colorScheme.onErrorContainer),
                 ),
               ),
               const SizedBox(width: 8),

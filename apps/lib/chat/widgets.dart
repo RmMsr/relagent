@@ -31,8 +31,11 @@ class ChatInputState extends ConsumerState<ChatInput>
   final FocusNode _focusNode = FocusNode();
   String _textBeforeRecording = '';
   bool _isUpdatingFromASR = false;
-  // Cache notifier reference for use in dispose (ref is already disposed there)
   RecordingNotifier? _recordingNotifier;
+
+  void requestFocus() {
+    _focusNode.requestFocus();
+  }
 
   void _submitText() {
     final text = _controller.text;

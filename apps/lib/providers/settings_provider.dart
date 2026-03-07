@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '/models/settings.dart';
 import 'agentic_chat_provider.dart';
+import 'chat_provider.dart';
 import 'credentials_manager.dart';
 import 'engine_health_check_provider.dart';
 import '/services/secure_credential_service.dart';
@@ -58,6 +59,7 @@ class SettingsNotifier extends Notifier<Settings> {
     if (urlChanged) {
       await _credentialsManager.clearCredentials(state.simpleChatBaseUrl);
       await _credentialsManager.clearChatApiKey(state.simpleChatBaseUrl);
+      ref.read(chatProvider.notifier).clearChat();
     }
 
     state = state.copyWith(
@@ -263,7 +265,9 @@ class SettingsNotifier extends Notifier<Settings> {
   }
 
   Future<String?> getChatApiKey() async {
-    final key = await _credentialsManager.getChatApiKey(state.simpleChatBaseUrl);
+    final key = await _credentialsManager.getChatApiKey(
+      state.simpleChatBaseUrl,
+    );
     if (key == null && state.simpleChatHasApiKey) {
       state = state.copyWith(simpleChatHasApiKey: false);
       await _persistenceManager.saveSettings(state);

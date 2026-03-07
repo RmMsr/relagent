@@ -621,7 +621,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       builder: (context) => AlertDialog(
         title: const Text('Reset All Settings'),
         content: const Text(
-          'Reset all settings to defaults? Unsaved changes will be lost.',
+          'Reset all settings to defaults? All changes will be lost.',
         ),
         actions: [
           TextButton(
