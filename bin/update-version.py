@@ -23,7 +23,6 @@ VERSION_FILE = REPO_ROOT / "VERSION"
 PYPROJECT_FILE = REPO_ROOT / "pyproject.toml"
 PUBSPEC_FILE = REPO_ROOT / "apps" / "pubspec.yaml"
 CONTAINER_FILE = REPO_ROOT / "run" / "relagent-engine.container"
-ANDROID_BUILD_FILE = REPO_ROOT / "apps" / "android" / "app" / "build.gradle.kts"
 
 # Semver regex: MAJOR.MINOR.PATCH with optional pre-release
 SEMVER_PATTERN = re.compile(
@@ -200,44 +199,6 @@ def increment_version_code() -> int:
     return new_code
 
 
-def update_android_build(version: str, version_code: int) -> bool:
-    """Update versionCode and versionName in build.gradle.kts."""
-    if not ANDROID_BUILD_FILE.exists():
-        print(f"Warning: {ANDROID_BUILD_FILE} not found, skipping", file=sys.stderr)
-        return False
-
-    content = ANDROID_BUILD_FILE.read_text()
-
-    new_content = content
-    code_count = 0
-    name_count = 0
-
-    code_pattern = r"(\s*versionCode\s*=\s*)\d+"
-    new_content, code_count = re.subn(
-        code_pattern, rf"\g<1>{version_code}", new_content
-    )
-
-    name_pattern = r'(\s*versionName\s*=\s*)"[^"]*"'
-    new_content, name_count = re.subn(name_pattern, rf'\g<1>"{version}"', new_content)
-
-    if code_count == 0:
-        print(
-            f"Warning: Could not find versionCode in {ANDROID_BUILD_FILE}",
-            file=sys.stderr,
-        )
-        return False
-
-    if name_count == 0:
-        print(
-            f"Warning: Could not find versionName in {ANDROID_BUILD_FILE}",
-            file=sys.stderr,
-        )
-        return False
-
-    ANDROID_BUILD_FILE.write_text(new_content)
-    return True
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Synchronize version across all project artifacts"
@@ -305,10 +266,9 @@ def main() -> int:
     update_pubspec(version)
     update_container(version)
 
-    # Increment version code from pubspec and update Android build
+    # Increment version code in pubspec
     new_code = increment_version_code()
     print(f"New version code: {new_code}")
-    update_android_build(version, new_code)
 
     return 0
 
