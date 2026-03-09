@@ -499,24 +499,6 @@ class AudioBackgroundService : Service() {
 
     // Audio Mode Management
 
-    private fun setAudioModeForSpeech() {
-        try {
-            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            val currentMode = audioManager.mode
-
-            // Only change mode if not already in communication mode
-            if (currentMode != AudioManager.MODE_IN_COMMUNICATION) {
-                Log.d(TAG, "Setting audio mode to IN_COMMUNICATION (was: ${getAudioModeString(currentMode)})")
-                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-                Log.d(TAG, "Audio mode set successfully")
-            } else {
-                Log.d(TAG, "Audio mode already IN_COMMUNICATION")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to set audio mode: ${e.message}", e)
-        }
-    }
-
     private fun resetAudioMode() {
         try {
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager

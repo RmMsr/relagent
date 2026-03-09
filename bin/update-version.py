@@ -23,6 +23,7 @@ VERSION_FILE = REPO_ROOT / "VERSION"
 PYPROJECT_FILE = REPO_ROOT / "pyproject.toml"
 PUBSPEC_FILE = REPO_ROOT / "apps" / "pubspec.yaml"
 CONTAINER_FILE = REPO_ROOT / "run" / "relagent-engine.container"
+ANDROID_BUILD_FILE = REPO_ROOT / "apps" / "android" / "app" / "build.gradle.kts"
 
 # Semver regex: MAJOR.MINOR.PATCH with optional pre-release
 SEMVER_PATTERN = re.compile(
@@ -158,6 +159,85 @@ def update_container(version: str) -> bool:
     return True
 
 
+def read_pubspec_version() -> tuple[str, int]:
+    """Read version and code from pubspec.yaml. Returns (version_string, code)."""
+    if not PUBSPEC_FILE.exists():
+        print(f"Error: {PUBSPEC_FILE} not found", file=sys.stderr)
+        sys.exit(1)
+
+    content = PUBSPEC_FILE.read_text()
+    pattern = r"^version:\s*([\d.]+)(?:\+(\d+))?"
+
+    match = re.search(pattern, content, re.MULTILINE)
+    if not match:
+        print(f"Error: Could not find version in {PUBSPEC_FILE}", file=sys.stderr)
+        sys.exit(1)
+
+    version = match.group(1)
+    code = int(match.group(2)) if match.group(2) else 1
+    return version, code
+
+
+def increment_version_code() -> int:
+    """Read current version code from pubspec, increment it, and update pubspec."""
+    version, code = read_pubspec_version()
+    new_code = code + 1
+
+    content = PUBSPEC_FILE.read_text()
+    pattern = r"^(version:\s*[\d.]+)\+(\d+)"
+    new_content, count = re.subn(
+        pattern, rf"\g<1>+{new_code}", content, flags=re.MULTILINE
+    )
+
+    if count == 0:
+        print(
+            f"Warning: Could not find version code in {PUBSPEC_FILE}",
+            file=sys.stderr,
+        )
+        return new_code
+
+    PUBSPEC_FILE.write_text(new_content)
+    return new_code
+
+
+def update_android_build(version: str, version_code: int) -> bool:
+    """Update versionCode and versionName in build.gradle.kts."""
+    if not ANDROID_BUILD_FILE.exists():
+        print(f"Warning: {ANDROID_BUILD_FILE} not found, skipping", file=sys.stderr)
+        return False
+
+    content = ANDROID_BUILD_FILE.read_text()
+
+    new_content = content
+    code_count = 0
+    name_count = 0
+
+    code_pattern = r"(\s*versionCode\s*=\s*)\d+"
+    new_content, code_count = re.subn(
+        code_pattern, rf"\g<1>{version_code}", new_content
+    )
+
+    name_pattern = r'(\s*versionName\s*=\s*)"[^"]*"'
+    new_content, name_count = re.subn(name_pattern, rf'\g<1>"{version}"', new_content)
+
+    if code_count == 0:
+        print(
+            f"Warning: Could not find versionCode in {ANDROID_BUILD_FILE}",
+            file=sys.stderr,
+        )
+        return False
+
+    if name_count == 0:
+        print(
+            f"Warning: Could not find versionName in {ANDROID_BUILD_FILE}",
+            file=sys.stderr,
+        )
+        return False
+
+    ANDROID_BUILD_FILE.write_text(new_content)
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Synchronize version across all project artifacts"
@@ -224,6 +304,11 @@ def main() -> int:
         return 1
     update_pubspec(version)
     update_container(version)
+
+    # Increment version code from pubspec and update Android build
+    new_code = increment_version_code()
+    print(f"New version code: {new_code}")
+    update_android_build(version, new_code)
 
     return 0
 
