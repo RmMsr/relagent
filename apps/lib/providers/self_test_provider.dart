@@ -73,7 +73,8 @@ class SelfTestNotifier extends Notifier<SelfTestState> {
           id: 'engine-reachable',
           label: 'Engine reachable',
           status: SelfTestStatus.error,
-          detail: 'Could not reach $baseUrl/health',
+          detail:
+              'Could not reach $baseUrl/health — check the engine base URL in settings',
         ),
       );
       _skipRemaining(['engine-auth', 'engine-version', 'engine-tests']);
@@ -85,7 +86,8 @@ class SelfTestNotifier extends Notifier<SelfTestState> {
         id: 'engine-reachable',
         label: 'Engine reachable',
         status: SelfTestStatus.ok,
-        detail: 'responded in ${(elapsed.inMilliseconds / 1000).toStringAsFixed(3)}s',
+        detail:
+            'responded in ${(elapsed.inMilliseconds / 1000).toStringAsFixed(3)}s',
       ),
     );
 
@@ -117,7 +119,8 @@ class SelfTestNotifier extends Notifier<SelfTestState> {
           id: 'engine-auth',
           label: 'Engine authentication',
           status: SelfTestStatus.error,
-          detail: e.message,
+          detail:
+              '${e.message} — check the connection settings on the settings page',
         ),
       );
       _skipRemaining(['engine-version', 'engine-tests']);
@@ -185,7 +188,11 @@ class SelfTestNotifier extends Notifier<SelfTestState> {
     final String detail;
     if (appMajor != engineMajor || appMinor != engineMinor) {
       status = SelfTestStatus.error;
-      detail = 'versions differ, app $appVersion · engine $engineVersion';
+      final appIsLower =
+          '$appMajor.$appMinor'.compareTo('$engineMajor.$engineMinor') < 0;
+      final hint = appIsLower ? 'update the app' : 'update the engine';
+      detail =
+          'versions differ, app $appVersion · engine $engineVersion — $hint to match';
     } else if (appPatch != enginePatch) {
       status = SelfTestStatus.warning;
       detail = 'patch versions differ, app $appVersion · engine $engineVersion';

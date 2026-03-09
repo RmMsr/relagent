@@ -183,7 +183,7 @@ class InfoPage extends ConsumerWidget {
                     ? null
                     : () => ref.read(selfTestProvider.notifier).runSelfTests(),
                 child: Text(
-                  selfTestState.isRunning ? 'Running…' : 'Run self-test',
+                  selfTestState.isRunning ? 'Checking…' : 'Check engine setup',
                 ),
               ),
             ),

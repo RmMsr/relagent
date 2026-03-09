@@ -19,7 +19,7 @@ The goal of the Relagent project is an accessible solution for agentic AI servic
 ## Current features
 
 - 🗨️ Chat interface
-- 📱 Mobile apps, 🖥️ Desktop apps and 🌐 Progressive Web app - all fully synchronized
+- 📱 Mobile apps, 🖥️ Desktop apps and 🌐 Progressive Web App - all fully synchronized
 - 💽 Pure local execution and data storage
 - 🧰 Agentic tools (e.g. web search)
 - 🎤 Speech Integration: Input and Output on device (mobile and desktop)
@@ -107,6 +107,9 @@ docker run \
 ```
 
 Now you can access the Relagent web app at [http://localhost:8000/](http://localhost:8000/) in your browser. In order to authorize the connection, you need to set the *secret access key* as Engine API key in the Settings.
+
+To ensure everything is working as expected, try out the **Self-Test** on the
+"About" page.
 
 ## Roadmap
 

@@ -34,7 +34,7 @@ async def check_llm_response_time(execution: AgentExecution) -> SelfTestResult:
             return SelfTestResult(
                 name="LLM response time",
                 status=SelfTestStatus.error,
-                detail=str(e),
+                detail=f"{e} — check the engine's provider settings",
             )
 
     first, second = times
@@ -63,13 +63,13 @@ async def check_llm_tool_calling(execution: AgentExecution) -> SelfTestResult:
         return SelfTestResult(
             name="LLM tool calling",
             status=SelfTestStatus.error,
-            detail=f"no tools were invoked, tried model '{model_name}'",
+            detail=f"no tools were invoked, tried model '{model_name}' — try another default model in the engine settings",
         )
     except Exception as e:
         return SelfTestResult(
             name="LLM tool calling",
             status=SelfTestStatus.error,
-            detail=str(e),
+            detail=f"{e} — check the engine's provider settings",
         )
 
 
@@ -84,7 +84,7 @@ async def check_data_persistence(execution: AgentExecution) -> SelfTestResult:
         return SelfTestResult(
             name="Engine data persistence",
             status=SelfTestStatus.error,
-            detail=f"Save failed: {e}",
+            detail=f"Save failed: {e} — check the engine's data_dir setting",
         )
     try:
         adapter.delete_session(session_id)
@@ -92,7 +92,7 @@ async def check_data_persistence(execution: AgentExecution) -> SelfTestResult:
         return SelfTestResult(
             name="Engine data persistence",
             status=SelfTestStatus.error,
-            detail=f"Delete failed (stray ID: {session_id}): {e}",
+            detail=f"Delete failed (stray ID: {session_id}): {e} — check the engine's data_dir setting",
         )
     elapsed = time.monotonic() - start
     return SelfTestResult(

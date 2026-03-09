@@ -44,9 +44,19 @@
 - [x] 7.1 Add `/about` route to `lib/router/app_router.dart` pointing to `AboutPage`
 - [x] 7.2 Add an about menu item to the chat page app bar that navigates to `/about`
 
-## 8. Quality
+## 9. Clarify scope and add actionable hints
 
-- [x] 8.1 Run `dart-flutter_analyze_files` and fix all warnings and errors
-- [x] 8.2 Run `dart-flutter_dart_format` on all changed Dart files
-- [x] 8.3 Run `uv run ruff check engine/` and fix any issues in changed Python files
-- [x] 8.4 Run `uv run pyright engine/` and fix any type errors in changed Python files
+- [x] 9.1 Change button label from "Run self-test" to "Check engine setup" (and "Running…" to "Checking…")
+- [x] 9.2 In `self_test_provider.dart`: engine-reachable failure hints at engine base URL setting
+- [x] 9.3 In `self_test_provider.dart`: auth failure hints at connection settings on the settings page
+- [x] 9.4 In `self_test_provider.dart`: version mismatch suggests updating whichever is lower (app or engine)
+- [x] 9.5 In `engine/self_test.py`: LLM response time error hints at engine's provider settings
+- [x] 9.6 In `engine/self_test.py`: LLM tool calling error suggests trying another default model in engine settings
+- [x] 9.7 In `engine/self_test.py`: persistence error hints at engine's data_dir setting
+
+## 11. Quality
+
+- [x] 11.1 Run `dart-flutter_analyze_files` and fix all warnings and errors
+- [x] 11.2 Run `dart-flutter_dart_format` on all changed Dart files
+- [x] 11.3 Run `uv run ruff check engine/` and fix any issues in changed Python files
+- [x] 11.4 Run `uv run pyright engine/` and fix any type errors in changed Python files

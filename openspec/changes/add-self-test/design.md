@@ -14,7 +14,6 @@ The app currently has no diagnostic tooling. Users who misconfigure the engine U
 **Non-Goals:**
 - Automated or scheduled self-tests (manual trigger only)
 - Streaming/incremental engine test results (too complex for v1)
-- Detailed per-step retry or remediation guidance
 - Testing non-engine backends (OpenAI-compatible only via the engine path)
 
 ## Decisions
@@ -57,6 +56,14 @@ The persistence test creates a session with ID `selftest-<timestamp>` and immedi
 - **Persistence test leaves stray data if deletion fails** → Failure is reported as an error result; a future cleanup job could prune `selftest-*` sessions
 - **LLM not configured / model not loaded** → Engine test returns `error` with message; app displays it verbatim
 - **`package_info_plus` adds a dependency** → It's a well-maintained Flutter package widely used in the ecosystem; acceptable addition
+
+### 8. Section header clarifies scope: "Engine Setup Check"
+
+The self-test section header reads "Engine Setup Check" instead of "Self-Test" to make it immediately clear that these checks verify the engine connection and configuration, not the app itself. The button label is "Check engine setup".
+
+### 9. Failed checks include actionable hints
+
+Each failure detail includes a short user-facing hint suggesting what to try. Hints are appended after the technical detail, separated by a newline or " — ". This keeps the technical info for copy-paste while giving users a next step. Hints are defined in the provider (app-side failures) and engine module (engine-side failures).
 
 ## Open Questions
 
