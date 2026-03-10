@@ -65,17 +65,10 @@ android {
             buildConfigField("boolean", "DEBUG", "false")
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                println("Warning: keystore file not found, building unsigned package")
             }
         }
-    }
-}
-
-gradle.taskGraph.whenReady {
-    if (allTasks.any { it.name.contains("Release") } && !keystorePropertiesFile.exists()) {
-        throw GradleException(
-            "Release build requires keystore file 'key.properties' to be present. " +
-            "Create it or build with --debug flag."
-        )
     }
 }
 
