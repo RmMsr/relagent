@@ -165,7 +165,7 @@ def read_pubspec_version() -> tuple[str, int]:
         sys.exit(1)
 
     content = PUBSPEC_FILE.read_text()
-    pattern = r"^version:\s*([\d.]+)(?:\+(\d+))?"
+    pattern = r"^version:\s*([\d.]+(?:-[a-zA-Z0-9.-]+)?)(?:\+(\d+))?"
 
     match = re.search(pattern, content, re.MULTILINE)
     if not match:
@@ -183,7 +183,7 @@ def increment_version_code() -> int:
     new_code = code + 1
 
     content = PUBSPEC_FILE.read_text()
-    pattern = r"^(version:\s*[\d.]+)\+(\d+)"
+    pattern = r"^(version:\s*[\d.]+(?:-[a-zA-Z0-9.-]+)?)\+(\d+)"
     new_content, count = re.subn(
         pattern, rf"\g<1>+{new_code}", content, flags=re.MULTILINE
     )
