@@ -1,16 +1,125 @@
-# You can override the included template(s) by including variable overrides
-# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
-# Secret Detection customization: https://docs.gitlab.com/ee/user/application_security/secret_detection/pipeline/#customization
-# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
-# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
-# Note that environment variables can be set in several places
-# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 stages:
 - test
 - build
-sast:
+- upload
+- release
+
+default:
+  tags:
+  - saas-linux-small-amd64
+
+variables:
+  DOCKERFILE_PATH: Containerfile
+  APP_ANDROID_PLATFORMS: android-arm,android-arm64,android-x64
+  PACKAGE_VERSION: "${CI_COMMIT_REF_NAME}"
+  PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/app-releases"
+
+test-apps:
   stage: test
-include:
-- template: Security/SAST.gitlab-ci.yml
-- component: $CI_SERVER_FQDN/components/dependency-scanning/swift@0.6.0
-- component: $CI_SERVER_FQDN/to-be-continuous/renovate/gitlab-ci-renovate@1.5.0
+  image: ghcr.io/cirruslabs/flutter:3.41.4
+  script:
+    - cd apps
+    - cp assets/config.template.json assets/config.json
+    - flutter test
+
+test-engine:
+  stage: test
+  image: ghcr.io/astral-sh/uv:0.10.9-debian-dhi
+  script:
+    - uv sync --locked
+    - uv run pytest
+
+build-android:
+  stage: build
+  tags:
+    - saas-linux-medium-amd64
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - when: manual
+  image: ghcr.io/cirruslabs/flutter:3.41.4
+  script:
+    - bin/reproducible-build-prepare.sh
+    - |
+      pushd /tmp/build/org.venkado.relagent/apps
+      flutter pub get --enforce-lockfile
+      flutter build apk --release --split-per-abi
+      popd
+    - bin/reproducible-build-collect.sh
+  artifacts:
+    name: 'android-app'
+    paths:
+      - apps/build/app/outputs/flutter-apk/*.apk
+
+
+# build-linux:
+#   stage: build
+#   tags:
+#     - saas-linux-medium-amd64
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+#     - when: manual
+#   image: ghcr.io/cirruslabs/flutter:3.41.4
+#   script:
+#     - bin/reproducible-build-prepare.sh
+#     - |
+#       cd /tmp/build/org.venkado.relagent/apps
+#       flutter pub get --enforce-lockfile
+#       flutter build linux
+#     - bin/reproducible-build-collect.sh
+#   artifacts:
+#     name: 'linux-app'
+#     paths:
+#       - apps/build/linux/x64/release/bundle/relagent
+
+upload-app-artifacts:
+  stage: upload
+  dependencies:
+    - build-android
+    # - build-linux
+  image: curlimages/curl:latest
+  script:
+    - |
+      if [ -f apps/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk ]; then
+        curl --location --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --fail \
+          --upload-file apps/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+          "${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}-unsigned/relagent-${PACKAGE_VERSION}-unsigned-android-arm.apk"
+      fi
+      if [ -f apps/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ]; then
+        curl --location --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --fail \
+          --upload-file apps/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+          "${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}-unsigned/relagent-${PACKAGE_VERSION}-unsigned-android-arm64.apk"
+      fi
+      if [ -f apps/build/app/outputs/flutter-apk/app-x86_64-release.apk ]; then
+        curl --location --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --fail \
+          --upload-file apps/build/app/outputs/flutter-apk/app-x86_64-release.apk \
+          "${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}-unsigned/relagent-${PACKAGE_VERSION}-unsigned-android-x64.apk"
+      fi
+      if [ -f apps/build/linux/x64/release/bundle/relagent ]; then
+        curl --location --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --fail \
+          --upload-file apps/build/linux/x64/release/bundle/relagent \
+          "${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-linux-x64.bin"
+      fi
+
+create-release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "running release job"
+  release:
+    tag_name: '$CI_COMMIT_TAG'
+    description: |
+      Automated release for $CI_COMMIT_TAG
+
+      Please note: Not all Download links might be connected to files.
+    assets:
+      links:
+        - name: 'Android arm32 APK (unsigned)'
+          url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}-unsigned/relagent-${PACKAGE_VERSION}-unsigned-android-arm.apk'
+        - name: 'Android arm64 APK (unsigned)'
+          url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}-unsigned/relagent-${PACKAGE_VERSION}-unsigned-android-arm64.apk'
+        - name: 'Android x64 APK (unsigned)'
+          url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}-unsigned/relagent-${PACKAGE_VERSION}-unsigned-android-x64.apk'
+        #- name: 'Linux desktop x64 Binary'
+        #  url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-linux-x64.bin'
