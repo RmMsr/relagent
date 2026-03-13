@@ -9,9 +9,9 @@ if [ -d "$REPO_ROOT"/apps/build ]; then
     rm -rf "$REPO_ROOT"/apps/build
 fi
 
-if [ -d "$REPO_ROOT"/apps/build ]; then
+if [ -d "$BUILD_DIR"/apps/build ]; then
     mv "$BUILD_DIR"/apps/build "$REPO_ROOT"/apps/
-    echo "Collected artifacts in apps/"
+    echo "Collected artifacts in repo's apps/"
 else
     echo "No builds found"
 fi

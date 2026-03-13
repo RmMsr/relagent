@@ -298,10 +298,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_riverpod
-      sha256: e2026c72738a925a60db30258ff1f29974e40716749f3c9850aabf34ffc1a14c
+      sha256: "4e166be88e1dbbaa34a280bdb744aeae73b7ef25fdf8db7a3bb776760a3648e2"
       url: "https://pub.dev"
     source: hosted
-    version: "3.2.1"
+    version: "3.3.1"
   flutter_secure_storage:
     dependency: "direct main"
     description:
@@ -972,50 +972,50 @@ packages:
     dependency: "direct main"
     description:
       name: sherpa_onnx
-      sha256: "3e864a08018656f1c51d17a0aa43d021a2f78a7bb5cff15476d5a0dc4dff2956"
+      sha256: "3ac66fd2ded0c198f16bba6aadf3b1ccbe599f90c89827473a2e53cc2c4d5bbb"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.29"
   sherpa_onnx_android:
     dependency: transitive
     description:
       name: sherpa_onnx_android
-      sha256: bc690be549b33ff0bc5d518ca9b4df1013a175ef84c25646298d1bedd3a6e305
+      sha256: ef4c155f05cfa2934a028fbab73567cc873690ff2e08e6d84df80789734cda9d
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.29"
   sherpa_onnx_ios:
     dependency: transitive
     description:
       name: sherpa_onnx_ios
-      sha256: "4f0bba765dafd9c9062a3be062aa11f7a012a0b34964244e3588c824d5fd6bbc"
+      sha256: cf158df4ab0953da6873a879b3f1ce230ac58d2bf50bcee198d8b4f33a928886
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.29"
   sherpa_onnx_linux:
     dependency: transitive
     description:
       name: sherpa_onnx_linux
-      sha256: bcad6925062f7a79a4f3b4b672d2485f5b02074e31d5b7f0a4f1ddf718a8a821
+      sha256: f241519d56b39735079a15661b42892d7b47017a1beb029af47328f299e4c3f3
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.29"
   sherpa_onnx_macos:
     dependency: transitive
     description:
       name: sherpa_onnx_macos
-      sha256: d6718808d4384e2babca6718b9bac668e98ed8d00a1492ac4d09ecf2b406f6e6
+      sha256: e4a356fcdee0dee572e123a287de982d4bc0333a7ad2505e1c51767ff8e0ceae
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.29"
   sherpa_onnx_windows:
     dependency: transitive
     description:
       name: sherpa_onnx_windows
-      sha256: ef6bc7a4c313d8ca710513a206fb650c4527e955068d8b4137b5a846f4809ead
+      sha256: "9283347fcb93a4c76f995568f83bda39fc4ef243c05a12f499b09e37eec63fa4"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.28"
+    version: "1.12.29"
   sherpa_voice:
     dependency: "direct main"
     description:
@@ -1032,10 +1032,10 @@ packages:
     dependency: transitive
     description:
       name: source_gen
-      sha256: "1d562a3c1f713904ebbed50d2760217fd8a51ca170ac4b05b0db490699dbac17"
+      sha256: adc962c96fffb2de1728ef396a995aaedcafbe635abdca13d2a987ce17e57751
       url: "https://pub.dev"
     source: hosted
-    version: "4.2.0"
+    version: "4.2.1"
   source_map_stack_trace:
     dependency: transitive
     description:
@@ -1248,10 +1248,10 @@ packages:
     dependency: transitive
     description:
       name: vector_graphics
-      sha256: a4f059dc26fc8295b5921376600a194c4ec7d55e72f2fe4c7d2831e103d461e6
+      sha256: "7076216a10d5c390315fbe536a30f1254c341e7543e6c4c8a815e591307772b1"
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.19"
+    version: "1.1.20"
   vector_graphics_codec:
     dependency: transitive
     description:
