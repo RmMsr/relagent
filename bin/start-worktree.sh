@@ -80,7 +80,7 @@ if [ -z "$WORKTREE_NAME" ]; then
   if [ -z "$suffix" ]; then
     suffix="$seed"
   fi
-  WORKTREE_NAME="${REPO_NAME}-${suffix}"
+  WORKTREE_NAME="changes/${suffix}"
 fi
 
 # Build worktree path (standard git worktree behavior: path basename = branch name)
@@ -115,7 +115,7 @@ git worktree add -b "$WORKTREE_NAME" "$WORKTREE_PATH" "$BRANCH"
 # Run the existing setup script for symlinks
 if [ -f "./bin/git-worktree-setup.sh" ]; then
   cd "$WORKTREE_PATH"
-  "$WORKTREE_PATH/bin/git-worktree-setup.sh"
+  bin/git-worktree-setup.sh
   cd - > /dev/null
 fi
 
