@@ -10,11 +10,23 @@ plugins {
 }
 
 
+// Signing config resolved from env vars (CI) with fallback to key.properties (local dev).
+// Env vars: ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
+
+fun signingValue(envVar: String, propertyKey: String): String? =
+    System.getenv(envVar) ?: keystoreProperties[propertyKey] as? String
+
+val signingKeystorePath = signingValue("ANDROID_KEYSTORE_PATH", "storeFile")
+val signingKeystorePassword = signingValue("ANDROID_KEYSTORE_PASSWORD", "storePassword")
+val signingKeyAlias = signingValue("ANDROID_KEY_ALIAS", "keyAlias") ?: "signing"
+val signingKeyPassword = signingValue("ANDROID_KEY_PASSWORD", "keyPassword") ?: signingKeystorePassword
+val hasSigningConfig = signingKeystorePath != null && signingKeystorePassword != null
+val allowUnsignedRelease = System.getenv("ANDROID_ALLOW_UNSIGNED_RELEASE") == "true"
 
 android {
     namespace = "org.venkado.relagent"
@@ -46,12 +58,12 @@ android {
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
+        if (hasSigningConfig) {
             create("release") {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = keystoreProperties["storeFile"]?.let { file(it) }
-                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+                storeFile = signingKeystorePath?.let { file(it) }
+                storePassword = signingKeystorePassword
             }
         }
     }
@@ -63,10 +75,16 @@ android {
         }
         release {
             buildConfigField("boolean", "DEBUG", "false")
-            if (keystorePropertiesFile.exists()) {
+            if (hasSigningConfig) {
                 signingConfig = signingConfigs.getByName("release")
+            } else if (allowUnsignedRelease) {
+                println("Warning: building unsigned release (ANDROID_ALLOW_UNSIGNED_RELEASE=true)")
             } else {
-                println("Warning: keystore file not found, building unsigned package")
+                throw GradleException(
+                    "Signing config missing for release build. " +
+                    "Provide ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD env or key.properties file. " +
+                    "For an unsigned build set ANDROID_ALLOW_UNSIGNED_RELEASE=true."
+                )
             }
         }
     }

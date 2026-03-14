@@ -12,8 +12,8 @@ git clone --depth 1 "file://$REPO_ROOT" "$BUILD_DIR"
 
 cd "$BUILD_DIR"/apps || exit
 
-echo "Flutter source checked out to: ${PWD}"
-
 cp assets/config.template.json assets/config.json
 
 flutter pub get --enforce-lockfile
+
+echo "Flutter source ready at: ${PWD}"
