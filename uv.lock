@@ -136,16 +136,16 @@ wheels = [
 
 [[package]]
 name = "ddgs"
-version = "9.11.3"
+version = "9.11.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "lxml" },
     { name = "primp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/06/9e/d89f0c24d78812bad0b4150d9a432925aa756b4bfeb4ef4815fe6ff8f2a6/ddgs-9.11.3.tar.gz", hash = "sha256:6098c030d6806217260071d85e38d9b94b99fe326a3c40ebf5de25f620528ae2", size = 34776, upload-time = "2026-03-11T07:12:02.041Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d7/3c/0ea1d5685bb0cd3607556d76da30e64c158e5d86bb16a3555f232fe0a33f/ddgs-9.11.4.tar.gz", hash = "sha256:445e22d3ffa16f893bfb0a717593bb0f34d1ceb1df68b6ff4ec27b1a3cdf6941", size = 34798, upload-time = "2026-03-14T18:15:18.086Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/9d/018d745128a9a33aff3e6b8f0260f7b970784d4b31573d36ee233b2e4db1/ddgs-9.11.3-py3-none-any.whl", hash = "sha256:596d656d00219b4748d839de1fa9a9c3eb5dd36db07365331f7526201115f18a", size = 43691, upload-time = "2026-03-11T07:12:00.21Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/46/f9412fafdebd4eaba366b5336ee4987995ccc3db1bc450e865a34db5fb63/ddgs-9.11.4-py3-none-any.whl", hash = "sha256:62d4d05b25db5d225a727c0a2771ef40258c1d894582c73dad24c88bf90f918b", size = 43681, upload-time = "2026-03-14T18:15:17.063Z" },
 ]
 
 [[package]]
@@ -482,7 +482,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "2.26.0"
+version = "2.28.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -494,9 +494,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d7/91/2a06c4e9597c338cac1e5e5a8dd6f29e1836fc229c4c523529dca387fda8/openai-2.26.0.tar.gz", hash = "sha256:b41f37c140ae0034a6e92b0c509376d907f3a66109935fba2c1b471a7c05a8fb", size = 666702, upload-time = "2026-03-05T23:17:35.874Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/56/87/eb0abb4ef88ddb95b3c13149384c4c288f584f3be17d6a4f63f8c3e3c226/openai-2.28.0.tar.gz", hash = "sha256:bb7fdff384d2a787fa82e8822d1dd3c02e8cf901d60f1df523b7da03cbb6d48d", size = 670334, upload-time = "2026-03-13T19:56:27.306Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/2e/3f73e8ca53718952222cacd0cf7eecc9db439d020f0c1fe7ae717e4e199a/openai-2.26.0-py3-none-any.whl", hash = "sha256:6151bf8f83802f036117f06cc8a57b3a4da60da9926826cc96747888b57f394f", size = 1136409, upload-time = "2026-03-05T23:17:34.072Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/5a/df122348638885526e53140e9c6b0d844af7312682b3bde9587eebc28b47/openai-2.28.0-py3-none-any.whl", hash = "sha256:79aa5c45dba7fef84085701c235cf13ba88485e1ef4f8dfcedc44fc2a698fc1d", size = 1141218, upload-time = "2026-03-13T19:56:25.46Z" },
 ]
 
 [[package]]
@@ -1121,7 +1121,7 @@ wheels = [
 
 [[package]]
 name = "relagent-engine"
-version = "0.1.18"
+version = "0.1.19"
 source = { virtual = "." }
 dependencies = [
     { name = "ddgs" },
