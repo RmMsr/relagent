@@ -31,7 +31,7 @@ build-android:
     - dedicated-build
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - when: manual
+    - if: $CI_COMMIT_TAG
   image: ghcr.io/cirruslabs/flutter:3.41.4
   script:
     - bin/reproducible-build-prepare.sh
@@ -73,7 +73,7 @@ upload-app-artifacts:
       if [ -f apps/build/app/outputs/bundle/release/app-release.aab ]; then
         curl --location --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --fail \
           --upload-file apps/build/app/outputs/bundle/release/app-release.aab \
-          "${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android-aab"
+          "${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android.aab"
       fi
       if [ -f apps/build/linux/x64/release/bundle/relagent ]; then
         curl --location --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --fail \
@@ -84,8 +84,8 @@ upload-app-artifacts:
 create-release:
   stage: release
   image: registry.gitlab.com/gitlab-org/cli:latest
-  rules:
-    - if: $CI_COMMIT_TAG
+  dependencies:
+    - upload-app-artifacts
   script:
     - echo "running release job"
   release:
@@ -110,5 +110,5 @@ create-release:
           link_type: package
         - name: 'Android App Bundle'
           filepath: '/relagent-${PACKAGE_VERSION}-android.aab'
-          url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android-aab'
+          url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android.aab'
           link_type: package
