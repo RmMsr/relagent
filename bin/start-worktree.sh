@@ -83,13 +83,17 @@ if [ -z "$WORKTREE_NAME" ]; then
   WORKTREE_NAME="changes/${suffix}"
 fi
 
-# Build worktree path (standard git worktree behavior: path basename = branch name)
-WORKTREE_PATH="../$WORKTREE_NAME"
+# Build worktree path relative to project root (parent of the main worktree)
+# This works correctly regardless of nesting depth (main/ or changes/branch/)
+MAIN_WORKTREE=$(git worktree list --porcelain | awk '/^worktree/{print $2; exit}')
+PROJECT_ROOT=$(dirname "$MAIN_WORKTREE")
+WORKTREE_PATH="$PROJECT_ROOT/$WORKTREE_NAME"
+WORKTREE_REL=$(realpath --relative-to="$(pwd)" "$WORKTREE_PATH")
 
 echo "Current branch: $BRANCH"
 echo "Current repo: $REPO_NAME"
 echo "Worktree name: $WORKTREE_NAME"
-echo "Worktree path: $WORKTREE_PATH"
+echo "Worktree path: $WORKTREE_REL"
 
 # Check if branch already exists
 if git show-ref --verify --quiet "refs/heads/$WORKTREE_NAME"; then
@@ -120,4 +124,4 @@ if [ -f "./bin/git-worktree-setup.sh" ]; then
 fi
 
 echo "${SUCCESS_SYM} Worktree created successfully!"
-echo "Switch to: cd $WORKTREE_PATH"
+echo "Switch to: cd $WORKTREE_REL"
