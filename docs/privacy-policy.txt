@@ -1,0 +1,33 @@
+Privacy Policy
+
+Updated: 2026-03-16
+
+This software consists of several components. Their data handling depends
+partially on your configuration.
+
+The main components and their intended use:
+
+- Relagent Engine: Receives, stores, processes, and returns data.
+  Uses a Large Language Model (LLM) for processing.
+- Relagent Apps: User interface to the engine. Handles and stores input and
+  output data.
+
+Both components use only local storage. Data is used internally within the
+application. Additionally, the software connects to external systems to
+fulfill its purpose. The exact connections depend on your setup.
+
+The following external connections are implemented as of the date above:
+
+- Required: Connecting to a Large Language Model (LLM) provider for inference.
+  Data handling is the responsibility of the chosen provider. If inference runs
+  on your own hardware, you are responsible for data handling.
+- Required: Using an external search providers. Search queries are sent to
+  fulfill your requests. The provider selection is currently fixed and cannot
+  be changed.
+- Optional: Sending monitoring data to an OpenTelemetry collector. Disabled by
+  default, enabled by specifying an endpoint in your configuration.
+
+This project makes a reasonable effort to avoid unintended data sharing with
+third parties. However, it relies on readily available software components
+(dependencies) that may collect or share data independently, now or in the
+future, without the knowledge of this project.
