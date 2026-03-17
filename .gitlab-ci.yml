@@ -4,10 +4,6 @@ stages:
 - upload
 - release
 
-default:
-  tags:
-    - dedicated-build
-
 variables:
   DOCKERFILE_PATH: Containerfile
   APP_ANDROID_PLATFORMS: android-arm,android-arm64,android-x64
@@ -100,18 +96,18 @@ create-release:
     assets:
       links:
         - name: 'Android arm32 APK'
-          filepath: '/relagent-${PACKAGE_VERSION}-android-arm.apk'
+          direct_asset_path: '/relagent-${PACKAGE_VERSION}-android-arm.apk'
           url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android-arm.apk'
           link_type: package
         - name: 'Android arm64 APK'
-          filepath: '/relagent-${PACKAGE_VERSION}-android-arm64.apk'
+          direct_asset_path: '/relagent-${PACKAGE_VERSION}-android-arm64.apk'
           url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android-arm64.apk'
           link_type: package
         - name: 'Android x64 APK'
-          filepath: '/relagent-${PACKAGE_VERSION}-android-x64.apk'
+          direct_asset_path: '/relagent-${PACKAGE_VERSION}-android-x64.apk'
           url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android-x64.apk'
           link_type: package
         - name: 'Android App Bundle'
-          filepath: '/relagent-${PACKAGE_VERSION}-android.aab'
+          direct_asset_path: '/relagent-${PACKAGE_VERSION}-android.aab'
           url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android.aab'
           link_type: package
