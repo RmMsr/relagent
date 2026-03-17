@@ -10,6 +10,10 @@ variables:
   PACKAGE_VERSION: "${CI_COMMIT_REF_NAME}"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/app-releases"
 
+default:
+  tags:
+    - dedicated-generic
+
 test-apps:
   stage: test
   image: ghcr.io/cirruslabs/flutter:3.41.4
