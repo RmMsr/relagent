@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
@@ -7,6 +6,7 @@ import '/providers/playback_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/tts/services.dart';
+import '/utils/logger.dart';
 import '/voice/model_resolver.dart';
 
 enum MessagePlaybackStatus {
@@ -142,7 +142,7 @@ class TtsNotifier extends Notifier<TtsState> {
     final settings = ref.read(settingsProvider);
     final downloadState = ref.read(modelDownloadProvider);
     final resolved = await resolveTtsModel(settings, downloadState);
-    debugPrint('TtsProvider: TTS model changed, reinitializing...');
+    Logger.debug('TtsProvider: TTS model changed, reinitializing...');
     await _service!.reinitializeWithModel(resolved);
   }
 
@@ -178,7 +178,7 @@ class TtsNotifier extends Notifier<TtsState> {
         );
         await ref.read(playbackProvider.notifier).jumpQueue(playbackItem);
       } catch (e) {
-        debugPrint('TtsProvider: Error playing $messageId: $e');
+        Logger.debug('TtsProvider: Error playing $messageId: $e');
         _updateMessageState(
           messageId,
           status: MessagePlaybackStatus.error,
@@ -229,7 +229,7 @@ class TtsNotifier extends Notifier<TtsState> {
         );
         await ref.read(playbackProvider.notifier).enqueue(playbackItem);
       } catch (e) {
-        debugPrint('TtsProvider: Error enqueueing $messageId: $e');
+        Logger.debug('TtsProvider: Error enqueueing $messageId: $e');
         _updateMessageState(
           messageId,
           status: MessagePlaybackStatus.error,
@@ -253,13 +253,13 @@ class TtsNotifier extends Notifier<TtsState> {
 
   /// Pause the currently playing message
   Future<void> pause() async {
-    debugPrint('TtsProvider: Pausing playback');
+    Logger.debug('TtsProvider: Pausing playback');
     await ref.read(playbackProvider.notifier).pause();
   }
 
   /// Resume the currently paused message
   Future<void> resume() async {
-    debugPrint('TtsProvider: Resuming playback');
+    Logger.debug('TtsProvider: Resuming playback');
     await ref.read(playbackProvider.notifier).resume();
   }
 
@@ -287,7 +287,7 @@ class TtsNotifier extends Notifier<TtsState> {
 
     // Handle queue clearing - reset all items that were in queue but are gone
     if (prev != null && prev.queue.isNotEmpty && next.queue.isEmpty) {
-      debugPrint(
+      Logger.debug(
         'TtsProvider: Playback queue cleared, resetting ${prev.queue.length} pending items',
       );
       for (final item in prev.queue) {

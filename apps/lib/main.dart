@@ -40,7 +40,6 @@ void main() async {
   // Initialize SharedPreferences for user settings
   final sharedPreferences = await SharedPreferences.getInstance();
 
-  // Log SharedPreferences keys for debugging
   Logger.debug('SharedPreferences initialized');
   Logger.debug('Existing keys: ${sharedPreferences.getKeys()}');
 

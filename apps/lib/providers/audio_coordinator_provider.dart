@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
 import '/providers/voice_service_provider.dart';
+import '/utils/logger.dart';
 import '/voice/voice_service.dart';
 
 /// Audio focus status from the native platform
@@ -94,7 +94,7 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
 
   /// Handle audio focus change events from native platform
   void handleAudioFocusChange(String eventType) {
-    debugPrint('AudioCoordinator: handleAudioFocusChange($eventType)');
+    Logger.debug('AudioCoordinator: handleAudioFocusChange($eventType)');
 
     switch (eventType) {
       case 'temporary_loss':
@@ -104,12 +104,12 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
       case 'gain':
         _handleGain();
       default:
-        debugPrint('AudioCoordinator: Unknown audio focus event: $eventType');
+        Logger.debug('AudioCoordinator: Unknown audio focus event: $eventType');
     }
   }
 
   void _handleTemporaryLoss() {
-    debugPrint(
+    Logger.debug(
       'AudioCoordinator: Temporary audio focus loss - saving state and pausing',
     );
 
@@ -125,7 +125,7 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
   }
 
   void _handlePermanentLoss() {
-    debugPrint('AudioCoordinator: Permanent audio focus loss - stopping');
+    Logger.debug('AudioCoordinator: Permanent audio focus loss - stopping');
 
     state = state.copyWith(
       mode: AudioMode.idle,
@@ -136,7 +136,7 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
 
     final currentSettings = ref.read(settingsProvider);
     if (currentSettings.voiceMode != VoiceMode.silent) {
-      debugPrint(
+      Logger.debug(
         'AudioCoordinator: Changing voice mode to silent due to permanent audio focus loss',
       );
       ref.read(settingsProvider.notifier).updateVoiceMode(VoiceMode.silent);
@@ -144,11 +144,11 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
   }
 
   void _handleGain() {
-    debugPrint('AudioCoordinator: Audio focus regained');
+    Logger.debug('AudioCoordinator: Audio focus regained');
 
     if (state.audioFocusState.status == AudioFocusStatus.temporaryLoss) {
       final previousMode = state.audioFocusState.stateBeforeInterruption;
-      debugPrint('AudioCoordinator: Restoring previous mode: $previousMode');
+      Logger.debug('AudioCoordinator: Restoring previous mode: $previousMode');
 
       state = state.copyWith(
         audioFocusState: const AudioFocusState(status: AudioFocusStatus.normal),
@@ -168,58 +168,58 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
 
   /// Request to start recording - returns true if granted
   Future<bool> requestRecording() async {
-    debugPrint(
+    Logger.debug(
       'AudioCoordinator: requestRecording() - current mode: ${state.mode}',
     );
 
     if (state.mode == AudioMode.playing) {
-      debugPrint('AudioCoordinator: Must stop playback first');
+      Logger.debug('AudioCoordinator: Must stop playback first');
       state = const AudioCoordinatorState(mode: AudioMode.idle);
       await _resetAudioSession();
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
 
     if (state.mode != AudioMode.idle) {
-      debugPrint('AudioCoordinator: Cannot record, mode is ${state.mode}');
+      Logger.debug('AudioCoordinator: Cannot record, mode is ${state.mode}');
       return false;
     }
 
-    debugPrint('AudioCoordinator: Transitioning to recording mode');
+    Logger.debug('AudioCoordinator: Transitioning to recording mode');
     state = const AudioCoordinatorState(mode: AudioMode.recording);
 
-    debugPrint('AudioCoordinator: Recording lock acquired');
+    Logger.debug('AudioCoordinator: Recording lock acquired');
     return true;
   }
 
   /// Request to start playback - returns true if granted
   Future<bool> requestPlayback() async {
-    debugPrint(
+    Logger.debug(
       'AudioCoordinator: requestPlayback() - current mode: ${state.mode}',
     );
 
     if (state.mode == AudioMode.recording) {
-      debugPrint('AudioCoordinator: Must stop recording first');
+      Logger.debug('AudioCoordinator: Must stop recording first');
       state = const AudioCoordinatorState(mode: AudioMode.idle);
       await _resetAudioSession();
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
 
     if (state.mode != AudioMode.idle) {
-      debugPrint('AudioCoordinator: Cannot play, mode is ${state.mode}');
+      Logger.debug('AudioCoordinator: Cannot play, mode is ${state.mode}');
       return false;
     }
 
     await _configureSpeechMode();
 
-    debugPrint('AudioCoordinator: Transitioning to playing mode');
+    Logger.debug('AudioCoordinator: Transitioning to playing mode');
     state = const AudioCoordinatorState(mode: AudioMode.playing);
 
-    debugPrint('AudioCoordinator: Playback lock acquired');
+    Logger.debug('AudioCoordinator: Playback lock acquired');
     return true;
   }
 
   Future<void> releaseRecording() async {
-    debugPrint('AudioCoordinator: releaseRecording() - mode: ${state.mode}');
+    Logger.debug('AudioCoordinator: releaseRecording() - mode: ${state.mode}');
     if (state.mode != AudioMode.recording) return;
 
     state = const AudioCoordinatorState(mode: AudioMode.idle);
@@ -227,13 +227,13 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
     final voiceMode = ref.read(settingsProvider).voiceMode;
     if (voiceMode == VoiceMode.listening ||
         voiceMode == VoiceMode.conversation) {
-      debugPrint('AudioCoordinator: Auto-resuming continuous recording');
+      Logger.debug('AudioCoordinator: Auto-resuming continuous recording');
       await requestRecording();
     }
   }
 
   Future<void> releasePlayback() async {
-    debugPrint('AudioCoordinator: releasePlayback() - mode: ${state.mode}');
+    Logger.debug('AudioCoordinator: releasePlayback() - mode: ${state.mode}');
     if (state.mode != AudioMode.playing) return;
 
     state = const AudioCoordinatorState(mode: AudioMode.idle);
@@ -244,7 +244,7 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
       final voiceMode = ref.read(settingsProvider).voiceMode;
       if (voiceMode == VoiceMode.listening ||
           voiceMode == VoiceMode.conversation) {
-        debugPrint('AudioCoordinator: Auto-resuming continuous recording');
+        Logger.debug('AudioCoordinator: Auto-resuming continuous recording');
         await requestRecording();
       }
     }
@@ -252,26 +252,26 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
 
   Future<void> _configureSpeechMode() async {
     try {
-      debugPrint('AudioCoordinator: Configuring audio session for speech mode');
+      Logger.debug('AudioCoordinator: Configuring audio session for speech mode');
       await _voiceService.activateAudioSession();
-      debugPrint('AudioCoordinator: Audio session activated for speech');
+      Logger.debug('AudioCoordinator: Audio session activated for speech');
     } catch (e) {
-      debugPrint('AudioCoordinator: Failed to configure speech mode: $e');
+      Logger.debug('AudioCoordinator: Failed to configure speech mode: $e');
     }
   }
 
   Future<void> _resetAudioSession() async {
     try {
-      debugPrint('AudioCoordinator: Resetting audio session for clean routing');
+      Logger.debug('AudioCoordinator: Resetting audio session for clean routing');
       await _voiceService.deactivateAudioSession();
-      debugPrint('AudioCoordinator: Audio session deactivated');
+      Logger.debug('AudioCoordinator: Audio session deactivated');
 
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
       await _voiceService.activateAudioSession();
-      debugPrint('AudioCoordinator: Audio session reactivated');
+      Logger.debug('AudioCoordinator: Audio session reactivated');
     } catch (e) {
-      debugPrint('AudioCoordinator: Failed to reset audio session: $e');
+      Logger.debug('AudioCoordinator: Failed to reset audio session: $e');
     }
   }
 }

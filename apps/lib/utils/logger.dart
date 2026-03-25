@@ -4,14 +4,10 @@ import 'package:flutter/foundation.dart';
 enum LogLevel { debug, info, warning, error }
 
 /// Minimalistic logger with configurable levels
-/// Default: debug level in debug builds, no output in release
+/// Debug builds log at debug level; release builds log at info level and above
 class Logger {
-  static LogLevel _minLevel = LogLevel.debug;
-
-  /// Set minimum log level (e.g., LogLevel.info to hide debug messages)
-  static void setLogLevel(LogLevel level) {
-    _minLevel = level;
-  }
+  static final LogLevel _minLevel =
+      kReleaseMode ? LogLevel.info : LogLevel.debug;
 
   static void debug(String message) {
     _log(LogLevel.debug, message);

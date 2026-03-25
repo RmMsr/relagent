@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
-
+import '/utils/logger.dart';
 import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 
@@ -30,9 +30,9 @@ class TtsService {
       try {
         await _voiceService.initializeTts(resolvedTtsModel: resolvedTtsModel);
         _isInitialized = true;
-        debugPrint('TTS initialized via VoiceService');
+        Logger.debug('TTS initialized via VoiceService');
       } catch (e) {
-        debugPrint('Failed to initialize TTS: $e');
+        Logger.error('Failed to initialize TTS: $e');
         rethrow;
       } finally {
         developer.Timeline.finishSync();
@@ -63,7 +63,7 @@ class TtsService {
 
     // Check cache first
     if (_audioCache.containsKey(messageId)) {
-      debugPrint('TtsService [$messageId]: Returning cached audio');
+      Logger.debug('TtsService [$messageId]: Returning cached audio');
       return _audioCache[messageId];
     }
 
@@ -83,12 +83,12 @@ class TtsService {
 
       if (wavBytes != null) {
         _addToCache(messageId, wavBytes);
-        debugPrint('TtsService [$messageId]: Generated and cached');
+        Logger.debug('TtsService [$messageId]: Generated and cached');
       }
       return wavBytes;
     } catch (e) {
       developer.Timeline.finishSync();
-      debugPrint('TtsService [$messageId]: Generation failed: $e');
+      Logger.debug('TtsService [$messageId]: Generation failed: $e');
       return null;
     }
   }
@@ -98,7 +98,7 @@ class TtsService {
     if (_cacheOrder.length >= _maxCacheItems) {
       final oldest = _cacheOrder.removeAt(0);
       _audioCache.remove(oldest);
-      debugPrint('TTS cache evicted: $oldest');
+      Logger.debug('TTS cache evicted: $oldest');
     }
 
     _cacheOrder.remove(messageId);
