@@ -60,9 +60,6 @@ abstract class VoiceService implements VoiceCapabilities {
 
   // TTS
 
-  /// Pre-cache TTS model files (call from main isolate before generating).
-  Future<void> preCacheTtsModels();
-
   /// Initialize TTS engine (may spawn background isolate).
   /// Pass [resolvedTtsModel] to use a downloaded model instead of bundled.
   Future<void> initializeTts({ResolvedTtsModel? resolvedTtsModel});

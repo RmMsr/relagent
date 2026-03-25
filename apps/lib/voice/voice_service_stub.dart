@@ -47,9 +47,6 @@ class NoOpVoiceService extends VoiceService {
   // TTS — no-ops
 
   @override
-  Future<void> preCacheTtsModels() async {}
-
-  @override
   Future<void> initializeTts({ResolvedTtsModel? resolvedTtsModel}) async {}
 
   @override

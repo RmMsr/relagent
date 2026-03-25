@@ -45,7 +45,7 @@ class ASR implements AsrService {
   final ValueChanged<Object>? onStreamError;
   final VoidCallback? onStreamDone;
 
-  /// Optional metadata for a downloaded ASR model. Null uses bundled asset model.
+  /// Metadata for the downloaded ASR model. Null means no model is selected.
   @override
   final AsrModelMetadata? modelMetadata;
 
@@ -95,9 +95,7 @@ class ASR implements AsrService {
         developer.Timeline.finishSync();
 
         developer.Timeline.startSync('ASR_CreateRecognizer');
-        _recognizer = modelMetadata != null
-            ? await createOnlineRecognizerFromMetadata(modelMetadata!)
-            : await createOnlineRecognizer();
+        _recognizer = await createOnlineRecognizerFromMetadata(modelMetadata!);
         developer.Timeline.finishSync();
 
         _isInitialized = true;

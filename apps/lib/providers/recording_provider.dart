@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
@@ -79,6 +80,8 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
   // Track intentional stops to avoid false "unexpected closure" errors
   bool _stoppingIntentionally = false;
+  // Track whether ASR has been initialized at least once (to show overlay only on first init)
+  bool _asrInitialized = false;
   // Target management
   RecordingTarget? _activeTarget;
 
@@ -108,6 +111,9 @@ class RecordingNotifier extends Notifier<RecordingState> {
     });
 
     ref.listen<Settings>(settingsProvider, (previous, next) {
+      if (previous?.selectedAsrModelId != next.selectedAsrModelId) {
+        _asrInitialized = false;
+      }
       if (previous?.voiceMode != next.voiceMode) {
         _handleVoiceModeChanged(previous?.voiceMode, next.voiceMode);
       }
@@ -230,9 +236,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
         return;
       }
 
-      state = state.copyWith(isInitializing: true);
-      await _startASR();
-      state = state.copyWith(isInitializing: false);
+      await _startASRWithInit();
       _recoveryAttempts = 0;
       _startHealthMonitoring();
       _startDurationTimer();
@@ -311,9 +315,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
         return;
       }
 
-      state = state.copyWith(isInitializing: true);
-      await _startASR();
-      state = state.copyWith(isInitializing: false);
+      await _startASRWithInit();
       Logger.debug('RecordingProvider: Dictation mode started');
       _activeTarget?.onRecordingStarted();
     } catch (e) {
@@ -465,10 +467,8 @@ class RecordingNotifier extends Notifier<RecordingState> {
     try {
       _resetAudioLevelTracking();
 
-      state = state.copyWith(isInitializing: true);
-      await _startASR();
+      await _startASRWithInit();
       state = state.copyWith(
-        isInitializing: false,
         isRecording: true,
         error: null,
       );
@@ -484,19 +484,48 @@ class RecordingNotifier extends Notifier<RecordingState> {
     }
   }
 
+  /// Yields until after the current frame is built and submitted to the raster
+  /// thread. After this point the raster thread renders the overlay
+  /// independently, so blocking the Dart thread does not prevent the user from
+  /// seeing the initialization message.
+  Future<void> _waitForFrame() {
+    final completer = Completer<void>();
+    SchedulerBinding.instance.addPostFrameCallback((_) => completer.complete());
+    return completer.future;
+  }
+
+  /// Starts ASR, showing an initialization overlay on the first call.
+  /// Subsequent calls (model already loaded) start immediately with no overlay.
+  Future<void> _startASRWithInit() async {
+    final needsOverlay = !_asrInitialized;
+    if (needsOverlay) {
+      state = state.copyWith(isInitializing: true);
+      await _waitForFrame();
+    }
+    try {
+      await _startASR();
+      _asrInitialized = true;
+    } finally {
+      if (needsOverlay) {
+        state = state.copyWith(isInitializing: false);
+      }
+    }
+  }
+
   Future<void> _startASR() async {
-    // Resolve selected ASR model (null = use bundled)
     final settings = ref.read(settingsProvider);
     final downloadState = ref.read(modelDownloadProvider);
     final asrMetadata = await resolveAsrMetadata(settings, downloadState);
 
-    if (asrMetadata != null) {
-      Logger.debug(
-        'RecordingProvider: Using downloaded ASR model: ${asrMetadata.modelId}',
+    if (asrMetadata == null) {
+      throw Exception(
+        'No ASR model selected. Download one in Settings.',
       );
-    } else {
-      Logger.debug('RecordingProvider: Using bundled ASR model');
     }
+
+    Logger.debug(
+      'RecordingProvider: Using ASR model: ${asrMetadata.modelId}',
+    );
 
     await _voiceService.startRecording(
       asrMetadata: asrMetadata,

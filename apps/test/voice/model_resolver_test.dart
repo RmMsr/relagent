@@ -193,11 +193,10 @@ void main() {
   // --- speaker count helper ---
 
   group('getSelectedTtsSpeakerCount', () {
-    test('returns bundled Kokoro speaker count when no model is selected', () {
-      // When no TTS model is selected, the app falls back to the bundled
-      // Kokoro model which has 54 speakers.
+    test('returns 0 when no model is selected', () {
+      // No bundled fallback — caller must handle 0 as "no TTS available".
       final settings = Settings.defaults();
-      expect(getSelectedTtsSpeakerCount(settings), 54);
+      expect(getSelectedTtsSpeakerCount(settings), 0);
     });
 
     test('returns speaker count from catalog entry', () {

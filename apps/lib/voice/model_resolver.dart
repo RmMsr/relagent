@@ -19,7 +19,7 @@ class ResolvedTtsModel {
   });
 }
 
-/// Resolve the selected ASR model to metadata, or null to use bundled.
+/// Resolve the selected ASR model to metadata, or null if no model available.
 Future<AsrModelMetadata?> resolveAsrMetadata(
   Settings settings,
   ModelDownloadState downloadState,
@@ -42,7 +42,7 @@ Future<AsrModelMetadata?> resolveAsrMetadata(
 }
 
 /// Resolve the selected TTS model to a ResolvedTtsModel with absolute paths,
-/// or null to use bundled. Resolves all paths in the main isolate.
+/// or null if no model available. Resolves all paths in the main isolate.
 Future<ResolvedTtsModel?> resolveTtsModel(
   Settings settings,
   ModelDownloadState downloadState,
@@ -81,13 +81,10 @@ Future<ResolvedTtsModel?> resolveTtsModel(
 }
 
 /// Get the speaker count for the currently selected TTS model.
-/// Returns the bundled Kokoro speaker count if no model is selected.
+/// Returns 0 when no model is selected.
 int getSelectedTtsSpeakerCount(Settings settings) {
   final modelId = settings.selectedTtsModelId;
-  if (modelId == null) {
-    // Bundled model is Kokoro with 54 speakers
-    return 54;
-  }
+  if (modelId == null) return 0;
 
   final entry = ModelCatalog.findById(modelId);
   return entry?.speakerCount ?? 0;

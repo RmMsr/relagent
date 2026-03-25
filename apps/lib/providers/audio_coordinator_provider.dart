@@ -224,9 +224,8 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
 
     state = const AudioCoordinatorState(mode: AudioMode.idle);
 
-    final voiceMode = ref.read(settingsProvider).voiceMode;
-    if (voiceMode == VoiceMode.listening ||
-        voiceMode == VoiceMode.conversation) {
+    final settings = ref.read(settingsProvider);
+    if (settings.continuousVoiceEnabled && settings.isContinuousRecording) {
       Logger.debug('AudioCoordinator: Auto-resuming continuous recording');
       await requestRecording();
     }
@@ -241,9 +240,8 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
     if (state.mode == AudioMode.idle) {
-      final voiceMode = ref.read(settingsProvider).voiceMode;
-      if (voiceMode == VoiceMode.listening ||
-          voiceMode == VoiceMode.conversation) {
+      final settings = ref.read(settingsProvider);
+      if (settings.continuousVoiceEnabled && settings.isContinuousRecording) {
         Logger.debug('AudioCoordinator: Auto-resuming continuous recording');
         await requestRecording();
       }

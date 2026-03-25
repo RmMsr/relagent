@@ -5,10 +5,8 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
-import '/config/app_config.dart'; // Only used by TtsIsolateWorker (main isolate)
 import '/models/model_catalog.dart';
 import '/tts/audio_source.dart';
-import '/tts/sherpa_tts.dart';
 import '/utils/logger.dart';
 import '/voice/model_resolver.dart';
 
@@ -177,24 +175,21 @@ void _ttsWorkerIsolate(_IsolateTask task) {
               final modelStopwatch = Stopwatch()..start();
               Logger.debug('[TTS Worker] Creating TTS model...');
 
-              if (message.resolvedModel != null) {
-                // Use pre-resolved paths for downloaded model
-                Logger.debug(
-                  '[TTS Worker] Using resolved paths: ${message.resolvedModel!.resolvedPaths}',
-                );
-                final modelConfig = _buildConfigFromResolvedPaths(
-                  message.resolvedModel!,
-                );
-                final config = sherpa_onnx.OfflineTtsConfig(
-                  model: modelConfig,
-                  ruleFsts: '',
-                  maxNumSenetences: 1,
-                );
-                tts = sherpa_onnx.OfflineTts(config);
-              } else {
-                // Legacy: asset-based model
-                tts = await createOfflineTts(modelName: modelName);
+              if (message.resolvedModel == null) {
+                throw Exception('No resolved TTS model provided');
               }
+              Logger.debug(
+                '[TTS Worker] Using resolved paths: ${message.resolvedModel!.resolvedPaths}',
+              );
+              final modelConfig = _buildConfigFromResolvedPaths(
+                message.resolvedModel!,
+              );
+              final config = sherpa_onnx.OfflineTtsConfig(
+                model: modelConfig,
+                ruleFsts: '',
+                maxNumSenetences: 1,
+              );
+              tts = sherpa_onnx.OfflineTts(config);
 
               modelStopwatch.stop();
               Logger.debug(
@@ -316,18 +311,11 @@ class TtsIsolateWorker {
 
   /// Initialize the worker isolate and load TTS model.
   /// Pass [resolvedModel] to use a downloaded model instead of bundled assets.
-  Future<void> initialize({ResolvedTtsModel? resolvedModel}) async {
+  Future<void> initialize({required ResolvedTtsModel resolvedModel}) async {
     if (_isInitialized) return;
 
-    final modelName = AppConfig.ttsModelName;
-
-    // Only pre-cache asset files when using the bundled model
-    if (resolvedModel == null && modelName != null) {
-      await preCacheTtsModelFiles(modelName: modelName);
-    }
-
     // Pocket TTS (voice cloning) uses a reference WAV bundled with the model.
-    final referenceWavPath = resolvedModel?.resolvedPaths['referenceWav'];
+    final referenceWavPath = resolvedModel.resolvedPaths['referenceWav'];
 
     Logger.debug('[TTS Manager] Spawning worker isolate...');
     final receivePort = ReceivePort();
@@ -352,13 +340,10 @@ class TtsIsolateWorker {
 
     // Initialize TTS in the worker
     final initResponsePort = ReceivePort();
-    final effectiveModelName = resolvedModel != null
-        ? 'downloaded:${resolvedModel.modelId}'
-        : (modelName ?? '');
     _workerSendPort!.send(
       InitializeTtsMessage(
         initResponsePort.sendPort,
-        effectiveModelName,
+        'downloaded:${resolvedModel.modelId}',
         resolvedModel: resolvedModel,
         referenceWavPath: referenceWavPath,
       ),

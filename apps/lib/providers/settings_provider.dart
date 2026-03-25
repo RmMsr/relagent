@@ -5,6 +5,7 @@ import 'agentic_chat_provider.dart';
 import 'chat_provider.dart';
 import 'credentials_manager.dart';
 import 'engine_health_check_provider.dart';
+import 'model_download_provider.dart';
 import '/services/secure_credential_service.dart';
 import 'sessions_provider.dart';
 import 'settings_history_manager.dart';
@@ -51,7 +52,32 @@ class SettingsNotifier extends Notifier<Settings> {
     _historyManager = ref.watch(settingsHistoryManagerProvider);
     _credentialsManager = ref.watch(credentialsManagerProvider);
 
+    // Validate selected model IDs against downloaded models once the
+    // initial filesystem scan completes, clearing any stale selections.
+    ref.listen<ModelDownloadState>(modelDownloadProvider, (previous, next) {
+      if ((previous?.isScanning ?? true) && !next.isScanning) {
+        _validateModelSelections(next.downloadedModels);
+      }
+    });
+
     return _persistenceManager.loadSettings();
+  }
+
+  Future<void> _validateModelSelections(Set<String> downloadedModels) async {
+    final asrId = state.selectedAsrModelId;
+    final ttsId = state.selectedTtsModelId;
+    bool changed = false;
+    if (asrId != null && !downloadedModels.contains(asrId)) {
+      state = state.copyWith(selectedAsrModelId: null);
+      changed = true;
+    }
+    if (ttsId != null && !downloadedModels.contains(ttsId)) {
+      state = state.copyWith(selectedTtsModelId: null);
+      changed = true;
+    }
+    if (changed) {
+      await _persistenceManager.saveSettings(state);
+    }
   }
 
   Future<bool> updateSimpleChatBaseUrl(String url) async {

@@ -140,7 +140,7 @@ class Settings {
   // Continuous voice mode opt-in (experimental)
   final bool continuousVoiceEnabled;
 
-  // Selected voice model IDs (null = use bundled asset model if available)
+  // Selected voice model IDs (null = no model selected)
   final String? selectedAsrModelId;
   final String? selectedTtsModelId;
 

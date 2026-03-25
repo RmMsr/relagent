@@ -7,12 +7,37 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
+import 'package:relagent/models/model_catalog.dart';
 import 'package:relagent/providers/audio_coordinator_provider.dart';
+import 'package:relagent/providers/model_download_provider.dart';
 import 'package:relagent/providers/playback_provider.dart';
 import 'package:relagent/providers/settings_provider.dart';
+import 'package:relagent/voice/model_download_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'audio_test_fixtures.mocks.dart';
+
+/// A [ModelDownloadService] stub that returns empty state immediately,
+/// preventing async filesystem I/O from outliving tests.
+class _NoOpModelDownloadService extends ModelDownloadService {
+  @override
+  Future<Set<String>> listDownloadedModels() async => {};
+
+  @override
+  Future<int> totalStorageUsed() async => 0;
+
+  @override
+  Future<void> downloadModel(
+    CatalogEntry entry, {
+    void Function(DownloadProgress)? onProgress,
+  }) async {}
+
+  @override
+  void cancelDownload(String modelId) {}
+
+  @override
+  Future<void> deleteModel(String modelId) async {}
+}
 
 /// Test fixtures and mocks for audio subsystem testing.
 ///
@@ -63,6 +88,8 @@ class AudioTestFixture {
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
         // Override AudioPlayer provider with mock
         audioPlayerProvider.overrideWithValue(mockAudioPlayer),
+        // Stub model download service so no async filesystem I/O outlives tests
+        modelDownloadServiceProvider.overrideWithValue(_NoOpModelDownloadService()),
       ],
     );
   }

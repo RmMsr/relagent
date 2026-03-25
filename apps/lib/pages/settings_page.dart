@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '/agentic/health_check.dart';
-import '/config/app_config.dart';
 import '/models/model_catalog.dart';
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
@@ -596,13 +595,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  Widget _modelSubtitle(BuildContext context, String? id, String? bundledName) {
+  Widget _modelSubtitle(BuildContext context, String? id) {
     final muted = Theme.of(context).textTheme.bodySmall?.copyWith(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         );
     if (id == null) {
-      final label = bundledName != null ? 'Bundled: $bundledName' : 'Bundled';
-      return Text(label);
+      return const Text('None');
     }
     final entry = ModelCatalog.findById(id);
     if (entry == null) return Text(id);
@@ -1047,7 +1045,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               subtitle: _modelSubtitle(
                 context,
                 settings.selectedAsrModelId,
-                AppConfig.speechRecognitionStreamingAsrModelName,
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/voice-models', extra: 0),
@@ -1059,7 +1056,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               subtitle: _modelSubtitle(
                 context,
                 settings.selectedTtsModelId,
-                AppConfig.ttsModelName,
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/voice-models', extra: 1),

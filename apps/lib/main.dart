@@ -3,16 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import '/models/app_info.dart';
+import '/widgets/voice_init_overlay.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '/config/app_config.dart';
 import '/models/model_catalog.dart';
 import '/providers/background_service_provider.dart';
 import '/providers/health_check_provider.dart';
 import '/providers/settings_provider.dart';
 import '/router/app_router.dart';
 import '/utils/logger.dart';
-import '/voice/voice_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,17 +21,8 @@ void main() async {
     JustAudioMediaKit.ensureInitialized();
   }
 
-  // Load static app config (ASR model, etc.)
-  await AppConfig.load();
-
   // Load voice model catalog from bundled JSON asset
   await ModelCatalog.init();
-
-  // Pre-cache TTS model files on native platforms (don't block app startup)
-  final voiceService = createVoiceService();
-  if (voiceService.isTtsAvailable) {
-    Future.microtask(() => voiceService.preCacheTtsModels());
-  }
 
   // Get runtime app info
   await AppInfo.initialize();
@@ -74,6 +64,7 @@ class MyApp extends ConsumerWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent),
       ),
       routerConfig: appRouter,
+      builder: (context, child) => VoiceInitOverlay(child: child!),
     );
   }
 }

@@ -2,23 +2,18 @@ import 'dart:async';
 
 import 'package:audio_session/audio_session.dart' as native_audio;
 import 'package:flutter/services.dart';
-import '/config/app_config.dart';
 import '/models/model_catalog.dart';
 import '/speech_recognition/services.dart' as asr;
 import '/speech_recognition/asr_metadata.dart';
 import '/speech_recognition/sherpa_vad_asr.dart';
-import '/tts/sherpa_tts.dart' as native_tts;
 import '/tts/tts_isolate_worker.dart';
 import '/utils/logger.dart';
-import '/voice/asset_model_loader.dart';
-import 'package:sherpa_voice/model_loader.dart';
 import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 import 'package:record/record.dart' as record_pkg;
 
 /// Native voice service wrapping sherpa_onnx, record, and audio_session.
 class NativeVoiceService extends VoiceService {
-  final ModelLoader _modelLoader = AssetModelLoader();
   asr.AsrService? _asr;
   TtsIsolateWorker? _ttsWorker;
   bool _ttsInitialized = false;
@@ -46,8 +41,6 @@ class NativeVoiceService extends VoiceService {
 
   @override
   bool get isBackgroundListeningAvailable => true;
-
-  ModelLoader get modelLoader => _modelLoader;
 
   // --- ASR ---
 
@@ -132,12 +125,6 @@ class NativeVoiceService extends VoiceService {
 
   // --- TTS ---
 
-  @override
-  Future<void> preCacheTtsModels() async {
-    if (AppConfig.ttsModelName == null) return;
-    await native_tts.preCacheTtsModelFiles();
-  }
-
   ResolvedTtsModel? _currentResolvedTtsModel;
 
   @override
@@ -150,8 +137,7 @@ class NativeVoiceService extends VoiceService {
 
     if (_ttsInitialized) return;
 
-    // Need either a bundled model or a resolved downloaded model
-    if (AppConfig.ttsModelName == null && resolvedTtsModel == null) {
+    if (resolvedTtsModel == null) {
       Logger.debug('NativeVoiceService: No TTS model available, skipping init');
       return;
     }

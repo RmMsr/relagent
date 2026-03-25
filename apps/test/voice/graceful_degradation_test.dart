@@ -74,12 +74,10 @@ void main() {
     });
 
     test(
-        'getSelectedTtsSpeakerCount falls back to bundled Kokoro (54 speakers) '
-        'when no TTS model is selected', () {
-      // When no model is selected, the bundled Kokoro is the implicit fallback.
-      // 54 is expected; this documents the fallback behaviour.
+        'getSelectedTtsSpeakerCount returns 0 when no TTS model is selected', () {
+      // No bundled fallback — 0 means TTS speaker selection is unavailable.
       final settings = Settings.defaults();
-      expect(getSelectedTtsSpeakerCount(settings), 54);
+      expect(getSelectedTtsSpeakerCount(settings), 0);
     });
   });
 }

@@ -108,6 +108,37 @@ The settings page SHALL include a "Voice Models" section for managing ASR and TT
 - **THEN** the system SHALL remove the model files from storage
 - **AND** if the model was active, the system SHALL clear the selection
 
+### Requirement: Startup Validation of Selected Models
+On app startup, the system SHALL verify that selected ASR and TTS model IDs correspond to models that are actually available in download storage. Stale selections SHALL be cleared automatically.
+
+#### Scenario: Selected ASR model still available
+- **WHEN** the app starts
+- **AND** the selected ASR model ID corresponds to a downloaded model
+- **THEN** the selection SHALL be preserved unchanged
+
+#### Scenario: Selected ASR model no longer available
+- **WHEN** the app starts
+- **AND** the selected ASR model ID does NOT correspond to a downloaded model
+- **THEN** the ASR model selection SHALL be cleared to null
+- **AND** the settings page SHALL show "None" for the active ASR model
+
+#### Scenario: Selected TTS model no longer available
+- **WHEN** the app starts
+- **AND** the selected TTS model ID does NOT correspond to a downloaded model
+- **THEN** the TTS model selection SHALL be cleared to null
+- **AND** the settings page SHALL show "None" for the active TTS model
+
+#### Scenario: No model selected at startup
+- **WHEN** the app starts
+- **AND** no ASR or TTS model is selected (both null)
+- **THEN** no validation action SHALL be taken
+- **AND** no errors SHALL be logged
+
+#### Scenario: Validation runs after download scan completes
+- **WHEN** the app starts
+- **THEN** model validation SHALL occur after `ModelDownloadProvider` has completed its initial scan of download storage
+- **AND** it SHALL NOT run while the scan is still in progress
+
 ### Requirement: Selected Model Persistence
 The system SHALL persist the user's model selections in SharedPreferences.
 
@@ -124,8 +155,8 @@ The system SHALL persist the user's model selections in SharedPreferences.
 #### Scenario: Selection cleared when model deleted
 - **GIVEN** the user has selected a model that is subsequently deleted
 - **WHEN** the app loads settings
-- **THEN** the selection SHALL be cleared
-- **AND** the system SHALL fall back to bundled model if available
+- **THEN** the selection SHALL be cleared to null
+- **AND** voice features SHALL be reported as unavailable until a new model is selected
 
 ### Requirement: Voice settings visible when available
 The voice-related settings sections SHALL be conditionally visible based on platform voice capabilities and model availability. The settings page SHALL use a tabbed layout with voice settings on a dedicated "Voice" tab.
@@ -137,7 +168,7 @@ The voice-related settings sections SHALL be conditionally visible based on plat
 - **AND** TTS-related settings (speaker, speed) SHALL be displayed
 
 #### Scenario: Voice mode selector indicates model requirement
-- **GIVEN** no ASR model is available (neither bundled nor downloaded)
+- **GIVEN** no ASR model is downloaded and selected
 - **WHEN** the user views the Voice tab
 - **THEN** it SHALL indicate that a model download is required to enable voice features
 - **AND** it SHALL provide a shortcut to the model management section

@@ -80,6 +80,7 @@ class ModelDownloadNotifier extends Notifier<ModelDownloadState> {
   Future<void> _refreshDownloadedModels({bool initialScan = false}) async {
     final downloaded = await _service.listDownloadedModels();
     final storage = await _service.totalStorageUsed();
+    if (!ref.mounted) return;
     state = state.copyWith(
       downloadedModels: downloaded,
       totalStorageBytes: storage,

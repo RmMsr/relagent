@@ -1,51 +1,14 @@
-## Purpose
+## REMOVED Requirements
 
-Define a unified `ModelLoader` interface that abstracts model loading from downloads, enabling flexible model management.
+### Requirement: Asset-Based Model Loader
+**Reason**: Asset-bundled model loading is no longer used. No models are bundled via `config.json`. The download system is the sole model source.
+**Migration**: All model loading uses `DownloadModelLoader`. Users must download models via the in-app model manager.
 
-## Requirements
+### Requirement: Model Loader Injection
+**Reason**: With only `DownloadModelLoader` remaining, loaders are created per-model in `model_resolver.dart` rather than injected as a field into `NativeVoiceService`.
+**Migration**: `NativeVoiceService` no longer holds a `ModelLoader` field. Model loaders are created on demand by the resolver.
 
-### Requirement: Model Loader Interface
-The system SHALL define an abstract `ModelLoader` interface that decouples model access from the specific loading strategy (asset bundling, file download, etc.).
-
-#### Scenario: Interface provides model file loading
-- **WHEN** a consumer needs access to a model file
-- **THEN** it SHALL call `ModelLoader.loadModelFile(modelName, fileName)`
-- **AND** the method SHALL return the file system path to the loaded file
-
-#### Scenario: Interface provides model directory loading
-- **WHEN** a consumer needs access to a model directory (e.g., espeak-ng-data)
-- **THEN** it SHALL call `ModelLoader.loadModel(modelName)`
-- **AND** the method SHALL return the file system path to the model directory
-
-#### Scenario: Interface supports checking model availability
-- **WHEN** a consumer needs to know if a model is available before loading
-- **THEN** it SHALL call `ModelLoader.isModelAvailable(modelName)`
-- **AND** the method SHALL return true if the model files exist and are complete
-
-### Requirement: Unavailable Model Loader for Web
-The system SHALL provide an `UnavailableModelLoader` implementation for platforms that cannot load local models.
-
-#### Scenario: Web model loader throws on access
-- **WHEN** `loadModelFile` or `loadModel` is called on web
-- **THEN** the loader SHALL throw `UnsupportedError`
-- **AND** callers SHALL handle this gracefully (voice service stub never calls the loader)
-
-### Requirement: Download-Based Model Loader
-The system SHALL provide a `DownloadModelLoader` implementation of `ModelLoader` that loads models from the permanent download storage directory.
-
-#### Scenario: Load model file from download storage
-- **WHEN** `loadModelFile(modelName, fileName)` is called
-- **THEN** it SHALL return the path `<support_dir>/models/<type>/<modelName>/<fileName>`
-- **AND** it SHALL verify the file exists before returning
-
-#### Scenario: Load model directory from download storage
-- **WHEN** `loadModelDirectory(modelName, dirName)` is called
-- **THEN** it SHALL return the path `<support_dir>/models/<type>/<modelName>/<dirName>`
-- **AND** it SHALL verify the directory exists before returning
-
-#### Scenario: File not found in download storage
-- **WHEN** a requested model file does not exist in download storage
-- **THEN** the loader SHALL throw a descriptive error indicating the model needs to be downloaded
+## MODIFIED Requirements
 
 ### Requirement: Model Loader Resolution
 The system SHALL select the appropriate `ModelLoader` implementation based on model availability.
