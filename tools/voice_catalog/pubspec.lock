@@ -106,50 +106,50 @@ packages:
     dependency: transitive
     description:
       name: sherpa_onnx
-      sha256: "3ac66fd2ded0c198f16bba6aadf3b1ccbe599f90c89827473a2e53cc2c4d5bbb"
+      sha256: "6f4d7fe496ee133367c2a38376249f26511a44297b940dde541af8cc84d2bf08"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.29"
+    version: "1.12.33"
   sherpa_onnx_android:
     dependency: transitive
     description:
       name: sherpa_onnx_android
-      sha256: ef4c155f05cfa2934a028fbab73567cc873690ff2e08e6d84df80789734cda9d
+      sha256: "568fbcbc4baf48bd80ae1478d60e97e922917177ce6a556fa19bbb6b0f2b801d"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.29"
+    version: "1.12.33"
   sherpa_onnx_ios:
     dependency: transitive
     description:
       name: sherpa_onnx_ios
-      sha256: cf158df4ab0953da6873a879b3f1ce230ac58d2bf50bcee198d8b4f33a928886
+      sha256: "067702a9fbf70de0a999137f7e78429f601e848ea03e93f69584232c1662f89c"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.29"
+    version: "1.12.33"
   sherpa_onnx_linux:
     dependency: transitive
     description:
       name: sherpa_onnx_linux
-      sha256: f241519d56b39735079a15661b42892d7b47017a1beb029af47328f299e4c3f3
+      sha256: "4faf444f3c71651a2dd65bbd53de2fc642ec3f03829524ba56df92f2cf597ec1"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.29"
+    version: "1.12.33"
   sherpa_onnx_macos:
     dependency: transitive
     description:
       name: sherpa_onnx_macos
-      sha256: e4a356fcdee0dee572e123a287de982d4bc0333a7ad2505e1c51767ff8e0ceae
+      sha256: "25bb40a810609b7988d51d04ab2d8597974ed7069e6a8b3e8860bb6451136dde"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.29"
+    version: "1.12.33"
   sherpa_onnx_windows:
     dependency: transitive
     description:
       name: sherpa_onnx_windows
-      sha256: "9283347fcb93a4c76f995568f83bda39fc4ef243c05a12f499b09e37eec63fa4"
+      sha256: "1a06882e3d3cec2e6cf97376a3b9b6f4df9094f7b84e13bd765f31280ee6d4c0"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.29"
+    version: "1.12.33"
   sherpa_voice:
     dependency: "direct main"
     description:
