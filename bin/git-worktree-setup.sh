@@ -5,52 +5,49 @@
 
 # Check if we're in a git worktree (not the main worktree)
 is_worktree() {
-    [ -f ".git" ] && [ ! -d ".git" ]
+    [ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ]
 }
 
 # Create symlink for a relative path (file or directory)
 create_symlink() {
     relative_path="$1"
 
-    # Get main repo name
-    main_repo_name=$(basename "$(dirname "$(git rev-parse --git-common-dir)")")
+    # Get main repository root
+    main_repo_root=$(dirname "$(git rev-parse --git-common-dir)")
 
-    source_path="../$main_repo_name/$relative_path"
+    # Get current directory
+    current_dir=$(pwd)
+
+    # Find worktree root directory
+    worktree_root=$(git rev-parse --show-toplevel)
+
+    # Calculate relative path from current dir to worktree root
+    relative_to_worktree=$(realpath --relative-to="$current_dir" "$worktree_root")
+
+    # Calculate relative path from worktree root to main repo root
+    relative_to_main=$(realpath --relative-to="$worktree_root" "$main_repo_root")
+
+    # Destination path (where symlink will be created) - relative to current directory
     dest_path="$relative_path"
 
-    # Calculate number of directories in relative_path
-    num_dirs=$(echo "$relative_path" | awk -F'/' '{print NF}')
-
-    if [ -d "$source_path" ]; then
+    if [ -d "$main_repo_root/$relative_path" ]; then
         # Directory: create symlinks for each file/subdir
         mkdir -p "$dest_path"
 
-        num_dots=$((num_dirs + 1))
-        dots=""
-        i=1
-        while [ "$i" -le "$num_dots" ]; do
-            dots="${dots}../"
-            i=$((i + 1))
-        done
-
-        for source_file in "$source_path"/*; do
+        for source_file in "$main_repo_root/$relative_path"/*; do
             [ -e "$source_file" ] || continue
             filename=$(basename "$source_file")
             dest_file="$dest_path/$filename"
             [ -e "$dest_file" ] && continue
-            ln -sf "${dots}$main_repo_name/$relative_path/$filename" "$dest_file"
+            # Create symlink relative to current directory
+            ln -sf "${relative_to_worktree}${relative_to_main:+/${relative_to_main}}/$relative_path/$filename" "$dest_file"
         done
 
-    elif [ -f "$source_path" ]; then
+    elif [ -f "$main_repo_root/$relative_path" ]; then
         # File: direct symlink
         [ -e "$dest_path" ] && return
-        dots=""
-        i=1
-        while [ "$i" -le "$num_dirs" ]; do
-            dots="${dots}../"
-            i=$((i + 1))
-        done
-        ln -sf "${dots}$main_repo_name/$relative_path" "$dest_path"
+        # Create symlink relative to current directory
+        ln -sf "${relative_to_worktree}${relative_to_main:+/${relative_to_main}}/$relative_path" "$dest_path"
     fi
 }
 
