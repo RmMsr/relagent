@@ -224,6 +224,20 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
 
     if (!state.isActive) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
+      // Re-validate after delay: settings or mode may have changed while waiting.
+      if (!ref.read(settingsProvider).continuousVoiceEnabled) {
+        Logger.debug(
+          'BackgroundServiceProvider: Continuous voice disabled after delay, aborting',
+        );
+        return;
+      }
+      final currentMode = ref.read(audioCoordinatorProvider).mode;
+      if (currentMode != mode) {
+        Logger.debug(
+          'BackgroundServiceProvider: Mode changed from $mode to $currentMode during delay, aborting stale start',
+        );
+        return;
+      }
     }
 
     try {
