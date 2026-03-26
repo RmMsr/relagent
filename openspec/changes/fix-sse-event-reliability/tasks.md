@@ -18,3 +18,15 @@
 
 - [x] 4.1 In `AgenticChatNotifier.loadHistory(fromId:)`, filter out fetched messages whose `id` already exists in `state.messages` before appending
 - [ ] 4.2 Verify: send messages from two devices to the same session, confirm no duplicates appear on either device
+
+## 5. Real-time session list updates (from session-management)
+
+- [ ] 5.1 Subscribe SessionsPage to session events to update list in real-time
+- [ ] 5.2 Handle edge case: user on sessions page when session created elsewhere
+- [ ] 5.3 Handle edge case: session deleted while user viewing it
+
+## 6. Active session deletion handling (from session-management)
+
+- [ ] 6.1 Handle active session deletion notification
+- [ ] 6.2 Auto-create new session when active session is deleted
+- [ ] 6.3 Show snackbar notification on active session deletion

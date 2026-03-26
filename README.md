@@ -117,9 +117,9 @@ To ensure everything is working as expected, try out the **Self-Test** on the
 
 Those are some very relevant topics that we would love to spend time on:
 
+- **Security gates**: Map execution steps (like thinking, data access or external tool calling) to risks and apply rules and permissions.
 - **Explicit cross session memory**: Creating and accessing topic specific long term memory.
 - **External triggers**: Allowing external events like calendar entries or scheduled reminders to initiate agent actions.
-- **Security gates**: Map execution steps (like thinking, data access or external tool calling) to risks and apply rules and permissions.
 - **Evolving context seed**: Allows the agent to step into interactions with distilled knowledge from previous sessions.
 
 ## Design decisions and limitations

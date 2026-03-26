@@ -1,4 +1,4 @@
-## Project Overview
+# Project Overview
 
 This is the Relagent ("Relatable Agentic Minion") frontend. A multi-platform Flutter app (Android/iOS/Linux) with speech recognition capabilities that connects to any OpenAI-compatible chat API server.
 
@@ -192,7 +192,7 @@ Default settings are used on first launch and can be reset via the settings page
 
 ## Repository Structure (Flutter App)
 
-```
+```text
 apps/
 ├── lib/                    # Dart source code
 │   ├── main.dart          # App entry point
@@ -352,7 +352,7 @@ Health monitoring logs recovery attempts and failures for troubleshooting:
 
 **Log Messages to Look For**:
 
-```
+```text
 Health check: Recording active, audio data flowing normally
 Health check: No audio data for 2+ minutes, attempting recovery
 Recovery attempt 1/3: Restarting audio stream

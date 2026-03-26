@@ -40,6 +40,16 @@ The system SHALL provide a script to synchronize the version across all artifact
 - **THEN** VERSION contains `0.2.0`
 - **AND** all artifacts are updated to `0.2.0`
 
+### Requirement: API Status Version Field
+
+The engine `/api/v1/status` response SHALL include a `version` field containing the deployed engine version string.
+
+#### Scenario: Status response includes version
+
+- **WHEN** an authenticated GET request is made to `/api/v1/status`
+- **THEN** the response JSON includes a `version` field with a valid semver string (e.g., `"0.1.13"`)
+- **AND** the value matches the version from the engine's deployed package metadata
+
 ### Requirement: Engine Status Endpoint
 
 The engine SHALL expose a `/health` endpoint returning version information.
