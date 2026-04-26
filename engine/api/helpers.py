@@ -5,17 +5,23 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.concurrency import asynccontextmanager
 from fastapi.security import APIKeyHeader
 
-from engine.adapters.pydantic_ai_execution.pydantic_execution import (
+from engine.adapters.pydantic_ai_execution.queries import (
     PydanticAgentAdapter,
 )
 from engine.adapters.sqlite_event_store.sqlite_backend import SqliteEventStoreAdapter
 from engine.adapters.yaml_persistence.yaml_adapter import YamlPersistenceAdapter
 from engine.constants import DATA_DIR, DEBUG_DUMPS, SECRET_ACCESS_KEY, WEB_DIR
 from engine.domain.ports.events import EventStore
-from engine.domain.services import AgentExecution, ChatService
-from engine.logging import get_logger
+from engine.domain.ports.persistence import Persistence
+from engine.domain.services import AgentExecution, ApprovalService, ChatService
+from engine.log_config import get_logger
 
 logger = get_logger(__name__)
+
+
+@cache
+def dependency_persistence() -> Persistence:
+    return YamlPersistenceAdapter(data_dir=DATA_DIR)
 
 
 @cache
@@ -24,16 +30,27 @@ def dependency_event_store() -> EventStore:
     return SqliteEventStoreAdapter(db_path=DATA_DIR / "events.db")
 
 
-def dependency_chat_service() -> ChatService:
-    return ChatService(
-        persistence_repository=YamlPersistenceAdapter(data_dir=DATA_DIR),
-        agent_execution=PydanticAgentAdapter(debug_dumps=DEBUG_DUMPS),
-        event_store=dependency_event_store(),
-    )
+@cache
+def dependency_approval_service() -> ApprovalService:
+    return ApprovalService(persistence_repository=dependency_persistence())
 
 
 def dependency_agent_execution() -> AgentExecution:
-    return PydanticAgentAdapter(debug_dumps=DEBUG_DUMPS)
+    return PydanticAgentAdapter(
+        approval_service=dependency_approval_service(),
+        debug_dumps=DEBUG_DUMPS,
+    )
+
+
+def dependency_chat_service(
+    agent_execution: AgentExecution = Depends(dependency_agent_execution),
+) -> ChatService:
+    return ChatService(
+        persistence_repository=dependency_persistence(),
+        agent_execution=agent_execution,
+        event_store=dependency_event_store(),
+        approval_service=dependency_approval_service(),
+    )
 
 
 def validate_api_key(key_to_check: str | None) -> bool:

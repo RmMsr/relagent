@@ -1,3 +1,1 @@
-"""
-Conrete adapters for domain ports
-"""
+"""Conrete adapters for domain ports"""

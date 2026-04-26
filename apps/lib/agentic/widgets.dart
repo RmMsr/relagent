@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 
+import '/agentic/approval_card.dart';
 import '/agentic/health_check.dart';
 import '/agentic/models.dart';
 import '/models/app_info.dart';
@@ -13,6 +14,9 @@ import '/speech_recognition/recording_target.dart';
 import '/speech_recognition/widgets.dart';
 import '/utils/logger.dart';
 import '/widgets/version_info_widget.dart';
+
+export '/agentic/approval_card.dart';
+export '/agentic/sensitivity_widgets.dart';
 
 class AgenticChatInput extends ConsumerStatefulWidget {
   final ValueChanged<String> onSubmitted;
@@ -179,6 +183,11 @@ class _MessageGroup {
   });
 
   bool shouldBreakGroup(AgenticMessage nextMessage) {
+    // System messages always stand alone
+    if (nextMessage.role == AgenticRole.system ||
+        sender == AgenticRole.system) {
+      return true;
+    }
     if (nextMessage.role != sender) return true;
     final lastMessageTime = messages.last.timestamp;
     final timeDiff = nextMessage.timestamp.difference(lastMessageTime);
@@ -214,6 +223,12 @@ class AgenticChatHistory extends StatelessWidget {
   final EngineHealthResult? engineHealthResult;
   final VoidCallback? onRetry;
   final bool isVoiceAvailable;
+  final SensitivityLevel sensitivityLevel;
+  final ValueChanged<SensitivityLevel>? onChangeSensitivity;
+  final void Function(ApprovalData, GrantRequest, bool isGlobal)?
+      onGrantApproval;
+  final ValueChanged<String>? onSkipApproval;
+  final VoidCallback? onContinue;
 
   const AgenticChatHistory({
     super.key,
@@ -224,6 +239,11 @@ class AgenticChatHistory extends StatelessWidget {
     this.engineHealthResult,
     this.onRetry,
     this.isVoiceAvailable = false,
+    this.sensitivityLevel = SensitivityLevel.personal,
+    this.onChangeSensitivity,
+    this.onGrantApproval,
+    this.onSkipApproval,
+    this.onContinue,
   });
 
   @override
@@ -292,21 +312,78 @@ class AgenticChatHistory extends StatelessWidget {
       final group = groups[groupIndex];
       final isLastGroup = groupIndex == groups.length - 1;
 
-      for (int msgIndex = 0; msgIndex < group.messages.length; msgIndex++) {
-        final message = group.messages[msgIndex];
-        final isFirstInGroup = msgIndex == 0;
-        final isLastInGroup = msgIndex == group.messages.length - 1;
+      // System messages get special rendering
+      if (group.sender == AgenticRole.system) {
+        for (final message in group.messages) {
+          final hasApprovals =
+              message.approvals != null && message.approvals!.isNotEmpty;
+          final isLastMessage = groupIndex == groups.length - 1;
 
-        chatWidgets.add(
-          _AgenticMessageBubble(
-            message: message,
-            isFirstInGroup: isFirstInGroup,
-            isLastInGroup: isLastInGroup,
-            onSpeak: onSpeak,
-            getMessagePlaybackStatus: getMessagePlaybackStatus,
-            onRetry: onRetry,
-          ),
-        );
+          if (hasApprovals) {
+            // Approval group with actionable cards
+            // Historical approvals (not the latest) render as resolved
+            final formattedTime =
+                DateFormat('HH:mm:ss').format(message.timestamp);
+            chatWidgets.add(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      top: 8,
+                      bottom: 4,
+                      left: 12,
+                    ),
+                    child: Builder(
+                      builder: (context) {
+                        final theme = Theme.of(context);
+                        return Text(
+                          'system • $formattedTime',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  ApprovalGroup(
+                    message: message,
+                    sessionSensitivity: sensitivityLevel,
+                    isActionable: isLastMessage,
+                    onChangeSensitivity: onChangeSensitivity,
+                    onGrant: onGrantApproval,
+                    onSkip: onSkipApproval,
+                    onContinue: isLastMessage ? onContinue : null,
+                  ),
+                ],
+              ),
+            );
+          } else if (message.notification != null) {
+            chatWidgets.add(
+              SystemNoteBubble(text: message.notification!),
+            );
+          }
+        }
+      } else {
+        for (int msgIndex = 0;
+            msgIndex < group.messages.length;
+            msgIndex++) {
+          final message = group.messages[msgIndex];
+          final isFirstInGroup = msgIndex == 0;
+          final isLastInGroup =
+              msgIndex == group.messages.length - 1;
+
+          chatWidgets.add(
+            _AgenticMessageBubble(
+              message: message,
+              isFirstInGroup: isFirstInGroup,
+              isLastInGroup: isLastInGroup,
+              onSpeak: onSpeak,
+              getMessagePlaybackStatus: getMessagePlaybackStatus,
+              onRetry: onRetry,
+            ),
+          );
+        }
       }
 
       if (!isLastGroup) {
@@ -862,3 +939,4 @@ class _AssistantPendingPlaceholderState
     );
   }
 }
+

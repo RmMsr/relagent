@@ -1,3 +1,1 @@
-"""
-Domain specific data and interfaces
-"""
+"""Domain specific data and interfaces"""

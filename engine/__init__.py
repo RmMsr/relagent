@@ -1,3 +1,1 @@
-"""
-FastAPI engine for agent.
-"""
+"""FastAPI engine for agent."""

@@ -1,23 +1,19 @@
-## Project Overview
+# Project Overview
 
-This is the Relagent engine, an agentic service for the Relagent apps. It provides a REST API and is responsible for agent orchestration, persistence and LLM access.
-
-- Agents and tools are created using Pydantic AI
-- Data is persisted in the form of YAML files
-- The API is built using FastAPI
+Relagent engine — agentic REST API service for agent orchestration, persistence and LLM access.
 
 ## Technology Stack
 
 - Python 3.12+
+- FastAPI for API endpoints
 - Pydantic for data models
 - Pydantic AI for agents and tools
-- FastAPI for API endpoints
-- pydantic-yaml for YAML serialization
+- PyYAML data serialization
 - portalocker for file locking
 
 ## Package Management
 
-Uses `uv` for dependency management with dependencies in `pyproject.toml`.
+Uses `uv` with `pyproject.toml`:
 
 ```bash
 uv sync --group dev          # Install dependencies
@@ -26,19 +22,44 @@ uv run ruff check engine/    # Lint
 uv run pyright engine/       # Type check
 ```
 
-## Key Modules
+## Core Modules
 
-- `engine/models.py` - Pydantic data models and YAML persistence with file locking
-- `engine/services.py` - Business logic and service layer
-- `engine/constants.py` - Configuration constants
-- `engine/agents.py` - Pydantic AI agent definitions
-- `engine/tools.py` - Agent tools (username, current time)
-- `engine/run.py` - FastAPI application and endpoints
+- `adapters/`: Concrete implementations for domain ports
+  - `pydantic_ai_execution/`: Pydantic AI agent execution adapter
+    - `queries.py`: Orchestrates agent runs, permission resolution, and history construction
+    - `tools.py`: Tool definitions (e.g. web_search)
+    - `agent_definitions.py`: Agent configuration
+  - `sqlite_event_store/`: Event store using a SQLite database
+  - `yaml_persistence/`: Persistence layer using YAML files
+  - `test_adapters.py`: In-memory adapters for testing (MemoryPersistence, StubAgentExecution)
+- `api/`: FastAPI endpoints and routers
+  - `v1.py`: REST API — sessions, messages, grants, approvals, continuation
+  - `demo.py`: Self-contained demo server with scripted agent responses
+  - `helpers.py`: Dependency injection wiring
+- `domain/`: High level logic and core classes
+  - `ports/`: Abstract interfaces (AgentExecution, Persistence, EventStore)
+  - `models.py`: Data structures (Approval, Grant, SystemAction, ChatContext, PermissionKey)
+  - `services.py`: ChatService (session/message lifecycle) and ApprovalService (grant resolution)
+  - `types.py`: Enums (ApprovalType, SensitivityLevel)
 
 ## Data Storage
 
-Session data is stored in `DATA_DIR/sessions/{session_id}/session_info.yaml` using YAML format with portalocker for concurrent write protection.
+Per default is all data stored in `~/.local/share/org.venkado.relagent-engine/data/`.
+Sessions for example in `$DATA_DIR/sessions/{session_id}/session_info.yaml`.
+
+## Approval Sysyem
+
+Tool calls usually require the user's approval. Approvals and grants are part of the visible
+domain and handled by the PermissionService. The Execution adapter like PydanticAgentAdapter
 
 ## Development
 
-Code needs to be formatted using Ruff and quality checked using Pyright.
+### Architecture
+
+- Separate modules following the hexagonal architecture with ports and adapters
+- The project should be able to run in a distributed environment like Kubernetes, even if it is run in one single container for most cases
+
+### Code Quality
+
+- Format with Ruff
+- Type-check with Pyright

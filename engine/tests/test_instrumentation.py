@@ -25,7 +25,9 @@ class TestParseOtlpHeaders:
         assert _parse_otlp_headers("") == {}
 
     def test_malformed_entry_skipped(self):
-        assert _parse_otlp_headers("Authorization=Bearer token;BADENTRY;X-API-Key=abc") == {
+        assert _parse_otlp_headers(
+            "Authorization=Bearer token;BADENTRY;X-API-Key=abc"
+        ) == {
             "Authorization": "Bearer token",
             "X-API-Key": "abc",
         }
@@ -38,7 +40,9 @@ class TestParseOtlpHeaders:
 
 class TestResetEnvPreservesOtlpHeaders:
     def test_otlp_headers_survives_reset(self, monkeypatch):
-        monkeypatch.setenv("INSTRUMENTATION_OTLP_HEADERS", "Authorization=Bearer mytoken")
+        monkeypatch.setenv(
+            "INSTRUMENTATION_OTLP_HEADERS", "Authorization=Bearer mytoken"
+        )
 
         import engine.settings as settings_module
 
@@ -49,4 +53,7 @@ class TestResetEnvPreservesOtlpHeaders:
 
         import os
 
-        assert os.environ.get("INSTRUMENTATION_OTLP_HEADERS") == "Authorization=Bearer mytoken"
+        assert (
+            os.environ.get("INSTRUMENTATION_OTLP_HEADERS")
+            == "Authorization=Bearer mytoken"
+        )

@@ -115,7 +115,6 @@ Future<SessionInfo> getSessionInfo({
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse('$normalizedUrl/api/v1/sessions/$sessionId');
-
   final headers = _buildHeaders(
     authType: authType,
     username: username,
@@ -127,72 +126,20 @@ Future<SessionInfo> getSessionInfo({
   try {
     response = await http.get(uri, headers: headers);
   } catch (e) {
-    final isNetworkError =
-        e.toString().contains('SocketException') ||
-        e.toString().contains('Connection refused') ||
-        e.toString().contains('Network is unreachable') ||
-        e.toString().contains('Connection timeout');
-
-    throw EngineApiException(
-      userMessage: isNetworkError
-          ? 'Network connection error'
-          : 'Could not connect to the engine',
-      technicalDetails: e.toString(),
-      url: uri.toString(),
-    );
+    throw _networkException(e, uri);
   }
 
   if (response.statusCode >= 300) {
-    String userMessage;
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      userMessage = 'Authentication failed';
-    } else if (response.statusCode == 404) {
-      userMessage = 'Session not found';
-    } else if (response.statusCode >= 500) {
-      userMessage = 'Engine error occurred';
-    } else {
-      userMessage = 'Request failed';
-    }
-
-    throw EngineApiException(
-      userMessage: userMessage,
-      technicalDetails: _extractErrorDetails(
-        response.statusCode,
-        response.body,
-      ),
-      url: uri.toString(),
-    );
+    throw _httpException(response, uri, notFoundMessage: 'Session not found');
   }
 
-  final Map<String, dynamic> responseJson;
-  try {
-    responseJson = jsonDecode(response.body) as Map<String, dynamic>;
-  } on FormatException catch (e) {
-    throw EngineApiException(
-      userMessage: 'Engine returned invalid response',
-      technicalDetails: 'JSON parsing failed: ${e.message}',
-      url: uri.toString(),
-    );
-  }
-
-  return SessionInfo.fromJson(responseJson);
+  return SessionInfo.fromJson(_parseJsonObject(response.body, uri));
 }
 
 /// Fetches message history for a session.
 ///
 /// If [fromId] is provided, only messages starting from that index are returned.
 /// This enables incremental fetching when new messages are appended.
-///
-/// Response format (MessagesResponse from OpenAPI schema):
-/// ```json
-/// {
-///   "session_id": "uuid",
-///   "messages": [
-///     {"role": "user", "content": "...", "timestamp": "ISO8601"},
-///     {"role": "assistant", "content": "...", "timestamp": "ISO8601"}
-///   ]
-/// }
-/// ```
 Future<List<AgenticMessage>> getMessageHistory({
   required String baseUrl,
   required String sessionId,
@@ -203,12 +150,10 @@ Future<List<AgenticMessage>> getMessageHistory({
   String? apiKey,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
-  var uriString = '$normalizedUrl/api/v1/messages/$sessionId';
-  if (fromId != null) {
-    uriString += '?from_id=$fromId';
-  }
+  final uriString = fromId != null
+      ? '$normalizedUrl/api/v1/messages/$sessionId?from_id=$fromId'
+      : '$normalizedUrl/api/v1/messages/$sessionId';
   final uri = Uri.parse(uriString);
-
   final headers = _buildHeaders(
     authType: authType,
     username: username,
@@ -220,82 +165,22 @@ Future<List<AgenticMessage>> getMessageHistory({
   try {
     response = await http.get(uri, headers: headers);
   } catch (e) {
-    final isNetworkError =
-        e.toString().contains('SocketException') ||
-        e.toString().contains('Connection refused') ||
-        e.toString().contains('Network is unreachable') ||
-        e.toString().contains('Connection timeout');
-
-    throw EngineApiException(
-      userMessage: isNetworkError
-          ? 'Network connection error'
-          : 'Could not connect to the engine',
-      technicalDetails: e.toString(),
-      url: uri.toString(),
-    );
+    throw _networkException(e, uri);
   }
 
   if (response.statusCode >= 300) {
-    String userMessage;
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      userMessage = 'Authentication failed';
-    } else if (response.statusCode == 404) {
-      userMessage = 'Session not found';
-    } else if (response.statusCode == 422) {
-      userMessage = 'Invalid request data';
-    } else if (response.statusCode >= 500) {
-      userMessage = 'Engine error occurred';
-    } else {
-      userMessage = 'Request failed';
-    }
-
-    throw EngineApiException(
-      userMessage: userMessage,
-      technicalDetails: _extractErrorDetails(
-        response.statusCode,
-        response.body,
-      ),
-      url: uri.toString(),
-    );
+    throw _httpException(response, uri, notFoundMessage: 'Session not found');
   }
 
-  // Parse MessagesResponse: {session_id, messages: [...]}
-  final Map<String, dynamic> responseJson;
-  try {
-    responseJson = jsonDecode(response.body) as Map<String, dynamic>;
-  } on FormatException catch (e) {
-    throw EngineApiException(
-      userMessage: 'Engine returned invalid response',
-      technicalDetails: 'JSON parsing failed: ${e.message}',
-      url: uri.toString(),
-    );
-  }
-
+  final responseJson = _parseJsonObject(response.body, uri);
   final messagesJson = responseJson['messages'] as List<dynamic>? ?? [];
-
   return messagesJson
       .map((json) => AgenticMessage.fromJson(json as Map<String, dynamic>))
       .toList();
 }
 
 /// Sends a message to the engine API.
-///
-/// Request format (ChatRequest from OpenAPI schema):
-/// ```json
-/// {
-///   "session_id": "uuid or null",
-///   "messages": [{"role": "user", "content": "...", "timestamp": "ISO8601"}]
-/// }
-/// ```
-///
-/// Response format (ChatResponse from OpenAPI schema):
-/// ```json
-/// {
-///   "session_id": "uuid",
-///   "message": {"role": "assistant", "content": "...", "timestamp": "ISO8601"}
-/// }
-/// ```
-Future<AgenticMessage> sendAgenticMessage({
+Future<ChatResponseData> sendAgenticMessage({
   required String baseUrl,
   String? sessionId, // null for first message, engine creates session
   required String content,
@@ -306,7 +191,6 @@ Future<AgenticMessage> sendAgenticMessage({
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse('$normalizedUrl/api/v1/messages');
-
   final headers = _buildHeaders(
     authType: authType,
     username: username,
@@ -314,101 +198,37 @@ Future<AgenticMessage> sendAgenticMessage({
     apiKey: apiKey,
   );
 
-  // Build ChatRequest per OpenAPI schema
-  final userMessage = <String, dynamic>{
-    'role': 'user',
-    'content': content,
-    'timestamp': DateTime.now().toUtc().toIso8601String(),
-  };
   final bodyMap = <String, dynamic>{
-    'messages': [userMessage],
+    'messages': [
+      {
+        'role': 'user',
+        'content': content,
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+      },
+    ],
+    'session_id': ?sessionId,
   };
-  if (sessionId != null) {
-    bodyMap['session_id'] = sessionId;
-  }
-  final body = jsonEncode(bodyMap);
 
   final http.Response response;
   try {
-    response = await http.post(uri, headers: headers, body: body);
+    response = await http.post(uri, headers: headers, body: jsonEncode(bodyMap));
   } catch (e) {
-    final isNetworkError =
-        e.toString().contains('SocketException') ||
-        e.toString().contains('Connection refused') ||
-        e.toString().contains('Network is unreachable') ||
-        e.toString().contains('Connection timeout');
-
-    throw EngineApiException(
-      userMessage: isNetworkError
-          ? 'Network connection error'
-          : 'Could not connect to the engine',
-      technicalDetails: e.toString(),
-      url: uri.toString(),
-    );
+    throw _networkException(e, uri);
   }
 
   if (response.statusCode >= 300) {
-    String userMessage;
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      userMessage = 'Authentication failed';
-    } else if (response.statusCode == 404) {
-      userMessage = 'Messages endpoint not found (check engine URL)';
-    } else if (response.statusCode == 422) {
-      userMessage = 'Invalid message format';
-    } else if (response.statusCode >= 500) {
-      userMessage = 'Engine error occurred';
-    } else {
-      userMessage = 'Request failed';
-    }
-
-    throw EngineApiException(
-      userMessage: userMessage,
-      technicalDetails: _extractErrorDetails(
-        response.statusCode,
-        response.body,
-      ),
-      url: uri.toString(),
+    throw _httpException(
+      response,
+      uri,
+      notFoundMessage: 'Messages endpoint not found (check engine URL)',
+      invalidDataMessage: 'Invalid message format',
     );
   }
 
-  final Map<String, dynamic> responseJson;
-  try {
-    responseJson = jsonDecode(response.body) as Map<String, dynamic>;
-  } on FormatException catch (e) {
-    throw EngineApiException(
-      userMessage: 'Engine returned invalid response',
-      technicalDetails: 'JSON parsing failed: ${e.message}',
-      url: uri.toString(),
-    );
-  }
-
-  // Parse ChatResponse: {session_id, message: {...}}
-  final sessionIdFromResponse = responseJson['session_id'] as String?;
-  final messageJson = responseJson['message'] as Map<String, dynamic>?;
-
-  if (messageJson == null) {
-    throw EngineApiException(
-      userMessage: 'Engine returned invalid response',
-      technicalDetails: 'Missing "message" field in response',
-      url: uri.toString(),
-    );
-  }
-
-  // Add session_id to message for tracking
-  messageJson['session_id'] = sessionIdFromResponse;
-
-  return AgenticMessage.fromJson(messageJson);
+  return _parseChatResponse(_parseJsonObject(response.body, uri), uri);
 }
 
 /// Fetches list of recent sessions.
-///
-/// Response format (list of SessionInfo from OpenAPI schema):
-/// ```json
-/// [
-///   {"session_id": "uuid", "title": "...", "created_at": "ISO8601", "updated_at": "ISO8601"},
-///   ...
-/// ]
-/// ```
 Future<List<SessionInfo>> getSessionsList({
   required String baseUrl,
   int limit = 100,
@@ -419,7 +239,6 @@ Future<List<SessionInfo>> getSessionsList({
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse('$normalizedUrl/api/v1/sessions?limit=$limit');
-
   final headers = _buildHeaders(
     authType: authType,
     username: username,
@@ -431,47 +250,22 @@ Future<List<SessionInfo>> getSessionsList({
   try {
     response = await http.get(uri, headers: headers);
   } catch (e) {
-    final isNetworkError =
-        e.toString().contains('SocketException') ||
-        e.toString().contains('Connection refused') ||
-        e.toString().contains('Network is unreachable') ||
-        e.toString().contains('Connection timeout');
-
-    throw EngineApiException(
-      userMessage: isNetworkError
-          ? 'Network connection error'
-          : 'Could not connect to the engine',
-      technicalDetails: e.toString(),
-      url: uri.toString(),
-    );
+    throw _networkException(e, uri);
   }
 
   if (response.statusCode >= 300) {
-    String userMessage;
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      userMessage = 'Authentication failed';
-    } else if (response.statusCode == 404) {
-      userMessage = 'Sessions endpoint not found (check engine URL)';
-    } else if (response.statusCode >= 500) {
-      userMessage = 'Engine error occurred';
-    } else {
-      userMessage = 'Request failed';
-    }
-
-    throw EngineApiException(
-      userMessage: userMessage,
-      technicalDetails: _extractErrorDetails(
-        response.statusCode,
-        response.body,
-      ),
-      url: uri.toString(),
+    throw _httpException(
+      response,
+      uri,
+      notFoundMessage: 'Sessions endpoint not found (check engine URL)',
     );
   }
 
-  // Parse list of SessionInfo
-  final List<dynamic> responseJson;
   try {
-    responseJson = jsonDecode(response.body) as List<dynamic>;
+    final json = jsonDecode(response.body) as List<dynamic>;
+    return json
+        .map((e) => SessionInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
   } on FormatException catch (e) {
     throw EngineApiException(
       userMessage: 'Engine returned invalid response',
@@ -479,10 +273,6 @@ Future<List<SessionInfo>> getSessionsList({
       url: uri.toString(),
     );
   }
-
-  return responseJson
-      .map((json) => SessionInfo.fromJson(json as Map<String, dynamic>))
-      .toList();
 }
 
 /// Deletes a session.
@@ -498,7 +288,6 @@ Future<void> deleteSessionApi({
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse('$normalizedUrl/api/v1/sessions/$sessionId');
-
   final headers = _buildHeaders(
     authType: authType,
     username: username,
@@ -510,39 +299,283 @@ Future<void> deleteSessionApi({
   try {
     response = await http.delete(uri, headers: headers);
   } catch (e) {
-    final isNetworkError =
-        e.toString().contains('SocketException') ||
-        e.toString().contains('Connection refused') ||
-        e.toString().contains('Network is unreachable') ||
-        e.toString().contains('Connection timeout');
-
-    throw EngineApiException(
-      userMessage: isNetworkError
-          ? 'Network connection error'
-          : 'Could not connect to the engine',
-      technicalDetails: e.toString(),
-      url: uri.toString(),
-    );
+    throw _networkException(e, uri);
   }
 
-  // 404 is acceptable - session already deleted
+  // 404 is acceptable — session was already deleted
   if (response.statusCode >= 300 && response.statusCode != 404) {
-    String userMessage;
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      userMessage = 'Authentication failed';
-    } else if (response.statusCode >= 500) {
-      userMessage = 'Engine error occurred';
-    } else {
-      userMessage = 'Request failed';
-    }
+    throw _httpException(response, uri);
+  }
+}
 
+/// Sets the sensitivity level for a session.
+Future<void> setSensitivityLevel({
+  required String baseUrl,
+  required String sessionId,
+  required int sensitivityValue,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
+  String? apiKey,
+}) async {
+  final normalizedUrl = _normalizeBaseUrl(baseUrl);
+  final uri = Uri.parse(
+    '$normalizedUrl/api/v1/sessions/$sessionId/sensitivity',
+  );
+
+  final headers = _buildHeaders(
+    authType: authType,
+    username: username,
+    password: password,
+    apiKey: apiKey,
+  );
+
+  final body = jsonEncode({'sensitivity_level': sensitivityValue});
+
+  final http.Response response;
+  try {
+    response = await http.put(uri, headers: headers, body: body);
+  } catch (e) {
+    throw _networkException(e, uri);
+  }
+
+  if (response.statusCode >= 300) {
+    throw _httpException(response, uri);
+  }
+}
+
+/// Creates a session-scoped grant.
+Future<void> createSessionGrant({
+  required String baseUrl,
+  required String sessionId,
+  required GrantRequest grant,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
+  String? apiKey,
+}) async {
+  final normalizedUrl = _normalizeBaseUrl(baseUrl);
+  final uri = Uri.parse(
+    '$normalizedUrl/api/v1/sessions/$sessionId/grants',
+  );
+
+  final headers = _buildHeaders(
+    authType: authType,
+    username: username,
+    password: password,
+    apiKey: apiKey,
+  );
+
+  final body = jsonEncode(grant.toJson());
+
+  final http.Response response;
+  try {
+    response = await http.post(uri, headers: headers, body: body);
+  } catch (e) {
+    throw _networkException(e, uri);
+  }
+
+  if (response.statusCode >= 300) {
+    throw _httpException(response, uri);
+  }
+}
+
+/// Creates a global grant.
+Future<void> createGlobalGrant({
+  required String baseUrl,
+  required GrantRequest grant,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
+  String? apiKey,
+}) async {
+  final normalizedUrl = _normalizeBaseUrl(baseUrl);
+  final uri = Uri.parse('$normalizedUrl/api/v1/grants');
+
+  final headers = _buildHeaders(
+    authType: authType,
+    username: username,
+    password: password,
+    apiKey: apiKey,
+  );
+
+  final body = jsonEncode(grant.toJson());
+
+  final http.Response response;
+  try {
+    response = await http.post(uri, headers: headers, body: body);
+  } catch (e) {
+    throw _networkException(e, uri);
+  }
+
+  if (response.statusCode >= 300) {
+    throw _httpException(response, uri);
+  }
+}
+
+/// Rejects (skips) approvals by ID so the engine marks them as denied.
+Future<void> rejectSessionApprovals({
+  required String baseUrl,
+  required String sessionId,
+  required List<String> approvalIds,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
+  String? apiKey,
+}) async {
+  final normalizedUrl = _normalizeBaseUrl(baseUrl);
+  final uri = Uri.parse(
+    '$normalizedUrl/api/v1/sessions/$sessionId/reject_approvals',
+  );
+
+  final headers = _buildHeaders(
+    authType: authType,
+    username: username,
+    password: password,
+    apiKey: apiKey,
+  );
+
+  final body = jsonEncode(approvalIds);
+
+  final http.Response response;
+  try {
+    response = await http.post(uri, headers: headers, body: body);
+  } catch (e) {
+    throw _networkException(e, uri);
+  }
+
+  if (response.statusCode >= 300) {
+    throw _httpException(response, uri);
+  }
+}
+
+/// Response from continue or sendMessage containing message + sensitivity.
+class ChatResponseData {
+  final AgenticMessage message;
+  final SensitivityLevel? sensitivityLevel;
+
+  ChatResponseData({required this.message, this.sensitivityLevel});
+}
+
+/// Continues a session — triggers an agent run with current state.
+Future<ChatResponseData> continueSession({
+  required String baseUrl,
+  required String sessionId,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
+  String? apiKey,
+}) async {
+  final normalizedUrl = _normalizeBaseUrl(baseUrl);
+  final uri = Uri.parse(
+    '$normalizedUrl/api/v1/sessions/$sessionId/continue',
+  );
+
+  final headers = _buildHeaders(
+    authType: authType,
+    username: username,
+    password: password,
+    apiKey: apiKey,
+  );
+
+  final http.Response response;
+  try {
+    response = await http.post(uri, headers: headers);
+  } catch (e) {
+    throw _networkException(e, uri);
+  }
+
+  if (response.statusCode >= 300) {
+    throw _httpException(response, uri);
+  }
+
+  final responseJson = _parseJsonObject(response.body, uri);
+  return _parseChatResponse(responseJson, uri);
+}
+
+// -- Helpers for new endpoints --
+
+EngineApiException _networkException(Object e, Uri uri) {
+  final isNetworkError =
+      e.toString().contains('SocketException') ||
+      e.toString().contains('Connection refused') ||
+      e.toString().contains('Network is unreachable') ||
+      e.toString().contains('Connection timeout');
+
+  return EngineApiException(
+    userMessage: isNetworkError
+        ? 'Network connection error'
+        : 'Could not connect to the engine',
+    technicalDetails: e.toString(),
+    url: uri.toString(),
+  );
+}
+
+EngineApiException _httpException(
+  http.Response response,
+  Uri uri, {
+  String? notFoundMessage,
+  String? invalidDataMessage,
+}) {
+  String userMessage;
+  if (response.statusCode == 401 || response.statusCode == 403) {
+    userMessage = 'Authentication failed';
+  } else if (response.statusCode == 404) {
+    userMessage = notFoundMessage ?? 'Endpoint not found (check engine URL and version)';
+  } else if (response.statusCode == 422) {
+    userMessage = invalidDataMessage ?? 'Invalid request data';
+  } else if (response.statusCode >= 500) {
+    userMessage = 'Engine error occurred';
+  } else {
+    userMessage = 'Request failed';
+  }
+
+  return EngineApiException(
+    userMessage: userMessage,
+    technicalDetails: _extractErrorDetails(response.statusCode, response.body),
+    url: uri.toString(),
+  );
+}
+
+Map<String, dynamic> _parseJsonObject(String body, Uri uri) {
+  try {
+    return jsonDecode(body) as Map<String, dynamic>;
+  } on FormatException catch (e) {
     throw EngineApiException(
-      userMessage: userMessage,
-      technicalDetails: _extractErrorDetails(
-        response.statusCode,
-        response.body,
-      ),
+      userMessage: 'Engine returned invalid response',
+      technicalDetails: 'JSON parsing failed: ${e.message}',
       url: uri.toString(),
     );
   }
+}
+
+ChatResponseData _parseChatResponse(
+  Map<String, dynamic> responseJson,
+  Uri uri,
+) {
+  final sessionIdFromResponse = responseJson['session_id'] as String?;
+  final messageJson = responseJson['message'] as Map<String, dynamic>?;
+
+  if (messageJson == null) {
+    throw EngineApiException(
+      userMessage: 'Engine returned invalid response',
+      technicalDetails: 'Missing "message" field in response',
+      url: uri.toString(),
+    );
+  }
+
+  messageJson['session_id'] = sessionIdFromResponse;
+
+  SensitivityLevel? sensitivityLevel;
+  final sensitivityRaw = responseJson['sensitivity_level'];
+  if (sensitivityRaw is int) {
+    sensitivityLevel = SensitivityLevel.fromValue(sensitivityRaw);
+  } else if (sensitivityRaw is String) {
+    sensitivityLevel = SensitivityLevel.fromName(sensitivityRaw);
+  }
+
+  return ChatResponseData(
+    message: AgenticMessage.fromJson(messageJson),
+    sensitivityLevel: sensitivityLevel,
+  );
 }

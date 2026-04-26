@@ -18,11 +18,13 @@ from engine.domain.models import (
     AssistantMessage,
     ChatContext,
     ChatMessage,
+    Grant,
     SessionInfo,
+    SystemAction,
     UserMessage,
 )
 from engine.domain.ports.persistence import Persistence
-from engine.logging import get_logger
+from engine.log_config import get_logger
 
 from .models import Metadata
 
@@ -54,6 +56,7 @@ class YamlPersistenceAdapter(Persistence):
         else:
             metadata = Metadata(session_id=session_id)
 
+        metadata.sensitivity_level = context.sensitivity_level
         documents.append(metadata)
 
         # Add all messages as separate documents
@@ -95,6 +98,8 @@ class YamlPersistenceAdapter(Persistence):
                         messages.append(UserMessage.model_validate(doc))
                     case "assistant":
                         messages.append(AssistantMessage.model_validate(doc))
+                    case "system":
+                        messages.append(SystemAction.model_validate(doc))
                     case _:
                         logger.error(
                             "Failed to load chat message (#%d). See file: %s",
@@ -108,6 +113,9 @@ class YamlPersistenceAdapter(Persistence):
                 )
                 raise ChatContextNotFound(session_id=session_id) from exc
 
+        sensitivity_level = metadata.sensitivity_level if metadata else None
+        if sensitivity_level is not None:
+            return ChatContext(messages=messages, sensitivity_level=sensitivity_level)
         return ChatContext(messages=messages)
 
     def save_session(self, session: SessionInfo) -> None:
@@ -177,6 +185,58 @@ class YamlPersistenceAdapter(Persistence):
         else:
             logger.warning("Session folder not found for deletion: %s", session_folder)
 
+    def add_global_grant(self, grant: Grant) -> None:
+        file_path = self.base_dir / "grants.yaml"
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        existing_grants = self.load_active_global_grants()
+        existing_grants = [
+            g for g in existing_grants if g.permission_key != grant.permission_key
+        ]
+        existing_grants.append(grant)
+        with portalocker.Lock(file_path, mode="w", timeout=5) as f:
+            yaml.safe_dump([g.model_dump(mode="json") for g in existing_grants], f)
+
+    def add_session_grant(self, session_id: UUID, grant: Grant) -> None:
+        file_path = self._get_session_folder(session_id) / "grants.yaml"
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        existing_grants = self.load_active_session_grants(session_id)
+        existing_grants = [
+            g for g in existing_grants if g.permission_key != grant.permission_key
+        ]
+        existing_grants.append(grant)
+        with portalocker.Lock(file_path, mode="w", timeout=5) as f:
+            yaml.safe_dump([g.model_dump(mode="json") for g in existing_grants], f)
+
+    def load_active_global_grants(self) -> list[Grant]:
+        file_path = self.base_dir / "grants.yaml"
+        if not file_path.exists():
+            return []
+        with open(file_path, "r") as f:
+            data = yaml.safe_load(f)
+
+        all_grants = [Grant.model_validate(item) for item in data]
+        now = datetime.now(timezone.utc)
+        return [
+            grant
+            for grant in all_grants
+            if grant.expires_at is None or grant.expires_at > now
+        ]
+
+    def load_active_session_grants(self, session_id: UUID) -> list[Grant]:
+        file_path = self._get_session_folder(session_id) / "grants.yaml"
+        if not file_path.exists():
+            return []
+        with open(file_path, "r") as f:
+            data = yaml.safe_load(f)
+
+        all_grants = [Grant.model_validate(item) for item in data]
+        now = datetime.now(timezone.utc)
+        return [
+            grant
+            for grant in all_grants
+            if grant.expires_at is None or grant.expires_at > now
+        ]
+
     def _get_session_folder(self, session_id: UUID) -> Path:
         return self.base_dir / "sessions" / str(session_id)
 
@@ -184,12 +244,10 @@ class YamlPersistenceAdapter(Persistence):
         return self._get_session_folder(session_id) / f"{part_name}.yaml"
 
     def _write_model_with_lock(self, file_path: Path, model: BaseModel) -> None:
-        """
-        Write model as a YAML document into a file using voluntary file locking
-        """
+        """Write model as a YAML document into a file using voluntary file locking"""
 
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        with portalocker.Lock(filename=file_path, mode="w") as fh:  # type: ignore[reportUnknownMemberType]
+        with portalocker.Lock(filename=file_path, mode="w", timeout=5) as fh:  # type: ignore[reportUnknownMemberType]
             yaml.safe_dump(model.model_dump(mode="json"), fh)  # type: ignore[reportUnknownMemberType]
             fh.flush()
             os.fsync(fh.fileno())
@@ -197,14 +255,12 @@ class YamlPersistenceAdapter(Persistence):
     def _write_documents_with_lock(
         self, file_path: Path, documents: Iterable[BaseModel]
     ) -> None:
-        """
-        Write models as multiple YAML documents into a single file using voluntary file locking
-        """
+        """Write models as multiple YAML documents into a single file using voluntary file locking"""
 
         data = [doc.model_dump(mode="json") for doc in documents]
 
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        with portalocker.Lock(filename=file_path, mode="w") as fh:  # type: ignore[reportUnknownMemberType]
+        with portalocker.Lock(filename=file_path, mode="w", timeout=5) as fh:  # type: ignore[reportUnknownMemberType]
             yaml.safe_dump_all(data, fh)  # type: ignore[reportUnknownMemberType]
             fh.flush()
             os.fsync(fh.fileno())
@@ -236,9 +292,7 @@ class YamlPersistenceAdapter(Persistence):
         return documents
 
     def _get_document_metadata(self, file_path: Path) -> Metadata:
-        """
-        Read only the first YAML document (metadata) from a file
-        """
+        """Read only the first YAML document (metadata) from a file"""
 
         with open(file_path, "r") as fh:
             for doc in yaml.safe_load_all(fh):
@@ -248,9 +302,7 @@ class YamlPersistenceAdapter(Persistence):
 
     @staticmethod
     def _update_folder_timestamp(folder_path: Path, timestamp: datetime) -> None:
-        """
-        Update the modification time of a folder to the given timestamp.
-        """
+        """Update the modification time of a folder to the given timestamp."""
         try:
             os.utime(folder_path, (timestamp.timestamp(), timestamp.timestamp()))
         except OSError as e:

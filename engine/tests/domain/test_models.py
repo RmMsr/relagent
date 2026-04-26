@@ -5,12 +5,17 @@ import pytest
 
 from engine.domain.models import (
     AgentStats,
+    Approval,
     AssistantMessage,
     ChatContext,
     ChatRequest,
+    Grant,
+    PermissionKey,
     SessionInfo,
+    SystemAction,
     UserMessage,
 )
+from engine.domain.types import ApprovalType, SensitivityLevel
 
 
 class TestSessionInfo:
@@ -161,3 +166,165 @@ class TestMessageSerialization:
 
         assert user_msg.role == "user"
         assert assistant_msg.role == "assistant"
+
+
+class TestApproval:
+    def test_defaults(self):
+        approval = Approval(type=ApprovalType.OutgoingData, purpose="test")
+        assert approval.type == ApprovalType.OutgoingData
+        assert approval.component is None
+        assert approval.allowed_parameters == {}
+        assert approval.internal_parameters == {}
+        assert approval.sensitivity == SensitivityLevel.OpenInformation
+        assert approval.granted is None
+        assert approval.expires_at is None
+
+    def test_permission_key_uses_type_component_parameters_sensitivity(self):
+        approval = Approval(
+            type=ApprovalType.OutgoingData,
+            component="web_search",
+            allowed_parameters={"provider": "ddg"},
+            sensitivity=SensitivityLevel.Personal,
+            purpose="test",
+        )
+        key = approval.permission_key
+        assert key.approval_type == ApprovalType.OutgoingData
+        assert key.component == "web_search"
+        assert key.sensitivity == SensitivityLevel.Personal
+        assert key.allowed_parameters == (("provider", "ddg"),)
+
+    def test_permission_key_excludes_internal_parameters(self):
+        approval = Approval(
+            type=ApprovalType.OutgoingData,
+            purpose="test",
+            internal_parameters={"tool_call_id": "call_123"},
+        )
+        key = approval.permission_key
+        assert not hasattr(key, "internal_parameters")
+        assert key.allowed_parameters == ()
+
+    def test_permission_key_sorts_allowed_parameters(self):
+        approval = Approval(
+            type=ApprovalType.OutgoingData,
+            purpose="test",
+            allowed_parameters={"z_key": "last", "a_key": "first"},
+        )
+        key = approval.permission_key
+        assert key.allowed_parameters == (("a_key", "first"), ("z_key", "last"))
+
+
+class TestGrant:
+    def test_defaults(self):
+        grant = Grant(approval_type=ApprovalType.NoneRequired)
+        assert grant.approval_type == ApprovalType.NoneRequired
+        assert grant.component is None
+        assert grant.allowed_parameters == {}
+        assert grant.max_sensitivity == SensitivityLevel.OpenInformation
+        assert grant.expires_at is None
+
+    def test_is_immutable(self):
+        grant = Grant(approval_type=ApprovalType.NoneRequired)
+        with pytest.raises(Exception):
+            grant.component = "web_search"  # type: ignore[misc]
+
+    def test_permission_key_structure(self):
+        grant = Grant(
+            approval_type=ApprovalType.OutgoingData,
+            component="web_search",
+            allowed_parameters={"provider": "ddg"},
+            max_sensitivity=SensitivityLevel.Confidential,
+        )
+        key = grant.permission_key
+        assert key.approval_type == ApprovalType.OutgoingData
+        assert key.component == "web_search"
+        assert key.sensitivity == SensitivityLevel.Confidential
+        assert key.allowed_parameters == (("provider", "ddg"),)
+
+    def test_permission_key_sorts_allowed_parameters(self):
+        grant = Grant(
+            approval_type=ApprovalType.OutgoingData,
+            allowed_parameters={"z_key": "last", "a_key": "first"},
+        )
+        key = grant.permission_key
+        assert key.allowed_parameters == (("a_key", "first"), ("z_key", "last"))
+
+    def test_wildcard_parameter_not_in_allowed_parameters(self):
+        with pytest.raises(ValueError, match="wildcard_parameter"):
+            Grant(
+                approval_type=ApprovalType.OutgoingData,
+                allowed_parameters={"query": "python"},
+                wildcard_parameter="query",
+            )
+
+    def test_wildcard_parameter_absent_from_allowed_parameters_is_valid(self):
+        grant = Grant(
+            approval_type=ApprovalType.OutgoingData,
+            allowed_parameters={"provider": "ddg"},
+            wildcard_parameter="query",
+        )
+        assert grant.wildcard_parameter == "query"
+        assert "query" not in grant.allowed_parameters
+
+    def test_wildcard_parameter_none_with_allowed_parameters_is_valid(self):
+        grant = Grant(
+            approval_type=ApprovalType.OutgoingData,
+            allowed_parameters={"query": "python"},
+        )
+        assert grant.wildcard_parameter is None
+        assert grant.allowed_parameters == {"query": "python"}
+
+
+class TestPermissionKeyConsistency:
+    def test_matching_approval_and_grant_produce_equal_keys(self):
+        approval = Approval(
+            type=ApprovalType.OutgoingData,
+            component="web_search",
+            allowed_parameters={"provider": "ddg"},
+            sensitivity=SensitivityLevel.Personal,
+            purpose="test",
+        )
+        grant = Grant(
+            approval_type=ApprovalType.OutgoingData,
+            component="web_search",
+            allowed_parameters={"provider": "ddg"},
+            max_sensitivity=SensitivityLevel.Personal,
+        )
+        assert approval.permission_key == grant.permission_key
+
+    def test_different_component_produces_different_keys(self):
+        approval = Approval(
+            type=ApprovalType.OutgoingData,
+            component="web_search",
+            purpose="test",
+        )
+        grant = Grant(
+            approval_type=ApprovalType.OutgoingData,
+            component="email_send",
+        )
+        assert approval.permission_key != grant.permission_key
+
+    def test_permission_key_is_hashable(self):
+        grant = Grant(
+            approval_type=ApprovalType.OutgoingData,
+            component="web_search",
+        )
+        key = grant.permission_key
+        assert isinstance(key, PermissionKey)
+        d = {key: grant}
+        assert d[key] == grant
+
+
+class TestSystemAction:
+    def test_role_is_system(self):
+        action = SystemAction()
+        assert action.role == "system"
+
+    def test_default_approvals_is_empty(self):
+        action = SystemAction()
+        assert action.approvals == []
+
+    def test_approvals_preserved(self):
+        approval = Approval(type=ApprovalType.OutgoingData, purpose="test")
+        action = SystemAction(approvals=[approval])
+        assert len(action.approvals) == 1
+        assert action.approvals[0].purpose == "test"

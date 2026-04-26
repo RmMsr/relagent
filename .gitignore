@@ -22,3 +22,7 @@ worktree.txt
 
 # FVM Version Cache
 .fvm/
+
+
+#Ignore windsurf AI rules
+.windsurfrules

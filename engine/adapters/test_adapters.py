@@ -1,3 +1,4 @@
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 from uuid import UUID
@@ -6,7 +7,13 @@ from sse_starlette import ServerSentEvent
 
 from engine.api.events import BaseEventConverter
 from engine.domain.exceptions import ChatContextNotFound, SessionNotFound
-from engine.domain.models import AssistantMessage, ChatContext, SessionInfo
+from engine.domain.models import (
+    AssistantMessage,
+    ChatContext,
+    Grant,
+    SessionInfo,
+    SystemAction,
+)
 from engine.domain.ports.agent_execution import AgentExecution
 from engine.domain.ports.events import Event, EventStore
 from engine.domain.ports.persistence import Persistence
@@ -19,6 +26,8 @@ class MemoryPersistence(Persistence):
         self._sessions: dict[UUID, SessionInfo] = {}
         self._contexts: dict[UUID, ChatContext] = {}
         self._timestamps: dict[UUID, datetime] = {}
+        self._global_grants: list[Grant] = []
+        self._session_grants: dict[UUID, list[Grant]] = {}
 
     def save_session(self, session: SessionInfo) -> None:
         self._sessions[session.session_id] = session.model_copy(deep=True)
@@ -62,6 +71,34 @@ class MemoryPersistence(Persistence):
         self._contexts.pop(session_id, None)
         self._timestamps.pop(session_id, None)
 
+    def add_global_grant(self, grant: Grant) -> None:
+        self._global_grants = [
+            g for g in self._global_grants if g.permission_key != grant.permission_key
+        ]
+        self._global_grants.append(grant)
+
+    def add_session_grant(self, session_id: UUID, grant: Grant) -> None:
+        existing = self._session_grants.get(session_id, [])
+        existing = [g for g in existing if g.permission_key != grant.permission_key]
+        existing.append(grant)
+        self._session_grants[session_id] = existing
+
+    def load_active_global_grants(self) -> list[Grant]:
+        now = datetime.now(timezone.utc)
+        return [
+            grant
+            for grant in self._global_grants
+            if grant.expires_at is None or grant.expires_at > now
+        ]
+
+    def load_active_session_grants(self, session_id: UUID) -> list[Grant]:
+        now = datetime.now(timezone.utc)
+        return [
+            grant
+            for grant in self._session_grants.get(session_id, [])
+            if grant.expires_at is None or grant.expires_at > now
+        ]
+
 
 class MemoryEventStoreAdapter(EventStore):
     """In-memory event store adapter for testing."""
@@ -101,13 +138,41 @@ class MemoryEventStoreAdapter(EventStore):
             yield converter.convert_to_sse(event)
 
 
-class EchoAgentExecution(AgentExecution):
-    """Echo agent execution for testing."""
+class StubAgentExecution(AgentExecution):
+    """Configurable agent execution for testing.
+
+    Prime with responses before the test's act step:
+
+        agent.prime(SystemAction(approvals=[approval]))
+        agent.prime(AssistantMessage(content="Done"))
+
+    Calls to run_basic_query pop from the queue in order.
+    When the queue is empty, falls back to echo behaviour.
+    """
+
+    def __init__(self) -> None:
+        self._basic_query_responses: deque[AssistantMessage | SystemAction] = deque()
+        self._titles: deque[str] = deque()
+
+    def prime_basic_query(self, response: AssistantMessage | SystemAction) -> None:
+        """Enqueue a response to be returned by the next run_basic_query call."""
+        self._basic_query_responses.append(response)
+
+    def prime_title(self, title: str) -> None:
+        """Enqueue a title to be returned by the next generate_title call."""
+        self._titles.append(title)
 
     async def run_basic_query(
-        self, context: ChatContext, query: str
-    ) -> AssistantMessage:
-        return AssistantMessage(content="Echo: " + query)
+        self,
+        context: ChatContext,
+        query: str | None = None,
+        session_id: UUID | None = None,
+    ) -> AssistantMessage | SystemAction:
+        if self._basic_query_responses:
+            return self._basic_query_responses.popleft()
+        return AssistantMessage(content="Echo: " + (query or "(continue)"))
 
     async def generate_title(self, query: str) -> str:
+        if self._titles:
+            return self._titles.popleft()
         return "Title: " + query

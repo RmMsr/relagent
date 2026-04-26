@@ -130,6 +130,8 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
             const VoiceModeSelector(),
             const SizedBox(width: 8),
           ],
+          if (ref.watch(settingsProvider).agenticSessionId != null)
+            const SensitivityIndicator(inAppBar: true),
           IconButton(
             icon: const Icon(Icons.restore_page),
             tooltip: 'New Session',
@@ -151,47 +153,75 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
             Expanded(
               child: ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 8, top: 4),
                 children: [
                   AgenticChatHistory(
-                    messages: chatState.messages,
-                    showAssistantPending: chatState.showAssistantPending,
-                    engineHealthResult: healthCheckState.lastResult,
-                    isVoiceAvailable: ref
-                        .watch(voiceCapabilitiesProvider)
-                        .isAsrAvailable,
-                    onRetry: () {
-                      ref
-                          .read(agenticChatProvider.notifier)
-                          .retryFailedMessages();
-                    },
-                    onSpeak:
-                        !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
-                        ? null
-                        : (text, messageId) {
-                            final status = ttsState
-                                .getMessageState(messageId)
-                                .status;
-                            final ttsNotifier = ref.read(ttsProvider.notifier);
+                        messages: chatState.messages,
+                        showAssistantPending: chatState.showAssistantPending,
+                        engineHealthResult: healthCheckState.lastResult,
+                        sensitivityLevel: chatState.sensitivityLevel,
+                        isVoiceAvailable: ref
+                            .watch(voiceCapabilitiesProvider)
+                            .isAsrAvailable,
+                        onRetry: () {
+                          ref
+                              .read(agenticChatProvider.notifier)
+                              .retryFailedMessages();
+                        },
+                        onSpeak:
+                            !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
+                            ? null
+                            : (text, messageId) {
+                                final status = ttsState
+                                    .getMessageState(messageId)
+                                    .status;
+                                final ttsNotifier = ref.read(
+                                  ttsProvider.notifier,
+                                );
 
-                            switch (status) {
-                              case MessagePlaybackStatus.playing:
-                                ttsNotifier.pause();
-                              case MessagePlaybackStatus.paused:
-                                ttsNotifier.resume();
-                              case MessagePlaybackStatus.idle:
-                              case MessagePlaybackStatus.completed:
-                              case MessagePlaybackStatus.error:
-                                ttsNotifier.playNow(text, messageId);
-                              case MessagePlaybackStatus.generating:
-                                break;
-                            }
-                          },
-                    getMessagePlaybackStatus: (messageId) =>
-                        ttsState.getMessageState(messageId).status,
+                                switch (status) {
+                                  case MessagePlaybackStatus.playing:
+                                    ttsNotifier.pause();
+                                  case MessagePlaybackStatus.paused:
+                                    ttsNotifier.resume();
+                                  case MessagePlaybackStatus.idle:
+                                  case MessagePlaybackStatus.completed:
+                                  case MessagePlaybackStatus.error:
+                                    ttsNotifier.playNow(text, messageId);
+                                  case MessagePlaybackStatus.generating:
+                                    break;
+                                }
+                              },
+                        getMessagePlaybackStatus: (messageId) =>
+                            ttsState.getMessageState(messageId).status,
+                        onChangeSensitivity: (level) {
+                          ref
+                              .read(agenticChatProvider.notifier)
+                              .changeSensitivity(level);
+                        },
+                        onGrantApproval: (approval, grant, isGlobal) {
+                          ref
+                              .read(agenticChatProvider.notifier)
+                              .grantApproval(
+                                approvalId: approval.id,
+                                grant: grant,
+                                isGlobal: isGlobal,
+                              );
+                        },
+                        onSkipApproval: (approvalId) {
+                          // ignore: discarded_futures
+                          ref
+                              .read(agenticChatProvider.notifier)
+                              .skipApproval(approvalId);
+                        },
+                        onContinue: () {
+                          ref
+                              .read(agenticChatProvider.notifier)
+                              .triggerContinuation();
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
             ),
             AgenticChatInput(
               key: _chatInputKey,

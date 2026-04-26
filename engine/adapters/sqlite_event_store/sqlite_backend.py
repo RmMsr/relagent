@@ -18,7 +18,7 @@ from engine.domain.ports.events import (
     SessionMessagesAppendedEvent,
     SessionUpdatedEvent,
 )
-from engine.logging import get_logger
+from engine.log_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -26,8 +26,7 @@ POLL_INTERVAL = 0.1  # 100ms; values down to 20ms tested with negligible CPU imp
 
 
 class SqliteEventStoreAdapter(EventStore):
-    """
-    Low effort implmenetation of EventStore using SQLite.
+    """Low effort implmenetation of EventStore using SQLite.
 
     Should work well with low concurrency and moderate event volume. Could be
     replaced by Redis streams if needed.
@@ -36,9 +35,7 @@ class SqliteEventStoreAdapter(EventStore):
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(
-            db_path, timeout=30.0, check_same_thread=False
-        )
+        self._conn = sqlite3.connect(db_path, timeout=30.0, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._ensure_schema()
 

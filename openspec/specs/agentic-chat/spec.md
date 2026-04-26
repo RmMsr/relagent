@@ -18,7 +18,7 @@ The system SHALL provide an Agentic Chat page as the primary frontend for the Re
 #### Scenario: Chat interface layout
 
 - **WHEN** the Agentic Chat page is displayed
-- **THEN** the page SHALL include a message list, text input, voice mode selector, and navigation drawer
+- **THEN** the page SHALL include a message list, text input, voice mode selector, navigation drawer, and a sensitivity indicator in the app bar
 - **AND** the layout SHALL be consistent with the simple chat interface
 
 #### Scenario: Material navigation drawer
@@ -82,6 +82,7 @@ The system SHALL fetch existing messages from the engine when the app loads, wit
 - **WHEN** the Agentic Chat page is initialized
 - **THEN** previous messages for that session SHALL be fetched from the engine
 - **AND** messages SHALL be displayed in the chat history
+- **AND** `SystemAction` messages (role=system) SHALL be parsed and rendered as system notes and approval cards
 
 #### Scenario: Empty session history
 
@@ -121,6 +122,7 @@ The system SHALL send user messages to the engine API and display responses.
 - **WHEN** the user submits a message
 - **THEN** the message SHALL be sent to the engine
 - **AND** the engine response SHALL be displayed in the chat
+- **AND** if the response is a `SystemAction`, it SHALL be rendered as system notes and/or approval cards (not as an assistant text bubble)
 
 #### Scenario: Send message with voice input
 
@@ -128,6 +130,12 @@ The system SHALL send user messages to the engine API and display responses.
 - **WHEN** speech is recognized and submitted
 - **THEN** the recognized text SHALL be sent to the engine
 - **AND** the response MAY be spoken via TTS if auto-playback is enabled
+
+#### Scenario: Chat response includes sensitivity level
+
+- **WHEN** a `ChatResponse` is received from the engine
+- **THEN** the app SHALL parse the `sensitivity_level` field
+- **AND** the chat state SHALL update to reflect the current sensitivity level
 
 ### Requirement: Clear Chat and Session Reset
 

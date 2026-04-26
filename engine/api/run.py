@@ -8,7 +8,7 @@ from engine.api.helpers import (
     lifespan,
 )
 from engine.constants import VERSION, WEB_DIR
-from engine.logging import get_logger, init_logging
+from engine.log_config import get_logger, init_logging
 from engine.settings import get_setting, get_setting_int
 
 from .instrumentation import init_app_instrumentation, init_global_instrumentation

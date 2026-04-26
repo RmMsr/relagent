@@ -6,9 +6,9 @@ from uuid import UUID
 import pytest
 
 from engine.adapters.test_adapters import (
-    EchoAgentExecution,
     MemoryEventStoreAdapter,
     MemoryPersistence,
+    StubAgentExecution,
 )
 from engine.domain.models import (
     AgentStats,
@@ -19,7 +19,7 @@ from engine.domain.models import (
 )
 from engine.domain.ports.events import EventStore
 from engine.domain.ports.persistence import Persistence
-from engine.domain.services import ChatService
+from engine.domain.services import ApprovalService, ChatService
 
 # Inject an empty config parser before any engine module reads settings.ini.
 # This must happen before importing modules that transitively import
@@ -94,20 +94,28 @@ def event_store() -> EventStore:
 
 
 @pytest.fixture
-def echo_agent_execution() -> EchoAgentExecution:
-    """Echo agent execution for testing."""
-    return EchoAgentExecution()
+def echo_agent_execution() -> StubAgentExecution:
+    """Stub agent execution for testing. Call .prime() to enqueue responses."""
+    return StubAgentExecution()
+
+
+@pytest.fixture
+def approval_service(persistence: Persistence):
+    """Approval service for testing."""
+    return ApprovalService(persistence_repository=persistence)
 
 
 @pytest.fixture
 def chat_service(
     persistence: Persistence,
-    echo_agent_execution: EchoAgentExecution,
+    echo_agent_execution: StubAgentExecution,
     event_store: EventStore,
+    approval_service: ApprovalService,
 ) -> ChatService:
     """Chat service with real in-memory adapters."""
     return ChatService(
         persistence_repository=persistence,
         agent_execution=echo_agent_execution,
         event_store=event_store,
+        approval_service=approval_service,
     )

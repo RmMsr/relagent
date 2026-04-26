@@ -1,6 +1,4 @@
-"""
-YAML persistence layer for agent data
-"""
+"""YAML persistence layer for agent data"""
 
 from .yaml_adapter import YamlPersistenceAdapter
 

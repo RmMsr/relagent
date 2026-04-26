@@ -6,18 +6,22 @@ from sse_starlette import EventSourceResponse
 
 from engine.api.helpers import (
     dependency_agent_execution,
+    dependency_approval_service,
     dependency_chat_service,
     dependency_event_store,
     require_api_key,
 )
-from engine.api.models import StatusResponse
+from engine.api.models import SetSensitivityRequest, StatusResponse
 from engine.constants import SERVICE_NAME, VERSION
 from engine.domain.exceptions import ChatContextNotFound, SessionNotFound
 from engine.domain.models import (
+    AssistantMessage,
     ChatRequest,
     ChatResponse,
+    Grant,
     MessagesResponse,
     SessionInfo,
+    SystemAction,
     UserMessage,
 )
 from engine.domain.ports.events import (
@@ -27,8 +31,8 @@ from engine.domain.ports.events import (
     SessionMessagesAppendedEvent,
     SessionUpdatedEvent,
 )
-from engine.domain.services import AgentExecution, ChatService
-from engine.logging import get_logger
+from engine.domain.services import AgentExecution, ApprovalService, ChatService
+from engine.log_config import get_logger
 from engine.self_test import SelfTestResult, run_all_tests
 
 logger = get_logger(__name__)
@@ -37,6 +41,9 @@ api_router = APIRouter(tags=["api"], dependencies=[Depends(require_api_key)])
 
 
 ChatServiceDepends = Annotated[ChatService, Depends(dependency_chat_service)]
+ApprovalServiceDepends = Annotated[
+    ApprovalService, Depends(dependency_approval_service)
+]
 EventStoreDepends = Annotated[EventStore, Depends(dependency_event_store)]
 AgentExecutionDepends = Annotated[AgentExecution, Depends(dependency_agent_execution)]
 
@@ -68,7 +75,14 @@ async def messages(
     response: ChatResponse = await service.perform_user_input(request=request)
 
     if plain_body:
-        return response.message.content
+        if isinstance(response.message, AssistantMessage):
+            return response.message.content
+        elif (
+            isinstance(response.message, SystemAction) and response.message.notification
+        ):
+            return response.message.notification
+        else:
+            return "(no output)"
     else:
         return response
 
@@ -105,6 +119,56 @@ def get_session(session_id: UUID, service: ChatServiceDepends) -> SessionInfo:
         raise HTTPException(status_code=404, detail="Session not found")
 
 
+@api_router.put("/sessions/{session_id}/sensitivity")
+def set_session_sensitivity(
+    session_id: UUID, body: SetSensitivityRequest, service: ChatServiceDepends
+) -> dict[str, str]:
+    """Set the sensitivity level for a session context."""
+    service.set_sensitivity_level(
+        session_id=session_id, sensitivity_level=body.sensitivity_level
+    )
+    return {"status": "updated"}
+
+
+@api_router.post("/sessions/{session_id}/continue")
+async def continue_session(
+    session_id: UUID,
+    service: ChatServiceDepends,
+) -> ChatResponse:
+    """Continue a session — re-run the agent with current state."""
+    try:
+        return await service.continue_session(session_id=session_id)
+    except SessionNotFound:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
+@api_router.post("/sessions/{session_id}/grants")
+def create_session_grant(
+    session_id: UUID, approval_service: ApprovalServiceDepends, grant: Grant
+) -> dict[str, str]:
+    """Create a grant for a specific session."""
+    approval_service.register_session_grant(session_id=session_id, grant=grant)
+    return {"status": "created"}
+
+
+@api_router.get("/sessions/{session_id}/grants")
+def get_session_grants(
+    session_id: UUID, approval_service: ApprovalServiceDepends
+) -> list[Grant]:
+    """Get available grants for a specific session."""
+    return approval_service.active_session_grants(session_id=session_id)
+
+
+@api_router.post("/sessions/{session_id}/reject_approvals")
+def reject_session_approvals(
+    session_id: UUID, approvals: list[UUID], approval_service: ApprovalServiceDepends
+):
+    approval_service.reject_session_approvals(
+        session_id=session_id, approvals=approvals
+    )
+    return {"status": "rejected"}
+
+
 @api_router.delete("/sessions/{session_id}")
 def delete_session(
     session_id: UUID,
@@ -116,6 +180,19 @@ def delete_session(
         return {"status": "deleted", "session_id": str(session_id)}
     except SessionNotFound:
         raise HTTPException(status_code=404, detail="Session not found")
+
+
+@api_router.post("/grants")
+def create_grant(approval: ApprovalServiceDepends, grant: Grant) -> dict[str, str]:
+    """Create a new grant for a specific resource."""
+    approval.register_global_grant(grant=grant)
+    return {"status": "created"}
+
+
+@api_router.get("/grants")
+def get_global_grants(approval: ApprovalServiceDepends) -> list[Grant]:
+    """Get available grants for the current user."""
+    return approval.active_global_grants()
 
 
 @api_router.get(

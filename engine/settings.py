@@ -4,7 +4,7 @@ from configparser import ConfigParser
 from pathlib import Path
 from typing import Any
 
-from engine.logging import get_logger
+from engine.log_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -103,8 +103,7 @@ _env_reset_done = False
 
 
 def reset_env():
-    """
-    Ensure no unintended configuration affects runtime behaviour.
+    """Ensure no unintended configuration affects runtime behaviour.
 
     Idempotent - safe to call multiple times (e.g. from forked workers).
     """
@@ -136,7 +135,7 @@ def reset_env():
 
     _env_reset_done = True
 
-    from engine.logging import init_logging
+    from engine.log_config import init_logging
 
     init_logging()
     logger.debug("Environment reset to: %s", sorted(os.environ.keys()))

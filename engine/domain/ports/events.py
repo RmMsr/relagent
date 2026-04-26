@@ -57,8 +57,7 @@ Event = (
 
 class EventStore(ABC):
     def close(self) -> None:
-        """
-        Release any resources held by the event store
+        """Release any resources held by the event store
 
         Implement in subclass if needed.
         """
@@ -70,8 +69,7 @@ class EventStore(ABC):
 
     @abstractmethod
     def get_events_after(self, last_id: int = 0, limit: int = 100) -> list[Event]:
-        """
-        Get events with ID > `last_id`
+        """Get events with ID > `last_id`
 
         Does not return more than `limit` events, skipping older events if needed
         """

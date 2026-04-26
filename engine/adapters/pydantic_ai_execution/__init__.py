@@ -1,7 +1,5 @@
-"""
-Pydantic-ai implementation of the AgentExecution port
-"""
+"""Pydantic-ai implementation of the AgentExecution port"""
 
-from .pydantic_execution import PydanticAgentAdapter
+from .queries import PydanticAgentAdapter
 
 __all__ = ["PydanticAgentAdapter"]

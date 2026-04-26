@@ -25,6 +25,8 @@ Use line comments only if they add significant to the understandability of the c
 
 Classes and modules deserve an brief explanation what their functionality and responsibility is. If functions are getting highly complex, try breaking the logic into smaller pieces. Assume an reader that has a fundamental understanding of application programming. Explain the intention of complex logic, side effects or intentional specific implementation details. Leave out comments that just rephrase what the code already describes.
 
+Test functions do not need docstrings. The test name should be sufficient. Inline comments follow the same rule as production code.
+
 ### Commits
 
 Commits to main should be isolated changes and focus on one aspect.

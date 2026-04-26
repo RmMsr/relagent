@@ -1,4 +1,210 @@
-enum AgenticRole { user, assistant, error }
+import 'package:flutter/material.dart';
+
+enum AgenticRole { user, assistant, system, error }
+
+enum SensitivityLevel {
+  openInformation(
+    1,
+    'Open Information',
+    'O',
+    Colors.green,
+    'Public information. No strong personal relevance, information could be related to anyone',
+  ),
+  specific(
+    2,
+    'Specific',
+    'S',
+    Colors.teal,
+    'Information is relevant to a group, but does not include personally identifiable information',
+  ),
+  personal(
+    3,
+    'Personal',
+    'P',
+    Colors.orange,
+    'May contain information identifying one person',
+  ),
+  confidential(
+    4,
+    'Confidential',
+    'C',
+    Colors.deepOrange,
+    'Clearly sensitive information',
+  ),
+  internal(
+    5,
+    'Internal',
+    'I',
+    Colors.red,
+    'Data not meant to be shared',
+  );
+
+  final int value;
+  final String label;
+  final String shortLabel;
+  final Color color;
+  final String description;
+
+  const SensitivityLevel(
+    this.value,
+    this.label,
+    this.shortLabel,
+    this.color,
+    this.description,
+  );
+
+  static SensitivityLevel fromValue(int value) {
+    return SensitivityLevel.values.firstWhere(
+      (l) => l.value == value,
+      orElse: () => SensitivityLevel.personal,
+    );
+  }
+
+  static SensitivityLevel fromName(String name) {
+    // Handles engine enum names like "OpenInformation", "Specific", etc.
+    final normalized = name.toLowerCase().replaceAll('_', '');
+    for (final level in SensitivityLevel.values) {
+      if (level.name.toLowerCase() == normalized) return level;
+    }
+    return SensitivityLevel.personal;
+  }
+}
+
+enum ApprovalType {
+  none('none'),
+  outgoingData('data/out');
+
+  final String value;
+
+  const ApprovalType(this.value);
+
+  static ApprovalType fromValue(String value) {
+    return ApprovalType.values.firstWhere(
+      (t) => t.value == value,
+      orElse: () => ApprovalType.none,
+    );
+  }
+}
+
+enum ApprovalResolution { pending, granted, skipped, stale }
+
+class ApprovalData {
+  final String id;
+  final ApprovalType type;
+  final String? component;
+  final String purpose;
+  final Map<String, dynamic> allowedParameters;
+  final SensitivityLevel sensitivity;
+  final bool granted;
+  final DateTime? expiresAt;
+  final String? note;
+  final ApprovalResolution resolution;
+
+  ApprovalData({
+    required this.id,
+    required this.type,
+    this.component,
+    required this.purpose,
+    this.allowedParameters = const {},
+    this.sensitivity = SensitivityLevel.openInformation,
+    this.granted = false,
+    this.expiresAt,
+    this.note,
+    this.resolution = ApprovalResolution.pending,
+  });
+
+  ApprovalData copyWith({ApprovalResolution? resolution, DateTime? expiresAt}) {
+    return ApprovalData(
+      id: id,
+      type: type,
+      component: component,
+      purpose: purpose,
+      allowedParameters: allowedParameters,
+      sensitivity: sensitivity,
+      granted: granted,
+      expiresAt: expiresAt ?? this.expiresAt,
+      note: note,
+      resolution: resolution ?? this.resolution,
+    );
+  }
+
+  factory ApprovalData.fromJson(Map<String, dynamic> json) {
+    return ApprovalData(
+      id: json['id'] as String,
+      type: ApprovalType.fromValue(json['type'] as String? ?? 'none'),
+      component: json['component'] as String?,
+      purpose: json['purpose'] as String? ?? '',
+      allowedParameters:
+          (json['allowed_parameters'] as Map<String, dynamic>?) ?? {},
+      sensitivity: json['sensitivity'] is int
+          ? SensitivityLevel.fromValue(json['sensitivity'] as int)
+          : SensitivityLevel.fromName(json['sensitivity'] as String? ?? ''),
+      granted: json['granted'] as bool? ?? false,
+      expiresAt: json['expires_at'] != null
+          ? DateTime.tryParse(json['expires_at'] as String)
+          : null,
+      note: json['note'] as String?,
+      resolution: (json['granted'] as bool? ?? false)
+          ? ApprovalResolution.granted
+          : ApprovalResolution.pending,
+    );
+  }
+}
+
+class GrantRequest {
+  final ApprovalType approvalType;
+  final String? component;
+  /// Parameters constrained to specific values. The wildcarded parameter key,
+  /// if any, is excluded from this map and placed in [wildcardParameter].
+  final Map<String, dynamic> allowedParameters;
+  /// When non-null, this parameter key may have any value at execution time.
+  /// Only one parameter may be wildcarded per grant.
+  final String? wildcardParameter;
+  final SensitivityLevel maxSensitivity;
+  final DateTime? expiresAt;
+
+  const GrantRequest({
+    required this.approvalType,
+    this.component,
+    this.allowedParameters = const {},
+    this.wildcardParameter,
+    this.maxSensitivity = SensitivityLevel.openInformation,
+    this.expiresAt,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'approval_type': approvalType.value,
+      if (component != null) 'component': component,
+      'allowed_parameters': allowedParameters,
+      if (wildcardParameter != null) 'wildcard_parameter': wildcardParameter,
+      'max_sensitivity': maxSensitivity.value,
+      if (expiresAt != null) 'expires_at': expiresAt!.toUtc().toIso8601String(),
+    };
+  }
+
+  factory GrantRequest.fromApproval(
+    ApprovalData approval, {
+    required SensitivityLevel maxSensitivity,
+    String? wildcardParameter,
+    DateTime? expiresAt,
+  }) {
+    // Remove the wildcarded key from allowed_parameters — engine expects it
+    // absent from the map and named separately in wildcard_parameter.
+    final params = wildcardParameter != null
+        ? (Map<String, dynamic>.from(approval.allowedParameters)
+            ..remove(wildcardParameter))
+        : approval.allowedParameters;
+    return GrantRequest(
+      approvalType: approval.type,
+      component: approval.component,
+      allowedParameters: params,
+      wildcardParameter: wildcardParameter,
+      maxSensitivity: maxSensitivity,
+      expiresAt: expiresAt,
+    );
+  }
+}
 
 class SessionInfo {
   final String sessionId;
@@ -71,6 +277,10 @@ class AgenticMessage {
   final String? technicalDetails;
   final String? sessionId; // Returned by engine, used to track conversation
   final AgentStats? stats; // Stats from engine response
+  final List<ApprovalData>? approvals; // SystemAction approvals
+  final String? notification; // SystemAction notification
+  final SensitivityLevel? sensitivityLevel; // From ChatResponse or approval
+  final bool isStale; // Marks invalidated approval groups
 
   AgenticMessage({
     this.id,
@@ -81,7 +291,28 @@ class AgenticMessage {
     this.technicalDetails,
     this.sessionId,
     this.stats,
+    this.approvals,
+    this.notification,
+    this.sensitivityLevel,
+    this.isStale = false,
   }) : timestamp = timestamp ?? DateTime.now();
+
+  AgenticMessage copyWith({bool? isStale, List<ApprovalData>? approvals}) {
+    return AgenticMessage(
+      id: id,
+      localId: localId,
+      text: text,
+      role: role,
+      timestamp: timestamp,
+      technicalDetails: technicalDetails,
+      sessionId: sessionId,
+      stats: stats,
+      approvals: approvals ?? this.approvals,
+      notification: notification,
+      sensitivityLevel: sensitivityLevel,
+      isStale: isStale ?? this.isStale,
+    );
+  }
 
   factory AgenticMessage.user(String text) {
     return AgenticMessage(
@@ -116,6 +347,8 @@ class AgenticMessage {
         role = AgenticRole.user;
       case 'assistant':
         role = AgenticRole.assistant;
+      case 'system':
+        role = AgenticRole.system;
       default:
         role = AgenticRole.assistant;
     }
@@ -130,14 +363,33 @@ class AgenticMessage {
       stats = AgentStats.fromJson(json['stats'] as Map<String, dynamic>);
     }
 
+    // Parse SystemAction fields for system role
+    List<ApprovalData>? approvals;
+    String? notification;
+    if (role == AgenticRole.system) {
+      if (json['approvals'] is List) {
+        approvals = (json['approvals'] as List)
+            .map((a) => ApprovalData.fromJson(a as Map<String, dynamic>))
+            .toList();
+      }
+      notification = json['notification'] as String?;
+    }
+
+    // System messages may not have 'content', use notification as fallback text
+    final text = json['content'] as String? ??
+        notification ??
+        (role == AgenticRole.system ? '' : '');
+
     return AgenticMessage(
       id: json['sequence_id'] as int? ?? json['id'] as int?,
       localId: _generateLocalId(),
-      text: json['content'] as String,
+      text: text,
       role: role,
       timestamp: timestamp,
       sessionId: json['session_id'] as String?,
       stats: stats,
+      approvals: approvals,
+      notification: notification,
     );
   }
 

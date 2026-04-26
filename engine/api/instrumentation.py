@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any
 
 from fastapi import FastAPI
@@ -9,12 +10,12 @@ from opentelemetry.instrumentation.fastapi import (  # type: ignore[reportUnknow
 )
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.attributes import service_attributes
 from opentelemetry.trace import Span
 
 from engine.constants import SERVICE_NAME
-from engine.logging import get_logger
+from engine.log_config import get_logger
 from engine.settings import get_setting
 
 logger = get_logger(__name__)
@@ -49,8 +50,21 @@ def init_global_instrumentation():
         headers = _parse_otlp_headers(
             get_setting("instrumentation", "otlp_headers", obscure_value=True) or ""
         )
-        exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers or None)
-        tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+        exporter = OTLPSpanExporter(
+            endpoint=endpoint,
+            headers=headers or None,
+            timeout=5,
+        )
+        tracer_provider.add_span_processor(
+            BatchSpanProcessor(
+                exporter,
+                export_timeout_millis=5000,
+            )
+        )
+        # Suppress noisy OTLP retry warnings — a single ERROR on final failure suffices
+        logging.getLogger(
+            "opentelemetry.exporter.otlp.proto.http.trace_exporter"
+        ).setLevel(logging.ERROR)
 
     logger.debug(
         "Tracing initialized. Endpoint: %s", endpoint if endpoint else "OTLP Default"
@@ -112,8 +126,7 @@ def init_app_instrumentation(app: FastAPI):
 
 
 def _parse_otlp_headers(raw: str) -> dict[str, str]:
-    """
-    Parse semicolon-separated 'Name=value' pairs into a headers dict.
+    """Parse semicolon-separated 'Name=value' pairs into a headers dict.
 
     Values may contain '=' (e.g. base64 padding); only the first '=' per pair
     is used as the key/value delimiter. Malformed pairs (no '=') are skipped.

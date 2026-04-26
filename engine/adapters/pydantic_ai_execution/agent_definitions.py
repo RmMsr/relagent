@@ -1,10 +1,11 @@
 from openai import AsyncOpenAI
-from pydantic_ai import Agent, InstrumentationSettings
+from pydantic_ai import Agent, DeferredToolRequests, InstrumentationSettings
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from engine.constants import DEFAULT_MODEL, PROVIDER_API_BASE, PROVIDER_API_KEY
-from engine.tools import current_date_and_time_tool, user_name_tool, web_search_tool
+
+from .tools import current_date_and_time_tool, user_name_tool, web_search_tool
 
 provider = OpenAIProvider(
     openai_client=AsyncOpenAI(
@@ -34,6 +35,7 @@ simple_question_agent = Agent(
         Use the tools available if they are likely to improve quality of ans answer.
     """,
     tools=[user_name_tool, current_date_and_time_tool, web_search_tool],
+    output_type=[str, DeferredToolRequests],
 )
 
 title_summarizer_agent = Agent(
@@ -60,4 +62,5 @@ discussion_agent = Agent(
         Be transparent about unclear data or low confidence levels.
     """,
     tools=[user_name_tool, current_date_and_time_tool, web_search_tool],
+    output_type=[str, DeferredToolRequests],
 )

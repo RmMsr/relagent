@@ -8,10 +8,10 @@ What Relagent brings you:
 
 * 🗨️ <b>Chat interface</b>: Chat with your AI assistant and manage sessions.
 * 🌐 <b>Persistent sessions</b>: Open new sessions and continue them on any device. Data stays on your systems only.
-* 🎤 <b>Speech Integration</b>: Input and Output on device with about 40 languages
+* 🎤 <b>Speech Integration</b>: Input and Output on device with about 40 languages.
 * ⚖️ <b>Use any open-weights model</b>: By using the OpenAI-compatible chat completions protocol, you can choose the inference service that works best for you. No external service needed - but you can use one.
 * 🔒️ <b>API Key Authentication</b>: Restrict access to your data. Combine with a HTTPS proxy or a VPN to protect your data while accessing it from anywhere.
-* 🧰 <b>Agentic tools</b> (e.g. web search)
+* 🧰 <b>Agentic tools</b>: For example web search. You can decide in which cases you want to be asked for permission based on your selected privacy level.
 
 What you do <b>NOT need</b>:
 

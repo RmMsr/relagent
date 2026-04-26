@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/agentic/models.dart';
@@ -13,6 +14,7 @@ class AgenticChatState {
   final String? error;
   final bool showAssistantPending;
   final String? sessionTitle;
+  final SensitivityLevel sensitivityLevel;
 
   const AgenticChatState({
     required this.messages,
@@ -21,6 +23,7 @@ class AgenticChatState {
     this.error,
     this.showAssistantPending = false,
     this.sessionTitle,
+    this.sensitivityLevel = SensitivityLevel.personal,
   });
 
   factory AgenticChatState.initial() {
@@ -35,6 +38,7 @@ class AgenticChatState {
     bool? showAssistantPending,
     String? sessionTitle,
     bool clearSessionTitle = false,
+    SensitivityLevel? sensitivityLevel,
   }) {
     return AgenticChatState(
       messages: messages ?? this.messages,
@@ -45,6 +49,7 @@ class AgenticChatState {
       sessionTitle: clearSessionTitle
           ? null
           : (sessionTitle ?? this.sessionTitle),
+      sensitivityLevel: sensitivityLevel ?? this.sensitivityLevel,
     );
   }
 }
@@ -140,7 +145,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       final password = await settingsNotifier.getEnginePassword();
       final apiKey = await settingsNotifier.getEngineApiKey();
 
-      final response = await sendAgenticMessage(
+      final chatResponse = await sendAgenticMessage(
         baseUrl: settings.engineBaseUrl,
         sessionId: sessionId, // null on first message, engine will create one
         content: text,
@@ -149,6 +154,8 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         password: password,
         apiKey: apiKey,
       );
+
+      final response = chatResponse.message;
 
       // Store session_id from response if we got a new one
       if (response.sessionId != null && response.sessionId != sessionId) {
@@ -162,6 +169,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         messages: [...state.messages, response],
         isLoading: false,
         showAssistantPending: false,
+        sensitivityLevel: chatResponse.sensitivityLevel,
       );
 
       final preview = response.text.length > 50
@@ -171,8 +179,9 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         'AgenticChat: Received response [id=${response.id}]: $preview',
       );
 
-      // Auto-queue for TTS if in auto-playback mode
-      if (settings.isAutoPlayback) {
+      // Auto-queue for TTS if in auto-playback mode (only for assistant text)
+      if (settings.isAutoPlayback &&
+          response.role == AgenticRole.assistant) {
         ref.read(ttsProvider.notifier).enqueue(response.text, response.localId);
       }
     } catch (e) {
@@ -244,6 +253,245 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       Logger.debug('AgenticChat: Loaded session title: ${sessionInfo.title}');
     } catch (e) {
       Logger.debug('AgenticChat: Failed to load session info: $e');
+    }
+  }
+
+  /// Change the session sensitivity level.
+  /// Optimistic update — reverts on API failure.
+  /// Marks any pending approval messages as stale.
+  Future<void> changeSensitivity(SensitivityLevel newLevel) async {
+    final settings = ref.read(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+    final sessionId = settings.agenticSessionId;
+
+    if (sessionId == null) return;
+
+    final previousLevel = state.sensitivityLevel;
+
+    // Optimistic update
+    state = state.copyWith(sensitivityLevel: newLevel);
+
+    // Mark pending approval messages as stale
+    final updatedMessages = state.messages.map((msg) {
+      if (msg.role == AgenticRole.system &&
+          msg.approvals != null &&
+          msg.approvals!.any((a) => a.resolution == ApprovalResolution.pending)) {
+        final newApprovals = msg.approvals!.map((a) =>
+          a.resolution == ApprovalResolution.pending
+              ? a.copyWith(resolution: ApprovalResolution.stale)
+              : a,
+        ).toList();
+        return msg.copyWith(isStale: true, approvals: newApprovals);
+      }
+      return msg;
+    }).toList();
+
+    state = state.copyWith(messages: updatedMessages);
+
+    try {
+      final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
+
+      await setSensitivityLevel(
+        baseUrl: settings.engineBaseUrl,
+        sessionId: sessionId,
+        sensitivityValue: newLevel.value,
+        authType: settings.engineAuthType,
+        username: settings.engineUsername,
+        password: password,
+        apiKey: apiKey,
+      );
+
+      Logger.debug('AgenticChat: Sensitivity changed to ${newLevel.label}');
+    } catch (e) {
+      // Revert on failure
+      state = state.copyWith(sensitivityLevel: previousLevel);
+      Logger.debug('AgenticChat: Failed to change sensitivity: $e');
+      rethrow;
+    }
+  }
+
+  /// Grant a specific approval. Calls the session or global grant API.
+  Future<void> grantApproval({
+    required String approvalId,
+    required GrantRequest grant,
+    required bool isGlobal,
+  }) async {
+    final settings = ref.read(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+    final sessionId = settings.agenticSessionId;
+
+    if (sessionId == null) return;
+
+    try {
+      final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
+
+      if (isGlobal) {
+        await createGlobalGrant(
+          baseUrl: settings.engineBaseUrl,
+          grant: grant,
+          authType: settings.engineAuthType,
+          username: settings.engineUsername,
+          password: password,
+          apiKey: apiKey,
+        );
+      } else {
+        await createSessionGrant(
+          baseUrl: settings.engineBaseUrl,
+          sessionId: sessionId,
+          grant: grant,
+          authType: settings.engineAuthType,
+          username: settings.engineUsername,
+          password: password,
+          apiKey: apiKey,
+        );
+      }
+
+      _updateApprovalResolution(
+        approvalId,
+        ApprovalResolution.granted,
+        expiresAt: grant.expiresAt,
+      );
+
+      Logger.debug('AgenticChat: Granted approval $approvalId');
+    } catch (e) {
+      Logger.debug('AgenticChat: Failed to grant approval: $e');
+      rethrow;
+    }
+  }
+
+  /// Skip a specific approval — tells the engine to reject it.
+  Future<void> skipApproval(String approvalId) async {
+    _updateApprovalResolution(approvalId, ApprovalResolution.skipped);
+
+    final settings = ref.read(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+    final sessionId = settings.agenticSessionId;
+
+    if (sessionId == null) return;
+
+    try {
+      final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
+
+      await rejectSessionApprovals(
+        baseUrl: settings.engineBaseUrl,
+        sessionId: sessionId,
+        approvalIds: [approvalId],
+        authType: settings.engineAuthType,
+        username: settings.engineUsername,
+        password: password,
+        apiKey: apiKey,
+      );
+
+      Logger.debug('AgenticChat: Skipped approval $approvalId');
+    } catch (e) {
+      Logger.debug('AgenticChat: Failed to skip approval: $e');
+      rethrow;
+    }
+  }
+
+  /// Continue the session — triggers an agent run with current state.
+  Future<void> triggerContinuation() async {
+    final settings = ref.read(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+    final sessionId = settings.agenticSessionId;
+
+    if (sessionId == null) return;
+
+    state = state.copyWith(
+      isLoading: true,
+      showAssistantPending: true,
+    );
+
+    try {
+      final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
+
+      final chatResponse = await continueSession(
+        baseUrl: settings.engineBaseUrl,
+        sessionId: sessionId,
+        authType: settings.engineAuthType,
+        username: settings.engineUsername,
+        password: password,
+        apiKey: apiKey,
+      );
+
+      state = state.copyWith(
+        messages: [...state.messages, chatResponse.message],
+        isLoading: false,
+        showAssistantPending: false,
+        sensitivityLevel: chatResponse.sensitivityLevel,
+      );
+
+      Logger.debug('AgenticChat: Continuation response received');
+    } catch (e) {
+      final errorText = e is EngineApiException ? e.userMessage : e.toString();
+      final technicalDetails =
+          e is EngineApiException ? e.technicalDetails : null;
+
+      final errorMessage = AgenticMessage.error(
+        errorText,
+        technicalDetails: technicalDetails,
+      );
+
+      state = state.copyWith(
+        messages: [...state.messages, errorMessage],
+        isLoading: false,
+        showAssistantPending: false,
+      );
+
+      Logger.debug('AgenticChat: Continuation failed: $e');
+    }
+  }
+
+  void _updateApprovalResolution(
+    String approvalId,
+    ApprovalResolution resolution, {
+    DateTime? expiresAt,
+  }) {
+    final updatedMessages = state.messages.map((msg) {
+      if (msg.role == AgenticRole.system && msg.approvals != null) {
+        bool changed = false;
+        final newApprovals = msg.approvals!.map((a) {
+          if (a.id == approvalId) {
+            changed = true;
+            return a.copyWith(resolution: resolution, expiresAt: expiresAt);
+          }
+          return a;
+        }).toList();
+        if (changed) return msg.copyWith(approvals: newApprovals);
+      }
+      return msg;
+    }).toList();
+
+    state = state.copyWith(messages: updatedMessages);
+    _triggerContinuationIfAllResolved();
+  }
+
+  @visibleForTesting
+  void setStateForTest(AgenticChatState s) => state = s;
+
+  /// Auto-continue once every approval in the latest actionable group is resolved.
+  void _triggerContinuationIfAllResolved() {
+    final messages = state.messages;
+
+    // Find the last system message with approvals that is not stale
+    for (int i = messages.length - 1; i >= 0; i--) {
+      final msg = messages[i];
+      if (msg.role == AgenticRole.system &&
+          msg.approvals != null &&
+          msg.approvals!.isNotEmpty &&
+          !msg.isStale) {
+        final allResolved = msg.approvals!.every(
+          (a) => a.resolution != ApprovalResolution.pending,
+        );
+        if (allResolved) {
+          triggerContinuation();
+        }
+        return; // Only check the most recent approval group
+      }
     }
   }
 

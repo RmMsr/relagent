@@ -24,6 +24,7 @@ The goal of the Relagent project is an accessible solution for agentic AI servic
 - 🧰 Agentic tools (e.g. web search)
 - 🎤 Speech Integration: Input and Output on device (mobile and desktop)
 - 📑 Unlimited parallel sessions
+- ⁉️ Reusable permission based on privacy sensitivity level
 
 ![Screenshots: App, Web, Desktop](docs/media/screenshots-0.1.12.png "Use Relagent anywhere - on your mobile, desktop or via a browser")
 
@@ -37,7 +38,7 @@ What you need:
 2. **LLM service**: Access to an OpenAI compatible inference service (API URL and optional API Key). For example:
    - Running locally. For example using [LM Studio](https://lmstudio.ai/), [Ollama](https://ollama.com/download) or [Lemonade-Server](https://lemonade-server.ai/).
    - Using a 3rd party provider who will run the LLM for you. Any provider that supports the OpenAI v1 API should work.
-3. **LLM Model**: Please choose a text generating large language model (LLM) available at your inference service. The model needs to support so called tool or function calling. For example `gpt-oss` or `olmo3` should give you a solid start.
+3. **LLM Model**: Please choose a text generating large language model (LLM) available at your inference service. The model needs to support so called tool or function calling. For example `gpt-oss`, `nemotron-3`, `gemma-4` or `olmo3` should give you a solid start.
 4. **Secret Access Key**: A secret only you know to protect access to your service.
 
 > **LM Studio** is a good choice to get going with local LLM inference. It comes with a graphical user interface and runs on Linux, macOS and Windows. The application helps you choose fitting models and runs them on CPU or GPU (nVidia=CUDA, AMD=ROCm and Intel=Vulkan). This example assumes you have the lm studio server running with default settings.

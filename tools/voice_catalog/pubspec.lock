@@ -21,10 +21,10 @@ packages:
     dependency: transitive
     description:
       name: async
-      sha256: "758e6d74e971c3e5aceb4110bfd6698efc7f501675bcfe0c775459a8140750eb"
+      sha256: e2eb0491ba5ddb6177742d2da23904574082139b07c1e33b8503b9f46f3e1a37
       url: "https://pub.dev"
     source: hosted
-    version: "2.13.0"
+    version: "2.13.1"
   characters:
     dependency: transitive
     description:
@@ -106,50 +106,50 @@ packages:
     dependency: transitive
     description:
       name: sherpa_onnx
-      sha256: "6f4d7fe496ee133367c2a38376249f26511a44297b940dde541af8cc84d2bf08"
+      sha256: c10a1052bf03b9e68562e5be7d3a60568738c8356f3607012f0260f88ea11f08
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.33"
+    version: "1.12.36"
   sherpa_onnx_android:
     dependency: transitive
     description:
       name: sherpa_onnx_android
-      sha256: "568fbcbc4baf48bd80ae1478d60e97e922917177ce6a556fa19bbb6b0f2b801d"
+      sha256: "03a70665e83c026ccf4d853fe87d011321bc66810c5ea108ea08a128f95d862a"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.33"
+    version: "1.12.36"
   sherpa_onnx_ios:
     dependency: transitive
     description:
       name: sherpa_onnx_ios
-      sha256: "067702a9fbf70de0a999137f7e78429f601e848ea03e93f69584232c1662f89c"
+      sha256: a725a7e14a0be3a6d604902efe12b7c3e8c3190f0506a2635153fc419b4af021
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.33"
+    version: "1.12.38"
   sherpa_onnx_linux:
     dependency: transitive
     description:
       name: sherpa_onnx_linux
-      sha256: "4faf444f3c71651a2dd65bbd53de2fc642ec3f03829524ba56df92f2cf597ec1"
+      sha256: "608146dfa2b654a7e9b6bd6c76ac407452e141c8326bf13eccd7422189e7cae6"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.33"
+    version: "1.12.38"
   sherpa_onnx_macos:
     dependency: transitive
     description:
       name: sherpa_onnx_macos
-      sha256: "25bb40a810609b7988d51d04ab2d8597974ed7069e6a8b3e8860bb6451136dde"
+      sha256: "8e2a9825081f21e53a0d94f4b83b15120624980585518feefc577313c9374042"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.33"
+    version: "1.12.38"
   sherpa_onnx_windows:
     dependency: transitive
     description:
       name: sherpa_onnx_windows
-      sha256: "1a06882e3d3cec2e6cf97376a3b9b6f4df9094f7b84e13bd765f31280ee6d4c0"
+      sha256: fb896256baf0450f9a0919d65ea838d4445be8578f5b567f40fe32130cb9fef3
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.33"
+    version: "1.12.38"
   sherpa_voice:
     dependency: "direct main"
     description:
