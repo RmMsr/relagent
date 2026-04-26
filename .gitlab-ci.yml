@@ -16,7 +16,7 @@ default:
 
 test-apps:
   stage: test
-  image: ghcr.io/cirruslabs/flutter:3.41.4
+  image: ghcr.io/cirruslabs/flutter:3.41.7
   script:
     - cd apps
     - cp assets/config.template.json assets/config.json
@@ -35,7 +35,7 @@ build-android:
     - dedicated-build
   rules:
     - if: $CI_COMMIT_TAG
-  image: ghcr.io/cirruslabs/flutter:3.41.4
+  image: ghcr.io/cirruslabs/flutter:3.41.7
   script:
     - bin/reproducible-build-prepare.sh
     - |
