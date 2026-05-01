@@ -23,6 +23,10 @@ IMPORTANT: Check also the subproject: @engine/AGENTS.md for the python backend a
 
 ### CRITICAL RULES
 
+- Read existing files before writing. Don't re-read unless changed.
+- Thorough in reasoning, concise in output.
+- Skip files over 10KB unless required.
+- Friendly, but brief technical communication.
 - Use the openspec framework for all changes. Make sure the specs stay in sync.
 - Regard automated quality control and AI driven testing as a high priority.
 
