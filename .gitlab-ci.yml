@@ -29,6 +29,17 @@ test-engine:
     - uv sync --locked
     - uv run pytest
 
+build-engine:
+  stage: build
+  rules:
+   - if: $CI_COMMIT_TAG
+  image: quay.io/buildah/stable
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+  script:
+    - buildah build --platform=linux/amd64 -t $CI_REGISTRY_IMAGE:$PACKAGE_VERSION .
+    - buildah push $CI_REGISTRY_IMAGE:$PACKAGE_VERSION
+
 build-android:
   stage: build
   tags:
@@ -104,18 +115,18 @@ create-release:
     assets:
       links:
         - name: 'Android arm32 APK'
-          direct_asset_path: '/relagent-${PACKAGE_VERSION}-android-arm.apk'
+          filepath: '/relagent-${PACKAGE_VERSION}-android-arm.apk'
           url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android-arm.apk'
           link_type: package
         - name: 'Android arm64 APK'
-          direct_asset_path: '/relagent-${PACKAGE_VERSION}-android-arm64.apk'
+          filepath: '/relagent-${PACKAGE_VERSION}-android-arm64.apk'
           url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android-arm64.apk'
           link_type: package
         - name: 'Android x64 APK'
-          direct_asset_path: '/relagent-${PACKAGE_VERSION}-android-x64.apk'
+          filepath: '/relagent-${PACKAGE_VERSION}-android-x64.apk'
           url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android-x64.apk'
           link_type: package
         - name: 'Android App Bundle'
-          direct_asset_path: '/relagent-${PACKAGE_VERSION}-android.aab'
+          filepath: '/relagent-${PACKAGE_VERSION}-android.aab'
           url: '${PACKAGE_REGISTRY_URL}/${PACKAGE_VERSION}/relagent-${PACKAGE_VERSION}-android.aab'
           link_type: package
