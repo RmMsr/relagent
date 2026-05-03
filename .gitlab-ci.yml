@@ -9,6 +9,7 @@ variables:
   APP_ANDROID_PLATFORMS: android-arm,android-arm64,android-x64
   PACKAGE_VERSION: "${CI_COMMIT_REF_NAME}"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/app-releases"
+  FLUTTER_IMAGE: ghcr.io/cirruslabs/flutter:3.41.9
 
 default:
   tags:
@@ -16,7 +17,7 @@ default:
 
 test-apps:
   stage: test
-  image: ghcr.io/cirruslabs/flutter:3.41.7
+  image: $FLUTTER_IMAGE
   script:
     - cd apps
     - cp assets/config.template.json assets/config.json
@@ -53,7 +54,7 @@ build-android:
     - dedicated-build
   rules:
     - if: $CI_COMMIT_TAG
-  image: ghcr.io/cirruslabs/flutter:3.41.7
+  image: $FLUTTER_IMAGE
   script:
     - bin/reproducible-build-prepare.sh
     - |

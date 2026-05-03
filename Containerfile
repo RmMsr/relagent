@@ -1,4 +1,4 @@
-FROM ghcr.io/cirruslabs/flutter:3.41.7 AS flutter-builder
+FROM ghcr.io/cirruslabs/flutter:3.41.9 AS flutter-builder
 
 RUN chown -R ubuntu:ubuntu /sdks/flutter && \
     mkdir -p /dart_packages/sherpa_voice && \
