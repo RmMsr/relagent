@@ -39,6 +39,11 @@ build-engine:
   script:
     - buildah build --platform=linux/amd64 -t $CI_REGISTRY_IMAGE:$PACKAGE_VERSION .
     - buildah push $CI_REGISTRY_IMAGE:$PACKAGE_VERSION
+    - buildah push $CI_REGISTRY_IMAGE:any
+    - |
+      if echo "$PACKAGE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        buildah push $CI_REGISTRY_IMAGE:latest
+      fi
 
 build-android:
   stage: build
