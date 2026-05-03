@@ -3,7 +3,7 @@ from typing import Sequence
 
 import pytest
 
-from engine.domain.exceptions import ChatContextNotFound
+from engine.domain.exceptions import ChatContextNotFound, MessageImmutabilityError
 from engine.domain.models import (
     AgentStats,
     Approval,
@@ -146,3 +146,118 @@ class TestContextPersistence:
         loaded = persistence.load_context(session_id=session.session_id)
 
         assert len(loaded.messages) == 10
+
+
+class TestFinalImmutabilityGuard:
+    """Persistence boundary rejects writes to final=True records (§2.2)."""
+
+    def test_mutating_a_final_message_raises(self, persistence: Persistence):
+        session = SessionInfo()
+        # Assign sequence_ids the way services.py would; the guard matches by id.
+        user = UserMessage(sequence_id=0, content="hi", final=True)
+        assistant = AssistantMessage(sequence_id=1, content="reply")
+        persistence.save_context(
+            session_id=session.session_id,
+            context=ChatContext(messages=[user, assistant]),
+        )
+
+        # Try to rewrite the user message's content while it is on disk as final.
+        mutated = UserMessage(sequence_id=0, content="EDITED", final=True)
+        with pytest.raises(MessageImmutabilityError) as exc_info:
+            persistence.save_context(
+                session_id=session.session_id,
+                context=ChatContext(messages=[mutated, assistant]),
+            )
+        assert exc_info.value.sequence_id == 0
+
+    def test_removing_a_final_message_raises(self, persistence: Persistence):
+        session = SessionInfo()
+        user = UserMessage(sequence_id=0, content="hi", final=True)
+        assistant = AssistantMessage(sequence_id=1, content="reply")
+        persistence.save_context(
+            session_id=session.session_id,
+            context=ChatContext(messages=[user, assistant]),
+        )
+
+        with pytest.raises(MessageImmutabilityError) as exc_info:
+            persistence.save_context(
+                session_id=session.session_id,
+                context=ChatContext(messages=[assistant]),
+            )
+        assert exc_info.value.sequence_id == 0
+
+    def test_flipping_final_false_to_true_is_allowed(
+        self, persistence: Persistence
+    ):
+        # Settlement: a previously in-flight UserMessage is flipped to final=True
+        # alongside the appended AssistantMessage. The guard MUST permit this.
+        session = SessionInfo()
+        user_inflight = UserMessage(sequence_id=0, content="hi", final=False)
+        persistence.save_context(
+            session_id=session.session_id,
+            context=ChatContext(messages=[user_inflight]),
+        )
+
+        user_settled = UserMessage(sequence_id=0, content="hi", final=True)
+        assistant = AssistantMessage(sequence_id=1, content="reply")
+        persistence.save_context(
+            session_id=session.session_id,
+            context=ChatContext(messages=[user_settled, assistant]),
+        )
+
+        loaded = persistence.load_context(session_id=session.session_id)
+        assert loaded.messages[0].final is True
+        assert loaded.messages[1].content == "reply"
+
+    def test_appending_a_new_message_after_a_final_one_is_allowed(
+        self, persistence: Persistence
+    ):
+        session = SessionInfo()
+        user = UserMessage(sequence_id=0, content="hi", final=True)
+        assistant = AssistantMessage(sequence_id=1, content="reply")
+        persistence.save_context(
+            session_id=session.session_id,
+            context=ChatContext(messages=[user, assistant]),
+        )
+
+        next_user = UserMessage(sequence_id=2, content="follow-up")
+        persistence.save_context(
+            session_id=session.session_id,
+            context=ChatContext(messages=[user, assistant, next_user]),
+        )
+
+        loaded = persistence.load_context(session_id=session.session_id)
+        assert len(loaded.messages) == 3
+        assert loaded.messages[2].content == "follow-up"
+
+    def test_mutating_an_in_flight_message_is_allowed(
+        self, persistence: Persistence
+    ):
+        # Granting an approval mutates the trailing in-flight SystemAction
+        # in place; the guard MUST NOT trip on final=False records.
+        session = SessionInfo()
+        user = UserMessage(sequence_id=0, content="hi", final=False)
+        approval = Approval(
+            type=ApprovalType.OutgoingData,
+            component="web_search",
+            purpose="p",
+        )
+        sys_action = SystemAction(
+            sequence_id=1, approvals=[approval], final=False
+        )
+        persistence.save_context(
+            session_id=session.session_id,
+            context=ChatContext(messages=[user, sys_action]),
+        )
+
+        granted_approval = approval.model_copy(update={"granted": True})
+        sys_after = SystemAction(
+            sequence_id=1, approvals=[granted_approval], final=False
+        )
+        persistence.save_context(
+            session_id=session.session_id,
+            context=ChatContext(messages=[user, sys_after]),
+        )
+
+        loaded = persistence.load_context(session_id=session.session_id)
+        assert loaded.messages[1].approvals[0].granted is True

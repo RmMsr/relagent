@@ -20,8 +20,13 @@ export '/agentic/sensitivity_widgets.dart';
 
 class AgenticChatInput extends ConsumerStatefulWidget {
   final ValueChanged<String> onSubmitted;
+  final bool enabled;
 
-  const AgenticChatInput({super.key, required this.onSubmitted});
+  const AgenticChatInput({
+    super.key,
+    required this.onSubmitted,
+    this.enabled = true,
+  });
 
   @override
   ConsumerState<AgenticChatInput> createState() => AgenticChatInputState();
@@ -36,6 +41,18 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
   RecordingNotifier? _recordingNotifier;
 
   void requestFocus() {
+    _focusNode.requestFocus();
+  }
+
+  // Used by the edit-queued flow. Per OQ1 input is overwritten unconditionally.
+  void setText(String text) {
+    setState(() {
+      _controller.text = text;
+      _controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: _controller.text.length),
+      );
+      _textBeforeRecording = text;
+    });
     _focusNode.requestFocus();
   }
 
@@ -137,6 +154,7 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
 
   @override
   Widget build(BuildContext context) {
+    final enabled = widget.enabled;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
       decoration: const BoxDecoration(border: Border(top: BorderSide())),
@@ -147,9 +165,12 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
               autofocus: true,
               controller: _controller,
               focusNode: _focusNode,
-              decoration: const InputDecoration(
+              enabled: enabled,
+              decoration: InputDecoration(
                 border: InputBorder.none,
-                hintText: 'Type a message...',
+                hintText: enabled
+                    ? 'Type a message...'
+                    : 'Edit queued message to type a new one',
               ),
               minLines: 1,
               maxLines: null,
@@ -160,7 +181,7 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
           ),
           IconButton(
             icon: const Icon(Icons.send),
-            onPressed: _submitText,
+            onPressed: enabled ? _submitText : null,
             tooltip: 'Send message',
           ),
           if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable)
@@ -227,8 +248,11 @@ class AgenticChatHistory extends StatelessWidget {
   final ValueChanged<SensitivityLevel>? onChangeSensitivity;
   final void Function(ApprovalData, GrantRequest, bool isGlobal)?
       onGrantApproval;
-  final ValueChanged<String>? onSkipApproval;
+  final ValueChanged<String>? onDeclineApproval;
   final VoidCallback? onContinue;
+  final VoidCallback? onStop;
+  final String? queuedMessage;
+  final VoidCallback? onEditQueued;
 
   const AgenticChatHistory({
     super.key,
@@ -242,8 +266,11 @@ class AgenticChatHistory extends StatelessWidget {
     this.sensitivityLevel = SensitivityLevel.personal,
     this.onChangeSensitivity,
     this.onGrantApproval,
-    this.onSkipApproval,
+    this.onDeclineApproval,
     this.onContinue,
+    this.onStop,
+    this.queuedMessage,
+    this.onEditQueued,
   });
 
   @override
@@ -350,10 +377,12 @@ class AgenticChatHistory extends StatelessWidget {
                     message: message,
                     sessionSensitivity: sensitivityLevel,
                     isActionable: isLastMessage,
+                    isAgentRunInFlight: showAssistantPending,
                     onChangeSensitivity: onChangeSensitivity,
                     onGrant: onGrantApproval,
-                    onSkip: onSkipApproval,
+                    onDecline: onDeclineApproval,
                     onContinue: isLastMessage ? onContinue : null,
+                    onStop: isLastMessage ? onStop : null,
                   ),
                 ],
               ),
@@ -395,6 +424,15 @@ class AgenticChatHistory extends StatelessWidget {
       chatWidgets.add(const _AssistantPendingPlaceholder());
     }
 
+    if (queuedMessage != null) {
+      chatWidgets.add(
+        QueuedMessageBubble(
+          text: queuedMessage!,
+          onEdit: onEditQueued,
+        ),
+      );
+    }
+
     return SelectionArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -433,7 +471,7 @@ class _AgenticMessageBubble extends StatelessWidget {
     return Container(
       margin: EdgeInsets.only(
         left: isUser ? 40 : 8,
-        right: isUser ? 8 : 40,
+        right: 8,
         top: isFirstInGroup ? 8 : 2,
         bottom: isLastInGroup ? 8 : 2,
       ),
@@ -878,7 +916,7 @@ class _AssistantPendingPlaceholderState
     final theme = Theme.of(context);
 
     return Container(
-      margin: const EdgeInsets.only(left: 8, right: 40, top: 8, bottom: 8),
+      margin: const EdgeInsets.only(left: 8, right: 8, top: 8, bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -938,5 +976,116 @@ class _AssistantPendingPlaceholderState
       ),
     );
   }
+}
+
+// Client-side queued user message rendered inline at the chat-list end.
+// Label + edit-pencil sit on the header line so the text is not displaced.
+class QueuedMessageBubble extends StatelessWidget {
+  final String text;
+  final VoidCallback? onEdit;
+
+  const QueuedMessageBubble({
+    super.key,
+    required this.text,
+    this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(left: 40, right: 8, top: 8, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4, left: 4, right: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Next user message',
+                  key: const Key('queued-message-label'),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                if (onEdit != null) ...[
+                  const SizedBox(width: 4),
+                  TextButton.icon(
+                    key: const Key('queued-message-edit'),
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined, size: 14),
+                    label: const Text('Edit'),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 0),
+                      foregroundColor: theme.colorScheme.onSurfaceVariant,
+                      textStyle: theme.textTheme.labelSmall,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          CustomPaint(
+            painter: _DashedRRectPainter(
+              color: theme.colorScheme.primary.withAlpha(160),
+              radius: 12,
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withAlpha(110),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(text),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashedRRectPainter extends CustomPainter {
+  static const _dashLength = 5.0;
+  static const _gapLength = 4.0;
+  static const _strokeWidth = 1.2;
+
+  final Color color;
+  final double radius;
+
+  _DashedRRectPainter({required this.color, required this.radius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = _strokeWidth
+      ..style = PaintingStyle.stroke;
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+    final dashed = Path();
+    for (final metric in path.computeMetrics()) {
+      double dist = 0;
+      while (dist < metric.length) {
+        final next = (dist + _dashLength).clamp(0.0, metric.length);
+        dashed.addPath(metric.extractPath(dist, next), Offset.zero);
+        dist += _dashLength + _gapLength;
+      }
+    }
+    canvas.drawPath(dashed, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRRectPainter old) =>
+      old.color != color || old.radius != radius;
 }
 

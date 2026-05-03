@@ -185,6 +185,7 @@ class TestPostMessages:
                     "tool_calls_count": None,
                 },
                 "timestamp": "2025-10-14T09:55:00",
+                "final": True,
             },
         }
 
@@ -275,6 +276,7 @@ class TestGetMessages:
                     "role": "user",
                     "content": "Hello",
                     "timestamp": "2025-10-14T09:55:00",
+                    "final": False,
                 },
                 {
                     "sequence_id": None,
@@ -282,6 +284,7 @@ class TestGetMessages:
                     "content": "Hi!",
                     "stats": None,
                     "timestamp": "2025-10-14T09:57:00",
+                    "final": True,
                 },
             ],
         }
@@ -578,61 +581,6 @@ class TestCreateGrant:
     def test_invalid_body(self, client_with_approval_mock: TestClient):
         response = client_with_approval_mock.post(
             "/api/v1/grants",
-            json={"approval_type": "not-a-valid-type"},
-        )
-
-        assert response.status_code == 422
-
-
-class TestCreateSessionGrant:
-    def test_requires_authentication(self, app_with_approval_mock: FastAPI):
-        session_id = uuid.uuid4()
-        assert_required_authentication(
-            TestClient(app_with_approval_mock),
-            method="post",
-            endpoint=f"/api/v1/sessions/{session_id}/grants",
-            payload={"approval_type": "data/out", "component": "web_search"},
-        )
-
-    def test_creates_grant(
-        self, client_with_approval_mock: TestClient, mock_approval_service: MagicMock
-    ):
-        session_id = uuid.uuid4()
-        response = client_with_approval_mock.post(
-            f"/api/v1/sessions/{session_id}/grants",
-            json={"approval_type": "data/out", "component": "web_search"},
-        )
-
-        assert response.status_code == 200
-        assert response.json() == {"status": "created"}
-
-    def test_delegates_to_approval_service(
-        self, client_with_approval_mock: TestClient, mock_approval_service: MagicMock
-    ):
-        session_id = uuid.uuid4()
-        client_with_approval_mock.post(
-            f"/api/v1/sessions/{session_id}/grants",
-            json={"approval_type": "data/out", "component": "web_search"},
-        )
-
-        mock_approval_service.register_session_grant.assert_called_once()
-        call_kwargs = mock_approval_service.register_session_grant.call_args.kwargs
-        assert call_kwargs["session_id"] == session_id
-        assert call_kwargs["grant"].component == "web_search"
-        assert call_kwargs["grant"].approval_type == ApprovalType.OutgoingData
-
-    def test_invalid_uuid_format(self, client_with_approval_mock: TestClient):
-        response = client_with_approval_mock.post(
-            "/api/v1/sessions/not-a-valid-uuid/grants",
-            json={"approval_type": "data/out", "component": "web_search"},
-        )
-
-        assert response.status_code == 422
-
-    def test_invalid_body(self, client_with_approval_mock: TestClient):
-        session_id = uuid.uuid4()
-        response = client_with_approval_mock.post(
-            f"/api/v1/sessions/{session_id}/grants",
             json={"approval_type": "not-a-valid-type"},
         )
 

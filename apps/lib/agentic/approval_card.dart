@@ -10,7 +10,7 @@ class ApprovalCard extends StatefulWidget {
   final bool isActionable;
   final ValueChanged<SensitivityLevel>? onChangeSensitivity;
   final void Function(ApprovalData, GrantRequest, bool isGlobal)? onGrant;
-  final ValueChanged<String>? onSkip;
+  final ValueChanged<String>? onDecline;
 
   const ApprovalCard({
     super.key,
@@ -19,7 +19,7 @@ class ApprovalCard extends StatefulWidget {
     this.isActionable = true,
     this.onChangeSensitivity,
     this.onGrant,
-    this.onSkip,
+    this.onDecline,
   });
 
   @override
@@ -78,7 +78,7 @@ class _ApprovalCardState extends State<ApprovalCard> {
         BorderSide(color: theme.colorScheme.outlineVariant, width: 1);
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       clipBehavior: Clip.antiAlias,
       elevation: 0,
       color: isStale
@@ -161,7 +161,7 @@ class _ApprovalCardState extends State<ApprovalCard> {
     } else if (approval.resolution == ApprovalResolution.granted) {
       headerIcon = Icons.check_circle_outline;
       headerIconColor = theme.colorScheme.primary;
-    } else if (approval.resolution == ApprovalResolution.skipped) {
+    } else if (approval.resolution == ApprovalResolution.declined) {
       headerIcon = Icons.cancel_outlined;
       headerIconColor = theme.colorScheme.onSurfaceVariant;
     } else {
@@ -528,12 +528,12 @@ class _ApprovalCardState extends State<ApprovalCard> {
           children: [
             Expanded(
               child: TextButton(
-                onPressed: () => widget.onSkip?.call(widget.approval.id),
+                onPressed: () => widget.onDecline?.call(widget.approval.id),
                 style: TextButton.styleFrom(
                   shape: const RoundedRectangleBorder(),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('Skip'),
+                child: const Text('Continue without'),
               ),
             ),
             VerticalDivider(
@@ -577,26 +577,50 @@ class ApprovalGroup extends StatelessWidget {
   final AgenticMessage message;
   final SensitivityLevel sessionSensitivity;
   final bool isActionable;
+  /// True while a /continue is in flight; suppresses the recovery Continue button.
+  final bool isAgentRunInFlight;
   final ValueChanged<SensitivityLevel>? onChangeSensitivity;
   final void Function(ApprovalData, GrantRequest, bool isGlobal)? onGrant;
-  final ValueChanged<String>? onSkip;
+  final ValueChanged<String>? onDecline;
   final VoidCallback? onContinue;
+  final VoidCallback? onStop;
 
   const ApprovalGroup({
     super.key,
     required this.message,
     required this.sessionSensitivity,
     this.isActionable = true,
+    this.isAgentRunInFlight = false,
     this.onChangeSensitivity,
     this.onGrant,
-    this.onSkip,
+    this.onDecline,
     this.onContinue,
+    this.onStop,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final approvals = message.approvals ?? [];
     final isStale = message.isStale;
+    // Hide Stop once any approval is decided — the auto-continue has fired.
+    final allPending = approvals.every(
+      (a) => a.resolution == ApprovalResolution.pending,
+    );
+    // Stuck cycle (in-flight, all decided, no run): offer Continue.
+    final allDecided = approvals.isNotEmpty &&
+        approvals.every((a) => a.resolution != ApprovalResolution.pending);
+    final showContinueButton = isActionable &&
+        !isStale &&
+        !message.isFinal &&
+        onContinue != null &&
+        allDecided &&
+        !isAgentRunInFlight;
+    final showStopBar = isActionable &&
+        !isStale &&
+        !message.isFinal &&
+        onStop != null &&
+        allPending;
 
     return Container(
       margin: const EdgeInsets.only(left: 8, right: 8, top: 8, bottom: 8),
@@ -614,7 +638,7 @@ class ApprovalGroup extends StatelessWidget {
               isActionable: isActionable && !isStale,
               onChangeSensitivity: onChangeSensitivity,
               onGrant: onGrant,
-              onSkip: onSkip,
+              onDecline: onDecline,
             ),
           if (isStale) ...[
             Padding(
@@ -628,6 +652,47 @@ class ApprovalGroup extends StatelessWidget {
               ),
             ),
           ],
+          if (showContinueButton)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('approval-group-continue-button'),
+                  onPressed: onContinue,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: const Text('Continue'),
+                ),
+              ),
+            ),
+          if (showStopBar)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  key: const Key('approval-group-stop-bar'),
+                  onPressed: onStop,
+                  icon: Icon(
+                    Icons.cancel_outlined,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  label: Text(
+                    'Stop and ask something else',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

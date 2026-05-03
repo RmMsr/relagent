@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 
 import '/agentic/models.dart';
@@ -82,6 +83,37 @@ class EngineApiException implements Exception {
     buffer.write('Details: $technicalDetails');
     return buffer.toString();
   }
+}
+
+/// Raised when the engine returns 409 because the session has an unsettled
+/// in-flight cycle. Reasons include a second client/tab on the same session
+/// or a prior /continue that errored mid-cycle and left the trailing
+/// SystemAction unresolved. The user-facing message is intentionally
+/// neutral — the right user action is the same in either case.
+class SessionInFlightException extends EngineApiException {
+  final String sessionId;
+  final int? trailingSequenceId;
+
+  SessionInFlightException({
+    required this.sessionId,
+    required this.trailingSequenceId,
+    required super.technicalDetails,
+    super.url,
+  }) : super(
+          userMessage:
+              'Interaction is not complete, please retry to continue.',
+        );
+}
+
+/// Raised when /stop is called but no cycle is in flight.
+class NoInFlightCycleException extends EngineApiException {
+  final String sessionId;
+
+  NoInFlightCycleException({
+    required this.sessionId,
+    required super.technicalDetails,
+    super.url,
+  }) : super(userMessage: 'No active request to stop');
 }
 
 Map<String, String> _buildHeaders({
@@ -344,42 +376,6 @@ Future<void> setSensitivityLevel({
   }
 }
 
-/// Creates a session-scoped grant.
-Future<void> createSessionGrant({
-  required String baseUrl,
-  required String sessionId,
-  required GrantRequest grant,
-  AuthType authType = AuthType.none,
-  String? username,
-  String? password,
-  String? apiKey,
-}) async {
-  final normalizedUrl = _normalizeBaseUrl(baseUrl);
-  final uri = Uri.parse(
-    '$normalizedUrl/api/v1/sessions/$sessionId/grants',
-  );
-
-  final headers = _buildHeaders(
-    authType: authType,
-    username: username,
-    password: password,
-    apiKey: apiKey,
-  );
-
-  final body = jsonEncode(grant.toJson());
-
-  final http.Response response;
-  try {
-    response = await http.post(uri, headers: headers, body: body);
-  } catch (e) {
-    throw _networkException(e, uri);
-  }
-
-  if (response.statusCode >= 300) {
-    throw _httpException(response, uri);
-  }
-}
-
 /// Creates a global grant.
 Future<void> createGlobalGrant({
   required String baseUrl,
@@ -413,11 +409,14 @@ Future<void> createGlobalGrant({
   }
 }
 
-/// Rejects (skips) approvals by ID so the engine marks them as denied.
-Future<void> rejectSessionApprovals({
+/// Records a per-approval grant decision on the in-flight SystemAction.
+/// If [grant] is provided, also registers it as a session-scoped grant so
+/// future approvals matching the same permission key auto-satisfy.
+Future<void> grantSessionApproval({
   required String baseUrl,
   required String sessionId,
-  required List<String> approvalIds,
+  required String approvalId,
+  GrantRequest? grant,
   AuthType authType = AuthType.none,
   String? username,
   String? password,
@@ -425,7 +424,7 @@ Future<void> rejectSessionApprovals({
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse(
-    '$normalizedUrl/api/v1/sessions/$sessionId/reject_approvals',
+    '$normalizedUrl/api/v1/sessions/$sessionId/approvals/$approvalId/grant',
   );
 
   final headers = _buildHeaders(
@@ -435,7 +434,7 @@ Future<void> rejectSessionApprovals({
     apiKey: apiKey,
   );
 
-  final body = jsonEncode(approvalIds);
+  final body = jsonEncode({if (grant != null) 'grant': grant.toJson()});
 
   final http.Response response;
   try {
@@ -447,6 +446,80 @@ Future<void> rejectSessionApprovals({
   if (response.statusCode >= 300) {
     throw _httpException(response, uri);
   }
+}
+
+/// Records a per-approval decline decision on the in-flight SystemAction.
+Future<void> declineSessionApproval({
+  required String baseUrl,
+  required String sessionId,
+  required String approvalId,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
+  String? apiKey,
+}) async {
+  final normalizedUrl = _normalizeBaseUrl(baseUrl);
+  final uri = Uri.parse(
+    '$normalizedUrl/api/v1/sessions/$sessionId/approvals/$approvalId/decline',
+  );
+
+  final headers = _buildHeaders(
+    authType: authType,
+    username: username,
+    password: password,
+    apiKey: apiKey,
+  );
+
+  final http.Response response;
+  try {
+    response = await http.post(uri, headers: headers);
+  } catch (e) {
+    throw _networkException(e, uri);
+  }
+
+  if (response.statusCode >= 300) {
+    throw _httpException(response, uri);
+  }
+}
+
+/// Settles the in-flight cycle by declining undecided approvals and marking
+/// all in-flight messages final. Returns the settled message list.
+Future<List<AgenticMessage>> stopSession({
+  required String baseUrl,
+  required String sessionId,
+  AuthType authType = AuthType.none,
+  String? username,
+  String? password,
+  String? apiKey,
+}) async {
+  final normalizedUrl = _normalizeBaseUrl(baseUrl);
+  final uri = Uri.parse(
+    '$normalizedUrl/api/v1/sessions/$sessionId/stop',
+  );
+
+  final headers = _buildHeaders(
+    authType: authType,
+    username: username,
+    password: password,
+    apiKey: apiKey,
+  );
+
+  final http.Response response;
+  try {
+    response = await http.post(uri, headers: headers);
+  } catch (e) {
+    throw _networkException(e, uri);
+  }
+
+  if (response.statusCode >= 300) {
+    throw _httpException(response, uri);
+  }
+
+  final responseJson = _parseJsonObject(response.body, uri);
+  final messagesJson = responseJson['messages'] as List<dynamic>? ?? [];
+  return messagesJson
+      .map((json) => AgenticMessage.fromJson(json as Map<String, dynamic>))
+      .toList();
 }
 
 /// Response from continue or sendMessage containing message + sensitivity.
@@ -517,6 +590,11 @@ EngineApiException _httpException(
   String? notFoundMessage,
   String? invalidDataMessage,
 }) {
+  if (response.statusCode == 409) {
+    final conflict = tryParseConflict(response.body, uri);
+    if (conflict != null) return conflict;
+  }
+
   String userMessage;
   if (response.statusCode == 401 || response.statusCode == 403) {
     userMessage = 'Authentication failed';
@@ -535,6 +613,34 @@ EngineApiException _httpException(
     technicalDetails: _extractErrorDetails(response.statusCode, response.body),
     url: uri.toString(),
   );
+}
+
+@visibleForTesting
+EngineApiException? tryParseConflict(String body, Uri uri) {
+  try {
+    final json = jsonDecode(body);
+    if (json is! Map<String, dynamic>) return null;
+    final detail = json['detail'];
+    if (detail is! Map<String, dynamic>) return null;
+    final error = detail['error'];
+    final sessionId = detail['session_id'] as String? ?? '';
+    if (error == 'session_in_flight') {
+      return SessionInFlightException(
+        sessionId: sessionId,
+        trailingSequenceId: detail['trailing_sequence_id'] as int?,
+        technicalDetails: body,
+        url: uri.toString(),
+      );
+    }
+    if (error == 'no_in_flight_cycle') {
+      return NoInFlightCycleException(
+        sessionId: sessionId,
+        technicalDetails: body,
+        url: uri.toString(),
+      );
+    }
+  } catch (_) {}
+  return null;
 }
 
 Map<String, dynamic> _parseJsonObject(String body, Uri uri) {

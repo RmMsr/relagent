@@ -165,6 +165,10 @@ class UserMessage(BaseModel):
     role: Literal["user"] = "user"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     content: str
+    final: bool = Field(
+        default=False,
+        description="True once the cycle this message opened has settled",
+    )
 
 
 class AssistantMessage(BaseModel):
@@ -179,6 +183,10 @@ class AssistantMessage(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     content: str
     stats: AgentStats | None = None
+    final: bool = Field(
+        default=True,
+        description="Always True for AssistantMessage; the field exists for uniform handling.",
+    )
 
 
 class SystemAction(BaseModel):
@@ -204,6 +212,10 @@ class SystemAction(BaseModel):
         description="Informative message to the user from the system", default=None
     )
     stats: AgentStats | None = None
+    final: bool = Field(
+        default=False,
+        description="True once the surrounding cycle has settled",
+    )
 
 
 ChatMessage = UserMessage | AssistantMessage | SystemAction

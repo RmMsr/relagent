@@ -86,7 +86,7 @@ enum ApprovalType {
   }
 }
 
-enum ApprovalResolution { pending, granted, skipped, stale }
+enum ApprovalResolution { pending, granted, declined, stale }
 
 class ApprovalData {
   final String id;
@@ -281,6 +281,10 @@ class AgenticMessage {
   final String? notification; // SystemAction notification
   final SensitivityLevel? sensitivityLevel; // From ChatResponse or approval
   final bool isStale; // Marks invalidated approval groups
+  /// True once the cycle this message belongs to has settled — settled
+  /// messages are immutable and SHALL NOT be overwritten on incremental
+  /// refresh. Mirrors the engine's universal `final` flag.
+  final bool isFinal;
 
   AgenticMessage({
     this.id,
@@ -295,9 +299,14 @@ class AgenticMessage {
     this.notification,
     this.sensitivityLevel,
     this.isStale = false,
+    this.isFinal = false,
   }) : timestamp = timestamp ?? DateTime.now();
 
-  AgenticMessage copyWith({bool? isStale, List<ApprovalData>? approvals}) {
+  AgenticMessage copyWith({
+    bool? isStale,
+    List<ApprovalData>? approvals,
+    bool? isFinal,
+  }) {
     return AgenticMessage(
       id: id,
       localId: localId,
@@ -311,6 +320,7 @@ class AgenticMessage {
       notification: notification,
       sensitivityLevel: sensitivityLevel,
       isStale: isStale ?? this.isStale,
+      isFinal: isFinal ?? this.isFinal,
     );
   }
 
@@ -327,6 +337,7 @@ class AgenticMessage {
       localId: _generateLocalId(),
       text: text,
       role: AgenticRole.assistant,
+      isFinal: true,
     );
   }
 
@@ -336,6 +347,7 @@ class AgenticMessage {
       text: text,
       role: AgenticRole.error,
       technicalDetails: technicalDetails,
+      isFinal: true,
     );
   }
 
@@ -390,6 +402,8 @@ class AgenticMessage {
       stats: stats,
       approvals: approvals,
       notification: notification,
+      // Engine omits `final` for pre-cutover records; assume settled.
+      isFinal: json['final'] as bool? ?? true,
     );
   }
 

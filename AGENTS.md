@@ -36,6 +36,7 @@ IMPORTANT: Check also the subproject: @engine/AGENTS.md for the python backend a
 - Globally aim for: Structure, transparency and uniformity.
 - Locally aim for: Clear, intentional, self-explanatory code.
 - Refactoring of unrelated code to honor principles is better than breaking them.
+- Compatibility between apps and engine is guaranteed for the same version. Patch level changes should not break compatibility. Breaking changes should be named explicitly.
 
 ### Research and Discussion
 
@@ -89,7 +90,7 @@ This project prioritizes:
 ### Code Comments
 
 - **Prefer better code** over comments - good names, structure, and small functions
-- **Comments should explain why**, not what - if needed explain intention, complex logic, side effects
+- **Comments should explain why**, not what - if needed explain intention, complex logic, side effects. Keep them short and concise
 - **Classes/modules** need brief explanations of responsibility
 - **Avoid obvious comments** that just rephrase the code
 - Assume readers have basic programming knowledge but not much time to read

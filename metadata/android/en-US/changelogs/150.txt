@@ -1,0 +1,3 @@
+- Queue messages while the engine is busy; they auto-send when ready
+- Stop control and Continue button for better approval cycle management
+- Improved chat alignment and smart retry for stuck cycles

@@ -110,7 +110,9 @@ class TestPerformUserInput:
         assert events[0].session_id == sample_session.session_id
         assert events[1].event_name == EventNames.SESSION_MESSAGES_APPENDED
         assert events[1].session_id == sample_session.session_id
-        assert events[1].latest_sequence_id == response.message.sequence_id
+        # Settlement publishes the cycle-start UserMessage id, not the AssistantMessage id
+        user_msg = context.messages[-2]
+        assert events[1].latest_sequence_id == user_msg.sequence_id
 
     async def test_processes_message_with_new_session(
         self,
@@ -139,7 +141,8 @@ class TestPerformUserInput:
         assert events[0].event_name == EventNames.SESSION_CREATED
         assert events[1].event_name == EventNames.SESSION_MESSAGES_APPENDED
         assert events[1].session_id == response.session_id
-        assert events[1].latest_sequence_id == response.message.sequence_id
+        user_msg = context.messages[-2]
+        assert events[1].latest_sequence_id == user_msg.sequence_id
 
     async def test_perform_user_input_increases_message_sequence_per_session(
         self,

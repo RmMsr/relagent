@@ -1,9 +1,18 @@
+import asyncio
+import time
+from datetime import datetime
 from typing import Sequence
 from uuid import UUID
 
-from engine.domain.exceptions import ChatContextNotFound, SessionNotFound
+from engine.domain.exceptions import (
+    ChatContextNotFound,
+    NoInFlightCycleToStop,
+    SessionInFlightTimeout,
+    SessionNotFound,
+)
 from engine.domain.models import (
     Approval,
+    AssistantMessage,
     ChatContext,
     ChatMessage,
     ChatRequest,
@@ -26,6 +35,10 @@ from engine.domain.ports.events import (
 from engine.domain.ports.persistence import Persistence
 from engine.domain.types import SensitivityLevel
 from engine.log_config import get_logger
+from engine.settings import get_setting_int
+
+DEFAULT_IN_FLIGHT_POLL_INTERVAL_MS = 250
+DEFAULT_IN_FLIGHT_TIMEOUT_SECONDS = 30
 
 logger = get_logger(__name__)
 
@@ -51,7 +64,11 @@ class ChatService:
     async def perform_user_input(self, request: ChatRequest) -> ChatResponse:
         new_session: bool = False
         session: SessionInfo | None = None
+        existing_context: ChatContext | None = None
         if request.session_id:
+            existing_context = await self.wait_for_settled(
+                session_id=request.session_id
+            )
             session = self.persistence_repository.find_session(
                 session_id=request.session_id
             )
@@ -60,7 +77,9 @@ class ChatService:
             session = SessionInfo()
             new_session = True
 
-        context: ChatContext = self.ensure_context(session_id=session.session_id)
+        context: ChatContext = (
+            existing_context if existing_context is not None else ChatContext()
+        )
 
         # TODO: Use all request messages
         ai_response = await self.agent_execution.run_basic_query(
@@ -71,6 +90,9 @@ class ChatService:
 
         self._add_messages_to_context_with_sequence_ids(context, request.messages)
         self._add_messages_to_context_with_sequence_ids(context, [ai_response])
+        cycle_start_id = self._get_trailing_cycle_start_id(context)
+        if isinstance(ai_response, AssistantMessage):
+            self._settle_cycle(context)
 
         await self.ensure_session_title(session=session, context=context)
 
@@ -85,10 +107,13 @@ class ChatService:
             session_id=session.session_id, context=context
         )
 
-        # Publish message append event with latest message ID
+        # Publish from the cycle's UserMessage so the app reloads the
+        # whole affected range (final flag flips, approval grants).
         self._publish_messages_appended(
             session_id=session.session_id,
-            latest_message_id=ai_response.sequence_id,
+            latest_message_id=cycle_start_id
+            if cycle_start_id is not None
+            else ai_response.sequence_id,
         )
 
         return ChatResponse(
@@ -116,6 +141,9 @@ class ChatService:
             self._remove_trailing_system_actions(context)
 
         self._add_messages_to_context_with_sequence_ids(context, [ai_response])
+        cycle_start_id = self._get_trailing_cycle_start_id(context)
+        if isinstance(ai_response, AssistantMessage):
+            self._settle_cycle(context)
 
         self.persistence_repository.save_context(
             session_id=session.session_id, context=context
@@ -123,7 +151,9 @@ class ChatService:
 
         self._publish_messages_appended(
             session_id=session.session_id,
-            latest_message_id=ai_response.sequence_id,
+            latest_message_id=cycle_start_id
+            if cycle_start_id is not None
+            else ai_response.sequence_id,
         )
 
         return ChatResponse(
@@ -312,6 +342,103 @@ class ChatService:
         return trailing
 
     @staticmethod
+    def _settle_cycle(context: ChatContext) -> None:
+        """Flip final=True on trailing in-flight chain through the cycle's UserMessage."""
+        for msg in reversed(context.messages):
+            if msg.final:
+                continue
+            msg.final = True
+            if isinstance(msg, UserMessage):
+                return
+
+    @staticmethod
+    def _get_trailing_cycle_start_id(context: ChatContext) -> int | None:
+        """Return sequence_id of the UserMessage that opened the trailing cycle.
+
+        Returns None if the trailing cycle is already settled (UserMessage final=True)
+        or there is no UserMessage in history.
+        """
+        for msg in reversed(context.messages):
+            if isinstance(msg, UserMessage):
+                return msg.sequence_id if not msg.final else None
+        return None
+
+    async def wait_for_settled(
+        self,
+        session_id: UUID,
+        *,
+        poll_interval: float | None = None,
+        timeout: float | None = None,
+    ) -> ChatContext | None:
+        """Block until trailing message has final=True. Returns the settled
+        context (or None if no context exists) so callers can avoid a reload."""
+        if poll_interval is None:
+            poll_interval = (
+                get_setting_int(
+                    "engine",
+                    "in_flight_poll_interval_ms",
+                    default=DEFAULT_IN_FLIGHT_POLL_INTERVAL_MS,
+                    write_log=False,
+                )
+                / 1000
+            )
+        if timeout is None:
+            timeout = float(
+                get_setting_int(
+                    "engine",
+                    "in_flight_timeout_seconds",
+                    default=DEFAULT_IN_FLIGHT_TIMEOUT_SECONDS,
+                    write_log=False,
+                )
+            )
+
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                context = self.persistence_repository.load_context(
+                    session_id=session_id
+                )
+            except ChatContextNotFound:
+                return None
+            if not context.messages or context.messages[-1].final:
+                return context
+            if time.monotonic() >= deadline:
+                raise SessionInFlightTimeout(
+                    session_id=session_id,
+                    trailing_sequence_id=context.messages[-1].sequence_id,
+                )
+            await asyncio.sleep(poll_interval)
+
+    def stop_cycle(self, session_id: UUID) -> ChatContext:
+        """Settle the in-flight cycle: decline undecided approvals, mark all final."""
+        context = self.persistence_repository.load_context(session_id=session_id)
+
+        if not context.messages or context.messages[-1].final:
+            raise NoInFlightCycleToStop(session_id=session_id)
+
+        cycle_start_id = self._get_trailing_cycle_start_id(context)
+
+        for msg in reversed(context.messages):
+            if msg.final:
+                break
+            if isinstance(msg, SystemAction):
+                for approval in msg.approvals:
+                    if approval.granted is None:
+                        approval.granted = False
+
+        self._settle_cycle(context)
+        self.persistence_repository.save_context(
+            session_id=session_id, context=context
+        )
+        self._publish_messages_appended(
+            session_id=session_id,
+            latest_message_id=cycle_start_id
+            if cycle_start_id is not None
+            else context.messages[-1].sequence_id,
+        )
+        return context
+
+    @staticmethod
     def _remove_trailing_system_actions(context: ChatContext) -> None:
         """Remove SystemAction messages from the tail of the message list."""
         messages = list(context.messages)
@@ -372,6 +499,28 @@ class ApprovalService:
             approvals_by_id[approval_id].granted = False
 
         self.persistence_repository.save_context(session_id, context)
+
+    def grant_session_approval(
+        self,
+        session_id: UUID,
+        approval_id: UUID,
+        expires_at: datetime | None = None,
+    ) -> None:
+        """Set granted=True on a specific approval in the session context."""
+        context = self.persistence_repository.load_context(session_id)
+
+        for msg in context.messages:
+            if not isinstance(msg, SystemAction):
+                continue
+            for approval in msg.approvals:
+                if approval.id == approval_id:
+                    approval.granted = True
+                    if expires_at is not None:
+                        approval.expires_at = expires_at
+                    self.persistence_repository.save_context(session_id, context)
+                    return
+
+        raise ValueError(f"Unknown approval ID: {approval_id}")
 
     def active_global_grants(self) -> list[Grant]:
         return self.persistence_repository.load_active_global_grants()

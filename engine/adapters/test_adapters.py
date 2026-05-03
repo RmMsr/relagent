@@ -7,6 +7,7 @@ from sse_starlette import ServerSentEvent
 
 from engine.api.events import BaseEventConverter
 from engine.domain.exceptions import ChatContextNotFound, SessionNotFound
+from engine.domain.immutability import check_final_immutability
 from engine.domain.models import (
     AssistantMessage,
     ChatContext,
@@ -42,6 +43,9 @@ class MemoryPersistence(Persistence):
         return session
 
     def save_context(self, session_id: UUID, context: ChatContext) -> None:
+        prior = self._contexts.get(session_id)
+        prior_messages = list(prior.messages) if prior else []
+        check_final_immutability(prior_messages, context.messages)
         self._contexts[session_id] = context.model_copy(deep=True)
         self._timestamps[session_id] = datetime.now(timezone.utc)
 

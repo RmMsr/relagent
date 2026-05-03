@@ -35,7 +35,8 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
 
     ref.listen<AgenticChatState>(agenticChatProvider, (previous, next) {
       if (previous?.messages.length != next.messages.length ||
-          previous?.showAssistantPending != next.showAssistantPending) {
+          previous?.showAssistantPending != next.showAssistantPending ||
+          previous?.queuedMessage != next.queuedMessage) {
         _scrollToBottom();
       }
     });
@@ -208,23 +209,27 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                                 isGlobal: isGlobal,
                               );
                         },
-                        onSkipApproval: (approvalId) {
+                        onDeclineApproval: (approvalId) {
                           // ignore: discarded_futures
                           ref
                               .read(agenticChatProvider.notifier)
-                              .skipApproval(approvalId);
+                              .declineApproval(approvalId);
                         },
                         onContinue: () {
                           ref
                               .read(agenticChatProvider.notifier)
                               .triggerContinuation();
                         },
+                        onStop: _onStop,
+                        queuedMessage: chatState.queuedMessage,
+                        onEditQueued: _pullQueuedToInput,
                       ),
                     ],
                   ),
             ),
             AgenticChatInput(
               key: _chatInputKey,
+              enabled: chatState.inputEnabled,
               onSubmitted: (text) {
                 ref.read(agenticChatProvider.notifier).sendMessage(text);
               },
@@ -410,6 +415,21 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
     if (result != null && mounted) {
       _showSnackBar(result);
     }
+  }
+
+  void _pullQueuedToInput() {
+    final text = ref.read(agenticChatProvider.notifier).editQueued();
+    if (text == null) return;
+    final inputState = _chatInputKey.currentState as AgenticChatInputState?;
+    inputState?.setText(text);
+  }
+
+  // Stop with queued: pull queued text back into input first, then stop.
+  // Per §11.8 the queued message is preserved as input rather than discarded.
+  void _onStop() {
+    _pullQueuedToInput();
+    // ignore: discarded_futures
+    ref.read(agenticChatProvider.notifier).stopCycle();
   }
 
   void _scrollToBottom() {

@@ -206,22 +206,15 @@ class PydanticAgentAdapter(AgentExecution):
     ) -> list[ModelMessage]:
         """Construct Pydantic AI history from Relagent context messages.
 
-        Completed approval cycles (a resolved SystemAction followed by an
-        AssistantMessage) are skipped. This simplifies generating the pydantic_ai
-        data structure and reduces context size.
-
-        The Relagent history might include messages that can not yet be processed
-        because of a pending tool call. Then the history is cut off to allow tool
-        calls to finish.
-
-        The goal is to construct a similar history to what pydantic returned in an
-        earlier call without the need to persist it completely.
-
         Rules:
-        - UserMessage / AssistantMessage: included until cut off (see below).
-        - SystemAction with completed cycle (all resolved, followed by an
-          AssistantMessage): skipped. The AssistantMessage is still included.
-        - SystemAction with one or more unresolved approvals: mark cut off
+        - UserMessage / AssistantMessage: included until cut off.
+        - SystemAction settled (final=True) AND all decided AND followed by
+          AssistantMessage: skipped (the AssistantMessage carries the result).
+        - SystemAction settled (final=True) AND all decided WITHOUT a following
+          AssistantMessage: stopped cycle — skipped entirely (no tool call
+          emitted, since there is no result to pair with it).
+        - SystemAction with unresolved approvals: emit tool call parts and cut
+          off so the agent processes deferred tool calls.
         """
 
         results: list[ModelMessage] = []
@@ -252,16 +245,19 @@ class PydanticAgentAdapter(AgentExecution):
                         # Skip: No relevant data for the agent
                         continue
 
-                    all_resolved: bool = all(
+                    all_decided: bool = all(
                         a.granted is not None for a in msg.approvals
                     )
 
-                    if not all_resolved:
-                        reached_cut_off = True
-
-                    if isinstance(next_msg, AssistantMessage) and all_resolved:
-                        # Skip: Approvals have been processed already
+                    # Settled with all decisions: either followed by an
+                    # AssistantMessage (normal completion) or a stopped cycle
+                    # (no result to emit). In both cases we skip the tool call
+                    # request — pydantic_ai would reject an unpaired ToolCallPart.
+                    if msg.final and all_decided:
                         continue
+
+                    if not all_decided:
+                        reached_cut_off = True
 
                     tool_call_parts: list[ToolCallPart] = []
                     for approval in msg.approvals:

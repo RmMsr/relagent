@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines how `SystemAction` messages from the engine are rendered as approval cards in the agentic chat page, including card content, grant/skip actions, and resolved states.
-
 ## Requirements
-
 ### Requirement: System Action Rendering
 
 The chat history SHALL render `SystemAction` messages from the engine, displaying notifications as system notes and approvals as actionable cards.
@@ -30,7 +28,7 @@ The chat history SHALL render `SystemAction` messages from the engine, displayin
 
 ### Requirement: Approval Card Content
 
-Each approval card SHALL display the approval details and provide grant/skip actions.
+Each approval card SHALL display the approval details and provide per-card decision actions.
 
 #### Scenario: Approval card displays request details
 
@@ -40,7 +38,7 @@ Each approval card SHALL display the approval details and provide grant/skip act
 - **AND** if `allowedParameters` is non-empty the card SHALL show a parameter table with columns: Parameter, Value, Any value
 - **AND** the card SHALL show a scope selector (This session / Any session)
 - **AND** the card SHALL show an expiry selector with options: Never, 2d, 1d, 2h, 1h, 15min
-- **AND** the card SHALL show Skip and Approve action buttons at the bottom
+- **AND** the card SHALL show "Continue without" and "Approve" action buttons at the bottom
 
 #### Scenario: Parameter wildcard toggle
 
@@ -65,7 +63,7 @@ Each approval card SHALL display the approval details and provide grant/skip act
 
 ### Requirement: Approval Grant Action
 
-The user SHALL be able to grant an approval with scope and optional expiry.
+The user SHALL be able to grant an approval with scope and optional expiry. Granting SHALL be a single click that records the per-approval decision via the new per-approval endpoint.
 
 #### Scenario: Scope selection
 
@@ -83,52 +81,49 @@ The user SHALL be able to grant an approval with scope and optional expiry.
 
 - **GIVEN** the user has selected "This session" scope and an optional expiry
 - **WHEN** the user taps "Approve"
-- **THEN** the app SHALL call `POST /session/{id}/grants` with the grant parameters
+- **THEN** the app SHALL call `POST /sessions/{id}/approvals/{approval_id}/grant` with the grant parameters
 - **AND** the approval card SHALL transition to a resolved "granted" state
-- **AND** if all approvals in the group are now resolved the session SHALL continue automatically
+- **AND** if every approval in the trailing in-flight `SystemAction` is now decided (granted or declined), the app SHALL follow up with `POST /sessions/{id}/continue`
 
 #### Scenario: Confirm grant with global scope
 
 - **GIVEN** the user has selected "Any session" scope and an optional expiry
 - **WHEN** the user taps "Approve"
-- **THEN** the app SHALL call `POST /grants` with the grant parameters
+- **THEN** the app SHALL call `POST /grants` with the grant parameters (global grants endpoint unchanged)
+- **AND** the app SHALL also call `POST /sessions/{id}/approvals/{approval_id}/grant` to record the per-approval decision in the in-flight `SystemAction`
 - **AND** the approval card SHALL transition to a resolved "granted" state
-- **AND** if all approvals in the group are now resolved the session SHALL continue automatically
+- **AND** if every approval in the trailing in-flight `SystemAction` is now decided, the app SHALL follow up with `POST /sessions/{id}/continue`
 
 #### Scenario: Grant API call fails
 
 - **GIVEN** the user taps "Approve"
-- **WHEN** the API call fails
+- **WHEN** the per-approval grant API call fails
 - **THEN** an error message SHALL be shown
 - **AND** the card SHALL remain in its actionable state
-
-### Requirement: Approval Skip Action
-
-The user SHALL be able to skip an approval without making an API call.
-
-#### Scenario: Skip an approval
-
-- **WHEN** the user taps "Skip" on an approval card
-- **THEN** the app SHALL call `POST /sessions/{id}/reject_approvals` with the approval ID
-- **AND** the card SHALL transition to a resolved "skipped" state
-- **AND** if all approvals in the group are now resolved the session SHALL continue automatically
+- **AND** the app SHALL NOT call `/continue`
 
 ### Requirement: Automatic Session Continuation
 
-Once all approvals in a group are resolved (each either granted or skipped), the session SHALL continue automatically without requiring explicit user action.
+Once every approval in the trailing in-flight `SystemAction` is decided (each either granted or declined), the app SHALL automatically call `POST /sessions/{id}/continue` to drive the agent's next iteration. The engine SHALL NOT auto-continue on its own.
 
-#### Scenario: Auto-continue when last approval is resolved
+#### Scenario: Auto-continue when last approval is decided
 
-- **GIVEN** a group of N approvals where N−1 are already resolved
-- **WHEN** the user resolves the last remaining approval
-- **THEN** the app SHALL automatically call `POST /session/{id}/continue`
+- **GIVEN** the trailing in-flight `SystemAction` has N approvals where N−1 are already decided
+- **WHEN** the user decides the last remaining approval (via Approve or Continue without)
+- **THEN** the app SHALL automatically call `POST /sessions/{id}/continue`
 - **AND** the chat SHALL show the pending state
 - **AND** the response SHALL be appended to the chat history
 
 #### Scenario: No continue button shown
 
-- **GIVEN** a pending approval group
-- **THEN** no explicit "Continue" button SHALL be shown — continuation is triggered automatically
+- **GIVEN** an in-flight approval group with undecided approvals
+- **THEN** no explicit "Continue" button SHALL be shown — continuation is triggered automatically once the last decision lands
+
+#### Scenario: Engine does not auto-continue
+
+- **WHEN** all per-approval decisions are recorded via `/grant` and `/decline`
+- **THEN** the engine SHALL NOT invoke the agent on its own
+- **AND** the next agent iteration SHALL only run after the client calls `/continue`
 
 ### Requirement: Stale Approval Continuation
 
@@ -186,28 +181,63 @@ The user SHALL be able to adjust the session sensitivity while resolving approva
 
 ### Requirement: Historical Approval Rendering
 
-Approval cards loaded from history SHALL render in a non-interactive resolved state.
+Approval cards loaded from history SHALL render in a non-interactive resolved state when their containing `SystemAction` has `final=true`. Cards in an in-flight `SystemAction` (i.e., `final=false`) MAY be actionable.
 
-#### Scenario: Granted approval from history
+#### Scenario: Granted approval from settled history
 
-- **GIVEN** a `SystemAction` loaded from message history
+- **GIVEN** a `SystemAction` with `final=true` loaded from message history
 - **AND** an approval in it has `granted: true`
 - **WHEN** the card is rendered
 - **THEN** it SHALL display in a collapsed resolved "granted" state
 - **AND** it SHALL be expandable to reveal details
 
-#### Scenario: Ungranted approval from history (not latest message)
+#### Scenario: Declined approval from settled history
 
-- **GIVEN** a `SystemAction` loaded from message history
+- **GIVEN** a `SystemAction` with `final=true` loaded from message history
 - **AND** an approval has `granted: false`
-- **AND** the `SystemAction` is NOT the most recent message
 - **WHEN** the card is rendered
-- **THEN** it SHALL display in a collapsed resolved "skipped" state
+- **THEN** it SHALL display in a collapsed resolved "declined" state
 
-#### Scenario: Pending approval from history (latest message)
+#### Scenario: Pending approval from in-flight SystemAction
 
-- **GIVEN** a `SystemAction` loaded from message history
-- **AND** it is the most recent message
-- **AND** approvals have `granted: false`
+- **GIVEN** a `SystemAction` with `final=false` (the trailing message in the session)
+- **AND** an approval has `granted: null` (undecided)
 - **WHEN** the card is rendered
-- **THEN** it SHALL display as actionable (grant/skip available)
+- **THEN** it SHALL display as actionable (Continue without / Approve available)
+
+### Requirement: Approval Decline Action
+
+The user SHALL be able to decline an individual approval, recording the decision per-approval via the new decline endpoint. Declining SHALL be a single click that does not trigger the agent.
+
+#### Scenario: Continue without click
+
+- **WHEN** the user taps "Continue without" on an approval card
+- **THEN** the app SHALL call `POST /sessions/{id}/approvals/{approval_id}/decline`
+- **AND** the card SHALL transition to a resolved "declined" state
+- **AND** if every approval in the trailing in-flight `SystemAction` is now decided, the app SHALL follow up with `POST /sessions/{id}/continue`
+- **AND** the engine SHALL NOT invoke the agent until `/continue` is called
+
+#### Scenario: Decline API call fails
+
+- **GIVEN** the user taps "Continue without"
+- **WHEN** the decline API call fails
+- **THEN** an error message SHALL be shown
+- **AND** the card SHALL remain in its actionable state
+- **AND** the app SHALL NOT call `/continue`
+
+### Requirement: Cycle-Level Stop Bar
+
+The approval group for an in-flight `SystemAction` SHALL include a cycle-level Stop control, separate from the per-card decision buttons. The Stop control SHALL settle the cycle without invoking the agent (see `cycle-stop-action`).
+
+#### Scenario: Stop bar visible only for in-flight approval group
+
+- **GIVEN** the trailing message is a `SystemAction` with `final=false`
+- **WHEN** the approval group is rendered
+- **THEN** a Stop bar SHALL appear at the bottom of the group, distinct from the per-card buttons
+
+#### Scenario: Stop bar absent for settled approval groups
+
+- **GIVEN** a `SystemAction` with `final=true` (loaded from history)
+- **WHEN** the approval group is rendered
+- **THEN** no Stop bar SHALL be displayed
+

@@ -11,9 +11,18 @@ from engine.api.helpers import (
     dependency_event_store,
     require_api_key,
 )
-from engine.api.models import SetSensitivityRequest, StatusResponse
+from engine.api.models import (
+    GrantApprovalRequest,
+    SetSensitivityRequest,
+    StatusResponse,
+)
 from engine.constants import SERVICE_NAME, VERSION
-from engine.domain.exceptions import ChatContextNotFound, SessionNotFound
+from engine.domain.exceptions import (
+    ChatContextNotFound,
+    NoInFlightCycleToStop,
+    SessionInFlightTimeout,
+    SessionNotFound,
+)
 from engine.domain.models import (
     AssistantMessage,
     ChatRequest,
@@ -66,13 +75,26 @@ async def self_test(execution: AgentExecutionDepends) -> list[SelfTestResult]:
 async def messages(
     body: ChatRequest | str, service: ChatServiceDepends
 ) -> ChatResponse | str:
+    """Send a user message. Returns 409 (`session_in_flight`) if the target
+    session has an unsettled cycle. Clients SHOULD queue locally and retry
+    after the cycle settles (see also POST `/sessions/{id}/stop`)."""
     plain_body = not isinstance(body, ChatRequest)
 
     request: ChatRequest = (
         ChatRequest(messages=[UserMessage(content=body)]) if plain_body else body
     )
 
-    response: ChatResponse = await service.perform_user_input(request=request)
+    try:
+        response: ChatResponse = await service.perform_user_input(request=request)
+    except SessionInFlightTimeout as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "session_in_flight",
+                "session_id": str(exc.session_id),
+                "trailing_sequence_id": exc.trailing_sequence_id,
+            },
+        )
 
     if plain_body:
         if isinstance(response.message, AssistantMessage):
@@ -135,20 +157,15 @@ async def continue_session(
     session_id: UUID,
     service: ChatServiceDepends,
 ) -> ChatResponse:
-    """Continue a session — re-run the agent with current state."""
+    """Drive the agent's next iteration on the session's in-flight cycle.
+
+    Called by clients after every approval in the trailing in-flight
+    `SystemAction` is decided (granted or declined). The engine does NOT
+    auto-continue on its own. Returns 404 if the session does not exist."""
     try:
         return await service.continue_session(session_id=session_id)
     except SessionNotFound:
         raise HTTPException(status_code=404, detail="Session not found")
-
-
-@api_router.post("/sessions/{session_id}/grants")
-def create_session_grant(
-    session_id: UUID, approval_service: ApprovalServiceDepends, grant: Grant
-) -> dict[str, str]:
-    """Create a grant for a specific session."""
-    approval_service.register_session_grant(session_id=session_id, grant=grant)
-    return {"status": "created"}
 
 
 @api_router.get("/sessions/{session_id}/grants")
@@ -159,14 +176,88 @@ def get_session_grants(
     return approval_service.active_session_grants(session_id=session_id)
 
 
-@api_router.post("/sessions/{session_id}/reject_approvals")
-def reject_session_approvals(
-    session_id: UUID, approvals: list[UUID], approval_service: ApprovalServiceDepends
-):
-    approval_service.reject_session_approvals(
-        session_id=session_id, approvals=approvals
-    )
-    return {"status": "rejected"}
+@api_router.post("/sessions/{session_id}/approvals/{approval_id}/grant")
+def grant_session_approval(
+    session_id: UUID,
+    approval_id: UUID,
+    body: GrantApprovalRequest,
+    approval_service: ApprovalServiceDepends,
+) -> dict[str, str]:
+    """Record a per-approval grant decision on the in-flight `SystemAction`.
+
+    The engine mutates the trailing `SystemAction(final=false)` in place;
+    no new record is appended. Granting does NOT trigger the agent — the
+    client follows up with POST `/sessions/{id}/continue` once every
+    approval in the group is decided. Returns 404 if the session or
+    approval does not exist. Replaces the removed POST
+    `/sessions/{id}/grants` (which is now only the global GET/POST `/grants`)."""
+    if body.grant is not None:
+        approval_service.register_session_grant(
+            session_id=session_id, grant=body.grant
+        )
+    try:
+        approval_service.grant_session_approval(
+            session_id=session_id,
+            approval_id=approval_id,
+            expires_at=body.grant.expires_at if body.grant is not None else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ChatContextNotFound:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "granted"}
+
+
+@api_router.post("/sessions/{session_id}/approvals/{approval_id}/decline")
+def decline_session_approval(
+    session_id: UUID,
+    approval_id: UUID,
+    approval_service: ApprovalServiceDepends,
+) -> dict[str, str]:
+    """Record a per-approval decline decision on the in-flight `SystemAction`.
+
+    Same semantics as `/grant` — mutates in place, does not invoke the
+    agent. Returns 404 if the session or approval does not exist.
+    Replaces the removed POST `/sessions/{id}/reject_approvals`, which
+    decided every undecided approval in one call; clients now decide
+    each approval individually."""
+    try:
+        approval_service.reject_session_approvals(
+            session_id=session_id, approvals=[approval_id]
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ChatContextNotFound:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "declined"}
+
+
+@api_router.post("/sessions/{session_id}/stop")
+def stop_session(
+    session_id: UUID, service: ChatServiceDepends
+) -> MessagesResponse:
+    """Settle the in-flight cycle by declining undecided approvals.
+
+    Sets every undecided approval to `granted=false`, flips the trailing
+    `SystemAction(s)` and the cycle's `UserMessage` to `final=true`, and
+    appends no new record. The agent is NOT invoked. Returns the
+    settled message list so the client can update its view without a
+    follow-up read. Returns 409 (`no_in_flight_cycle`) if the trailing
+    message is already `final=true`, or 404 if the session does not
+    exist."""
+    try:
+        context = service.stop_cycle(session_id=session_id)
+    except NoInFlightCycleToStop as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "no_in_flight_cycle",
+                "session_id": str(exc.session_id),
+            },
+        )
+    except ChatContextNotFound:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return MessagesResponse(session_id=session_id, messages=context.messages)
 
 
 @api_router.delete("/sessions/{session_id}")

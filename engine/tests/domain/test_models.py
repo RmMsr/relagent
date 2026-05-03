@@ -59,6 +59,14 @@ class TestUserMessage:
         with pytest.raises(ValueError):
             UserMessage(content="Hello", role="assistant")  # type: ignore[arg-type]
 
+    def test_default_final_is_false(self):
+        msg = UserMessage(content="Hello")
+        assert msg.final is False
+
+    def test_explicit_final_preserved(self):
+        msg = UserMessage(content="Hello", final=True)
+        assert msg.final is True
+
 
 class TestAgentStats:
     def test_default_values_are_none(self):
@@ -90,6 +98,10 @@ class TestAssistantMessage:
         msg = AssistantMessage(content="Response", stats=stats)
         assert msg.stats is not None
         assert msg.stats.agent_name == "test"
+
+    def test_default_final_is_true(self):
+        msg = AssistantMessage(content="Response")
+        assert msg.final is True
 
 
 class TestChatContext:
@@ -166,6 +178,27 @@ class TestMessageSerialization:
 
         assert user_msg.role == "user"
         assert assistant_msg.role == "assistant"
+
+    def test_user_message_final_round_trip(self):
+        msg = UserMessage(content="Test", final=True)
+        restored = UserMessage.model_validate(msg.model_dump(mode="json"))
+        assert restored.final is True
+
+    def test_assistant_message_final_round_trip(self):
+        msg = AssistantMessage(content="Response")
+        restored = AssistantMessage.model_validate(msg.model_dump(mode="json"))
+        assert restored.final is True
+
+    def test_system_action_final_round_trip(self):
+        action = SystemAction(final=True)
+        restored = SystemAction.model_validate(action.model_dump(mode="json"))
+        assert restored.final is True
+
+    def test_user_message_serializes_final_field(self):
+        msg = UserMessage(content="Test")
+        data = msg.model_dump(mode="json")
+        assert "final" in data
+        assert data["final"] is False
 
 
 class TestApproval:
@@ -328,3 +361,11 @@ class TestSystemAction:
         action = SystemAction(approvals=[approval])
         assert len(action.approvals) == 1
         assert action.approvals[0].purpose == "test"
+
+    def test_default_final_is_false(self):
+        action = SystemAction()
+        assert action.final is False
+
+    def test_explicit_final_preserved(self):
+        action = SystemAction(final=True)
+        assert action.final is True

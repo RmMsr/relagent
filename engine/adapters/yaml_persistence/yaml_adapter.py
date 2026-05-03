@@ -14,6 +14,7 @@ from engine.domain.exceptions import (
     PersistenceError,
     SessionNotFound,
 )
+from engine.domain.immutability import check_final_immutability
 from engine.domain.models import (
     AssistantMessage,
     ChatContext,
@@ -42,10 +43,8 @@ class YamlPersistenceAdapter(Persistence):
         logger.info("Saving chat messages to: %s", file_path)
 
         documents: list[BaseModel] = []
-
-        # Create or update metadata
-
         metadata: Metadata | None = None
+        prior_messages: list[ChatMessage] = []
 
         if file_path.exists():
             metadata = self._get_document_metadata(file_path)
@@ -53,13 +52,17 @@ class YamlPersistenceAdapter(Persistence):
                 logger.error("Found session_id mismatch in file: %s", file_path)
                 raise PersistenceError("Chat context inconsistent")
             metadata.updated_at = datetime.now(tz=timezone.utc)
+            try:
+                prior_messages = list(self.load_context(session_id).messages)
+            except ChatContextNotFound:
+                prior_messages = []
         else:
             metadata = Metadata(session_id=session_id)
 
+        check_final_immutability(prior_messages, context.messages)
+
         metadata.sensitivity_level = context.sensitivity_level
         documents.append(metadata)
-
-        # Add all messages as separate documents
 
         for msg in context.messages:
             documents.append(msg)
@@ -92,6 +95,9 @@ class YamlPersistenceAdapter(Persistence):
         # Remaining documents are chat messages
         messages: list[ChatMessage] = []
         for num, doc in enumerate(docs[1:], start=1):
+            # Pre-cutover records: treat as settled.
+            if isinstance(doc, dict) and "final" not in doc:
+                doc["final"] = True
             try:
                 match doc.get("role"):
                     case "user":

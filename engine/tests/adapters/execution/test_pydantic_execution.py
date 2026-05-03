@@ -263,8 +263,8 @@ class TestGetHistoryFromMessages:
         granted_approval = _tool_approval()
         granted_approval.granted = True
         messages = [
-            UserMessage(content="Before"),
-            SystemAction(approvals=[granted_approval]),
+            UserMessage(content="Before", final=True),
+            SystemAction(approvals=[granted_approval], final=True),
             AssistantMessage(content="Done"),
         ]
         result = adapter._get_known_history_from_messages(messages)
@@ -280,8 +280,8 @@ class TestGetHistoryFromMessages:
         denied_approval = _tool_approval()
         denied_approval.granted = False
         messages = [
-            UserMessage(content="Before"),
-            SystemAction(approvals=[denied_approval]),
+            UserMessage(content="Before", final=True),
+            SystemAction(approvals=[denied_approval], final=True),
             AssistantMessage(content="OK, I won't do that"),
         ]
         result = adapter._get_known_history_from_messages(messages)
@@ -330,8 +330,8 @@ class TestGetHistoryFromMessages:
         granted = _tool_approval()
         granted.granted = True
         messages = [
-            UserMessage(content="Search"),
-            SystemAction(approvals=[granted]),
+            UserMessage(content="Search", final=True),
+            SystemAction(approvals=[granted], final=True),
             AssistantMessage(content="Here are results"),
             UserMessage(content="Thanks"),
         ]
@@ -371,11 +371,11 @@ class TestGetHistoryFromMessages:
         granted_2 = _tool_approval(tool_call_id="call_2")
         granted_2.granted = True
         messages = [
-            UserMessage(content="First"),
-            SystemAction(approvals=[granted_1]),
+            UserMessage(content="First", final=True),
+            SystemAction(approvals=[granted_1], final=True),
             AssistantMessage(content="Result 1"),
-            UserMessage(content="Second"),
-            SystemAction(approvals=[granted_2]),
+            UserMessage(content="Second", final=True),
+            SystemAction(approvals=[granted_2], final=True),
             AssistantMessage(content="Result 2"),
         ]
         result = adapter._get_known_history_from_messages(messages)
@@ -416,11 +416,11 @@ class TestGetHistoryFromMessages:
         granted.granted = True
         pending = _tool_approval(tool_call_id="call_2")
         messages = [
-            UserMessage(content="First"),
-            SystemAction(approvals=[granted]),
+            UserMessage(content="First", final=True),
+            SystemAction(approvals=[granted], final=True),
             AssistantMessage(content="Result"),
-            UserMessage(content="Second"),
-            SystemAction(approvals=[pending]),
+            UserMessage(content="Second", final=False),
+            SystemAction(approvals=[pending], final=False),
             UserMessage(content="Ignored"),
         ]
         result = adapter._get_known_history_from_messages(messages)
