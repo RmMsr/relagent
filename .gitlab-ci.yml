@@ -37,11 +37,13 @@ build-engine:
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
   script:
-    - buildah build --platform=linux/amd64 -t $CI_REGISTRY_IMAGE:$PACKAGE_VERSION .
+    - buildah build --layers --platform=linux/amd64 --cache-from $CI_REGISTRY_IMAGE:latest -t $CI_REGISTRY_IMAGE:$PACKAGE_VERSION .
     - buildah push $CI_REGISTRY_IMAGE:$PACKAGE_VERSION
+    - buildah tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION $CI_REGISTRY_IMAGE:any
     - buildah push $CI_REGISTRY_IMAGE:any
     - |
       if echo "$PACKAGE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        buildah tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION $CI_REGISTRY_IMAGE:latest
         buildah push $CI_REGISTRY_IMAGE:latest
       fi
 
