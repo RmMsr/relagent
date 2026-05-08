@@ -12,10 +12,10 @@ class _StubSettingsNotifier extends SettingsNotifier {
   Settings build() => Settings.defaults();
 
   @override
-  Future<String?> getEnginePassword() async => null;
+  Future<String?> getEnginePassword({String? url}) async => null;
 
   @override
-  Future<String?> getEngineApiKey() async => null;
+  Future<String?> getEngineApiKey({String? url}) async => null;
 }
 
 /// Tracks calls to loadHistory and optionally pauses them via a Completer.

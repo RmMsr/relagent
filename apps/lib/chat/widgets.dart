@@ -417,7 +417,7 @@ class ChatMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final time = DateFormat.Hms().format(message.timestamp);
+    final time = DateFormat.Hms().format(message.timestamp.toLocal());
     final isError = message.role == ChatRole.error;
     final isUser = message.role == ChatRole.user;
     final playbackStatus =

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/agentic/models.dart';
 import '/agentic/services.dart';
+import '/providers/sessions_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/tts_provider.dart';
 import '../utils/logger.dart';
@@ -211,10 +212,33 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       );
 
       final response = chatResponse.message;
+      final bool isNewSession =
+          response.sessionId != null && response.sessionId != sessionId;
 
-      if (response.sessionId != null && response.sessionId != sessionId) {
+      if (isNewSession) {
         await settingsNotifier.setAgenticSessionId(response.sessionId!);
         Logger.debug('AgenticChat: Stored new session ID: ${response.sessionId}');
+
+        // Apply locally-chosen sensitivity to the newly created session
+        if (state.sensitivityLevel != chatResponse.sensitivityLevel) {
+          try {
+            await setSensitivityLevel(
+              baseUrl: settings.engineBaseUrl,
+              sessionId: response.sessionId!,
+              sensitivityValue: state.sensitivityLevel.value,
+              authType: settings.engineAuthType,
+              username: settings.engineUsername,
+              password: password,
+              apiKey: apiKey,
+            );
+            Logger.debug(
+              'AgenticChat: Applied sensitivity ${state.sensitivityLevel.label} '
+              'to new session',
+            );
+          } catch (e) {
+            Logger.debug('AgenticChat: Failed to apply sensitivity: $e');
+          }
+        }
       }
 
       if (response.isFinal) {
@@ -229,7 +253,8 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       state = state.copyWith(
         isLoading: false,
         showAssistantPending: false,
-        sensitivityLevel: chatResponse.sensitivityLevel,
+        sensitivityLevel:
+            isNewSession ? state.sensitivityLevel : chatResponse.sensitivityLevel,
       );
 
       final preview = response.text.length > 50
@@ -324,6 +349,39 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     Logger.debug('AgenticChat: Chat cleared and session reset');
   }
 
+  /// Deletes the current session on the server, removes it from the sessions
+  /// list, then starts a fresh empty session.
+  Future<void> purgeSession() async {
+    final settings = ref.read(settingsProvider);
+    final sessionId = settings.agenticSessionId;
+
+    if (sessionId != null) {
+      try {
+        final settingsNotifier = ref.read(settingsProvider.notifier);
+        final password = await settingsNotifier.getEnginePassword();
+        final apiKey = await settingsNotifier.getEngineApiKey();
+
+        await deleteSessionApi(
+          baseUrl: settings.engineBaseUrl,
+          sessionId: sessionId,
+          authType: settings.engineAuthType,
+          username: settings.engineUsername,
+          password: password,
+          apiKey: apiKey,
+        );
+
+        ref.read(sessionsProvider.notifier).removeSession(sessionId);
+
+        Logger.debug('AgenticChat: Purged session $sessionId');
+      } catch (e) {
+        // Continue with clearing chat even if deletion fails
+        Logger.debug('AgenticChat: Failed to purge session: $e');
+      }
+    }
+
+    await clearChat();
+  }
+
   void clearMessages() {
     state = AgenticChatState.initial();
     ref.read(ttsProvider.notifier).onChatCleared();
@@ -367,15 +425,15 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
   /// Marks any pending approval messages as stale.
   Future<void> changeSensitivity(SensitivityLevel newLevel) async {
     final settings = ref.read(settingsProvider);
-    final settingsNotifier = ref.read(settingsProvider.notifier);
     final sessionId = settings.agenticSessionId;
-
-    if (sessionId == null) return;
-
     final previousLevel = state.sensitivityLevel;
 
     // Optimistic update
     state = state.copyWith(sensitivityLevel: newLevel);
+
+    if (sessionId == null) return;
+
+    final settingsNotifier = ref.read(settingsProvider.notifier);
 
     // Mark pending approval messages as stale
     final updatedMessages = state.messages.map((msg) {

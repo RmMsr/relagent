@@ -23,7 +23,7 @@ class _SessionsPageState extends ConsumerState<SessionsPage> {
   }
 
   String _formatRelativeTime(DateTime dateTime) {
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();
     final difference = now.difference(dateTime);
 
     if (difference.inSeconds < 60) {

@@ -131,10 +131,15 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
             const VoiceModeSelector(),
             const SizedBox(width: 8),
           ],
+          const SensitivityIndicator(inAppBar: true),
           if (ref.watch(settingsProvider).agenticSessionId != null)
-            const SensitivityIndicator(inAppBar: true),
+            IconButton(
+              icon: const Icon(Icons.local_fire_department_outlined),
+              tooltip: 'Purge session',
+              onPressed: () => _showPurgeConfirmation(),
+            ),
           IconButton(
-            icon: const Icon(Icons.restore_page),
+            icon: const Icon(Icons.restore_page_outlined),
             tooltip: 'New Session',
             onPressed: () {
               ref.read(agenticChatProvider.notifier).clearChat();
@@ -444,6 +449,38 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
           );
         }
       });
+    }
+  }
+
+  Future<void> _showPurgeConfirmation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Purge Session'),
+        content: const Text(
+          'Delete this session permanently and start a new one? '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Purge'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await ref.read(agenticChatProvider.notifier).purgeSession();
+      if (!mounted) return;
+      _showSnackBar('Session purged');
     }
   }
 

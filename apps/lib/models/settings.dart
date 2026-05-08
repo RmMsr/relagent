@@ -95,6 +95,58 @@ class SettingsHistoryEntry {
   String toString() => '$url ($model)';
 }
 
+class EngineUrlEntry {
+  final String url;
+  final AuthType authType;
+  final String? username;
+  final bool hasApiKey;
+
+  const EngineUrlEntry({
+    required this.url,
+    this.authType = AuthType.none,
+    this.username,
+    this.hasApiKey = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'url': url,
+    'authType': authType.name,
+    if (username != null) 'username': username,
+    if (hasApiKey) 'hasApiKey': true,
+  };
+
+  factory EngineUrlEntry.fromJson(Map<String, dynamic> json) {
+    AuthType authType;
+    if (json.containsKey('authType')) {
+      authType = AuthType.values.firstWhere(
+        (e) => e.name == json['authType'],
+        orElse: () => AuthType.none,
+      );
+    } else {
+      authType = AuthType.none;
+    }
+    return EngineUrlEntry(
+      url: json['url'] as String,
+      authType: authType,
+      username: json['username'] as String?,
+      hasApiKey: (json['hasApiKey'] as bool?) ?? false,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is EngineUrlEntry &&
+        other.url == url &&
+        other.authType == authType &&
+        other.username == username &&
+        other.hasApiKey == hasApiKey;
+  }
+
+  @override
+  int get hashCode => Object.hash(url, authType, username, hasApiKey);
+}
+
 class Settings {
   // URL to an legacy OpenAI compatible API endpoint
   final String simpleChatBaseUrl;
@@ -128,8 +180,8 @@ class Settings {
   final String? engineUsername;
   final String? agenticSessionId;
 
-  // History of previously used engine URLs for autocomplete
-  final List<String> engineUrlHistory;
+  // History of previously used engine URLs with auth config for autocomplete
+  final List<EngineUrlEntry> engineUrlHistory;
 
   // Selected chat backend type
   final ChatBackendType selectedBackend;
@@ -205,7 +257,7 @@ class Settings {
     AuthType? engineAuthType,
     String? engineUsername,
     Object? agenticSessionId = _unset,
-    List<String>? engineUrlHistory,
+    List<EngineUrlEntry>? engineUrlHistory,
     ChatBackendType? selectedBackend,
     bool? engineHasApiKey,
     bool? simpleChatHasApiKey,
@@ -269,7 +321,7 @@ class Settings {
       'engineAuthType': engineAuthType.name,
       'engineUsername': engineUsername,
       'agenticSessionId': agenticSessionId,
-      'engineUrlHistory': engineUrlHistory,
+      'engineUrlHistory': engineUrlHistory.map((e) => e.toJson()).toList(),
       'selectedBackend': selectedBackend.name,
       'engineHasApiKey': engineHasApiKey,
       'simpleChatHasApiKey': simpleChatHasApiKey,
@@ -380,9 +432,18 @@ class Settings {
       engineAuthType: engineAuthType,
       engineUsername: json['engineUsername'] as String?,
       agenticSessionId: json['agenticSessionId'] as String?,
-      engineUrlHistory:
-          (json['engineUrlHistory'] as List<dynamic>?)?.cast<String>() ??
-          const [],
+      engineUrlHistory: () {
+        final raw = json['engineUrlHistory'] as List<dynamic>?;
+        if (raw == null || raw.isEmpty) return const <EngineUrlEntry>[];
+        if (raw.first is String) {
+          return raw.cast<String>()
+              .map((url) => EngineUrlEntry(url: url))
+              .toList();
+        }
+        return raw.cast<Map<String, dynamic>>()
+            .map((e) => EngineUrlEntry.fromJson(e))
+            .toList();
+      }(),
       selectedBackend: selectedBackend,
       engineHasApiKey: (json['engineHasApiKey'] as bool?) ?? false,
       simpleChatHasApiKey: (json['simpleChatHasApiKey'] as bool?) ?? false,

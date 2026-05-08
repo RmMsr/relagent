@@ -350,7 +350,7 @@ class AgenticChatHistory extends StatelessWidget {
             // Approval group with actionable cards
             // Historical approvals (not the latest) render as resolved
             final formattedTime =
-                DateFormat('HH:mm:ss').format(message.timestamp);
+                DateFormat('HH:mm:ss').format(message.timestamp.toLocal());
             chatWidgets.add(
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,7 +466,7 @@ class _AgenticMessageBubble extends StatelessWidget {
     final isError = message.role == AgenticRole.error;
 
     final timeFormat = DateFormat('HH:mm:ss');
-    final formattedTime = timeFormat.format(message.timestamp);
+    final formattedTime = timeFormat.format(message.timestamp.toLocal());
 
     return Container(
       margin: EdgeInsets.only(

@@ -170,10 +170,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         username: _engineUsernameController.text.trim(),
         password: _enginePasswordController.text.trim().isNotEmpty
             ? _enginePasswordController.text.trim()
-            : await notifier.getEnginePassword(),
+            : await notifier.getEnginePassword(url: baseUrl),
         apiKey: _engineApiKeyController.text.trim().isNotEmpty
             ? _engineApiKeyController.text.trim()
-            : await notifier.getEngineApiKey(),
+            : await notifier.getEngineApiKey(url: baseUrl),
       );
 
       setState(() {
@@ -801,7 +801,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       FocusNode fieldFocusNode,
                       VoidCallback onFieldSubmitted,
                     ) {
-                      fieldTextEditingController.text = _baseUrlController.text;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (fieldTextEditingController.text !=
+                            _baseUrlController.text) {
+                          fieldTextEditingController.text =
+                              _baseUrlController.text;
+                        }
+                      });
                       fieldTextEditingController.addListener(() {
                         _baseUrlController.text =
                             fieldTextEditingController.text;
@@ -849,9 +855,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       FocusNode fieldFocusNode,
                       VoidCallback onFieldSubmitted,
                     ) {
-                      fieldTextEditingController.text = _modelController.text;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (fieldTextEditingController.text !=
+                            _modelController.text) {
+                          fieldTextEditingController.text =
+                              _modelController.text;
+                        }
+                      });
                       fieldTextEditingController.addListener(() {
-                        _modelController.text = fieldTextEditingController.text;
+                        _modelController.text =
+                            fieldTextEditingController.text;
                       });
                       return TextFormField(
                         controller: fieldTextEditingController,
@@ -928,7 +941,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 16),
-              _AutocompleteWithFocusLoss<String>(
+              _AutocompleteWithFocusLoss<EngineUrlEntry>(
                 key: ValueKey('engine-url-${settings.selectedBackend}'),
                 optionsBuilder: (TextEditingValue textEditingValue) {
                   return settings.engineUrlHistory;
@@ -948,8 +961,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             final option = options.elementAt(index);
                             return ListTile(
                               title: Text(
-                                option.isEmpty ? '(same origin)' : option,
-                                style: option.isEmpty
+                                option.url.isEmpty ? '(same origin)' : option.url,
+                                style: option.url.isEmpty
                                     ? const TextStyle(
                                         fontStyle: FontStyle.italic,
                                       )
@@ -963,8 +976,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ),
                   );
                 },
-                onSelected: (String selection) {
-                  _engineUrlController.text = selection;
+                onSelected: (EngineUrlEntry selection) {
+                  _engineUrlController.text = selection.url;
+                  _engineBasicAuthEnabled =
+                      selection.authType == AuthType.basic;
+                  _engineUsernameController.text = selection.username ?? '';
+                  _enginePasswordController.clear();
+                  _engineApiKeyController.clear();
+                  _hasEnginePassword = false;
                 },
                 fieldViewBuilder:
                     (
@@ -973,8 +992,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       FocusNode fieldFocusNode,
                       VoidCallback onFieldSubmitted,
                     ) {
-                      fieldTextEditingController.text =
-                          _engineUrlController.text;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (fieldTextEditingController.text !=
+                            _engineUrlController.text) {
+                          fieldTextEditingController.text =
+                              _engineUrlController.text;
+                        }
+                      });
                       fieldTextEditingController.addListener(() {
                         _engineUrlController.text =
                             fieldTextEditingController.text;

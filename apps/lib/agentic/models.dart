@@ -143,7 +143,7 @@ class ApprovalData {
           : SensitivityLevel.fromName(json['sensitivity'] as String? ?? ''),
       granted: json['granted'] as bool? ?? false,
       expiresAt: json['expires_at'] != null
-          ? DateTime.tryParse(json['expires_at'] as String)
+          ? DateTime.tryParse(json['expires_at'] as String)?.toUtc()
           : null,
       note: json['note'] as String?,
       resolution: switch (json['granted'] as bool?) {
@@ -227,8 +227,8 @@ class SessionInfo {
     return SessionInfo(
       sessionId: json['session_id'] as String,
       title: json['title'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: DateTime.parse(json['created_at'] as String).toUtc(),
+      updatedAt: DateTime.parse(json['updated_at'] as String).toUtc(),
     );
   }
 }
@@ -303,7 +303,7 @@ class AgenticMessage {
     this.sensitivityLevel,
     this.isStale = false,
     this.isFinal = false,
-  }) : timestamp = timestamp ?? DateTime.now();
+  }) : timestamp = timestamp ?? DateTime.now().toUtc();
 
   AgenticMessage copyWith({
     bool? isStale,
@@ -373,7 +373,7 @@ class AgenticMessage {
 
     DateTime? timestamp;
     if (json['timestamp'] != null) {
-      timestamp = DateTime.tryParse(json['timestamp'] as String);
+      timestamp = DateTime.tryParse(json['timestamp'] as String)?.toUtc();
     }
 
     AgentStats? stats;

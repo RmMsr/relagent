@@ -31,7 +31,7 @@ class ChatMessage {
     this.stats,
     DateTime? timestamp,
   }) : id = id ?? generateMessageId(),
-       timestamp = timestamp ?? DateTime.now();
+       timestamp = timestamp ?? DateTime.now().toUtc();
 
   // Factory for creating error messages
   factory ChatMessage.error(String errorText, {String? technicalDetails}) {

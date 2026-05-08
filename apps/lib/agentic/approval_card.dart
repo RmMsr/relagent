@@ -54,7 +54,7 @@ class _ApprovalCardState extends State<ApprovalCard> {
     if (expiresAt == null) return 'Never';
     final local = expiresAt.toLocal();
     final now = DateTime.now();
-    final diff = expiresAt.difference(now);
+    final diff = local.difference(now);
     if (diff.isNegative) return 'Expired';
     // Same day: show time only
     if (local.year == now.year &&

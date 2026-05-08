@@ -202,20 +202,20 @@ class SettingsNotifier extends Notifier<Settings> {
 
   Future<bool> updateEngineBaseUrl(String url) async {
     if (url != state.engineBaseUrl) {
-      // Clear stored credentials for the old URL
-      await _credentialsManager.clearEngineCredentials(state.engineBaseUrl);
-
-      // Reset engine-related state
-      state = state.copyWith(
-        engineAuthType: AuthType.none,
-        engineUsername: null,
-        agenticSessionId: null,
-        engineHasApiKey: false,
-      );
-
       // Clear persisted SSE last event ID
       final prefs = ref.read(sharedPreferencesProvider);
       await prefs.remove('sse_last_event_id');
+
+      // Restore engine auth from history for the new URL, or reset if unknown
+      final match = state.engineUrlHistory.where((e) => e.url == url);
+      final entry = match.isNotEmpty ? match.first : null;
+
+      state = state.copyWith(
+        engineAuthType: entry?.authType ?? AuthType.none,
+        engineUsername: entry?.username,
+        agenticSessionId: null,
+        engineHasApiKey: entry?.hasApiKey ?? false,
+      );
 
       // Clear runtime state in dependent providers
       ref.read(engineHealthCheckProvider.notifier).clearResult();
@@ -228,9 +228,17 @@ class SettingsNotifier extends Notifier<Settings> {
   }
 
   void _updateEngineUrlHistory(String url) {
-    final history = List<String>.from(state.engineUrlHistory);
-    history.remove(url);
-    history.insert(0, url);
+    final history = List<EngineUrlEntry>.from(state.engineUrlHistory);
+    history.removeWhere((e) => e.url == url);
+    history.insert(
+      0,
+      EngineUrlEntry(
+        url: url,
+        authType: state.engineAuthType,
+        username: state.engineUsername,
+        hasApiKey: state.engineHasApiKey,
+      ),
+    );
     if (history.length > 5) {
       history.removeRange(5, history.length);
     }
@@ -254,8 +262,8 @@ class SettingsNotifier extends Notifier<Settings> {
     );
   }
 
-  Future<String?> getEnginePassword() async {
-    return await _credentialsManager.getEnginePassword(state.engineBaseUrl);
+  Future<String?> getEnginePassword({String? url}) async {
+    return await _credentialsManager.getEnginePassword(url ?? state.engineBaseUrl);
   }
 
   Future<void> clearEngineCredentials() async {
@@ -270,9 +278,10 @@ class SettingsNotifier extends Notifier<Settings> {
     await _persistenceManager.saveSettings(state);
   }
 
-  Future<String?> getEngineApiKey() async {
-    final key = await _credentialsManager.getEngineApiKey(state.engineBaseUrl);
-    if (key == null && state.engineHasApiKey) {
+  Future<String?> getEngineApiKey({String? url}) async {
+    final targetUrl = url ?? state.engineBaseUrl;
+    final key = await _credentialsManager.getEngineApiKey(targetUrl);
+    if (key == null && targetUrl == state.engineBaseUrl && state.engineHasApiKey) {
       state = state.copyWith(engineHasApiKey: false);
       await _persistenceManager.saveSettings(state);
     }

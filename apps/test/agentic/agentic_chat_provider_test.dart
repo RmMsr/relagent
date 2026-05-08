@@ -18,10 +18,10 @@ class _StubSettingsNotifier extends SettingsNotifier {
       );
 
   @override
-  Future<String?> getEnginePassword() async => null;
+  Future<String?> getEnginePassword({String? url}) async => null;
 
   @override
-  Future<String?> getEngineApiKey() async => null;
+  Future<String?> getEngineApiKey({String? url}) async => null;
 }
 
 AgenticMessage _systemMessageWithApprovals(List<ApprovalData> approvals) {

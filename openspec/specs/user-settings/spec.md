@@ -53,13 +53,28 @@ The system SHALL persist a boolean indicator for each backend's API key status i
 
 ### Requirement: API Key Credential Binding to URL
 
-The system SHALL treat API key credentials as attributes of their respective URL. Changing a URL SHALL invalidate and remove the credentials associated with the old URL.
+The system SHALL store API key credentials and basic auth credentials per URL in secure storage. When switching back to a previously-used URL, the stored auth configuration (auth type, username, API key indicator) SHALL be restored from the engine URL history.
 
-#### Scenario: Engine URL change resets API key indicator
+#### Scenario: Engine URL change preserves auth config from history
+- **GIVEN** the user has configured basic auth for URL A
+- **AND** the user switches to URL B (which resets auth to none)
+- **WHEN** the user switches back to URL A
+- **THEN** the stored auth config for URL A SHALL be restored
+- **AND** `engineAuthType` SHALL be `basic`
+- **AND** `engineUsername` SHALL be restored
+- **AND** `engineHasApiKey` SHALL reflect the stored indicator
+
+#### Scenario: Engine URL change resets API key indicator for unknown URLs
 - **GIVEN** `engineHasApiKey` is `true` for the current engine URL
-- **WHEN** the user changes the engine URL to a different value and saves
+- **WHEN** the user changes to a URL that has never been used before
 - **THEN** `engineHasApiKey` SHALL be set to `false`
-- **AND** the old API key SHALL be cleared from secure storage
+- **AND** `engineAuthType` SHALL be set to `none`
+
+#### Scenario: Unknown URL resets auth to none
+- **GIVEN** the user has no URL history
+- **WHEN** the user enters a new engine URL and saves
+- **THEN** `engineAuthType` SHALL be `none`
+- **AND** `engineUsername` SHALL be null
 
 #### Scenario: Simple chat URL change resets API key indicator
 - **GIVEN** `simpleChatHasApiKey` is `true` for the current simple chat URL
@@ -72,6 +87,27 @@ The system SHALL treat API key credentials as attributes of their respective URL
 - **WHEN** the JSON representation is written to SharedPreferences
 - **THEN** `engineHasApiKey` and `simpleChatHasApiKey` boolean values SHALL be included
 - **AND** no actual API key string value SHALL appear in the serialized output
+
+### Requirement: Engine URL History with Auth Configuration
+
+The system SHALL persist a history of previously used engine URLs along with their associated auth configuration (auth type, username, API key indicator). The actual password and API key values remain in secure storage.
+
+#### Scenario: History entry stores auth metadata
+- **GIVEN** the user has configured engine URL A with basic auth and username "admin"
+- **WHEN** the URL is saved
+- **THEN** the history entry for URL A SHALL store `url`, `authType`, `username`, and `hasApiKey`
+
+#### Scenario: History limited to 5 entries
+- **GIVEN** the engine URL history contains 5 entries
+- **WHEN** a new URL is saved
+- **THEN** the oldest entry SHALL be removed
+- **AND** the new entry SHALL be inserted at position 0
+
+#### Scenario: Duplicate URL updates history position
+- **GIVEN** the engine URL history contains URL A at position 2
+- **WHEN** URL A is saved again
+- **THEN** URL A SHALL be moved to position 0
+- **AND** its auth config SHALL be updated to the current values
 
 ### Requirement: Model Management Settings Section
 The settings page SHALL include a "Voice Models" section for managing ASR and TTS models.
