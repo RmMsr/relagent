@@ -33,6 +33,13 @@ The app SHALL provide a typed event system that receives and processes events fr
 
 The app SHALL process update events by fetching relevant data from the engine when the update is applicable to the current app state.
 
+#### Scenario: Session created
+
+- **GIVEN** a `session.created` event is received
+- **WHEN** the named session is currently active in the chat
+- **THEN** session info SHALL be fetched from the engine and applied to the chat page
+- **AND** the active session ID SHALL be re-read from settings at comparison time rather than using a value captured earlier in the event handler
+
 #### Scenario: Session updated
 
 - **GIVEN** a `session.updated` event is received

@@ -110,6 +110,14 @@ The system SHALL fetch existing messages from the engine when the app loads, wit
 - **THEN** the response SHALL include only messages with ID >= from_id
 - **AND** the response format SHALL match the standard messages response
 
+#### Scenario: Incremental history deduplication
+
+- **GIVEN** the app has messages loaded locally (including optimistic messages from POST responses)
+- **WHEN** an incremental history fetch returns messages
+- **THEN** messages whose sequence ID already exists in the local message list SHALL be skipped
+- **AND** only messages with new sequence IDs SHALL be appended
+- **AND** locally-created messages without a sequence ID SHALL NOT be affected
+
 ### Requirement: Send Messages
 
 The system SHALL send user messages to the engine API and display responses, subject to the strict-ordering constraint that at most one cycle is in flight per session at a time. When a cycle is already in flight, submitted messages SHALL be queued client-side rather than sent (see `client-message-queue`).

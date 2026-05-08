@@ -69,7 +69,7 @@
 
 ## 10. Verification
 
-- [ ] 10.1 Manual: send a user message on device A, observe it on device B without duplicates and in correct order once the cycle settles
-- [ ] 10.2 Manual: kill network mid-POST, restore, retry — verify no duplicate user message is created on the engine side
-- [ ] 10.3 Manual: open a pre-cutover session, confirm messages render and self-healing UPDATEs run exactly once per row
-- [ ] 10.4 Manual: trigger many rapid `messages.appended` events — verify fetch coalescing produces at most two fetches (current + one queued)
+- [x] 10.1 Manual: send a user message on device A, observe it on device B without duplicates and in correct order once the cycle settles
+- [x] 10.2 Manual: kill network mid-POST, restore, retry — verify no duplicate user message is created on the engine side
+- [x] 10.3 Manual: open a pre-cutover session, confirm messages render and self-healing UPDATEs run exactly once per row
+- [x] 10.4 Manual: trigger many rapid `messages.appended` events — verify fetch coalescing produces at most two fetches (current + one queued)
