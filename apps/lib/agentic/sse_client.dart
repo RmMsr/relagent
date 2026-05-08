@@ -29,7 +29,6 @@ sealed class SseEvent {
       'session.messages.appended' => MessagesAppendedEvent(
         id: parsedId,
         sessionId: json['session_id'] as String,
-        latestSequenceId: json['latest_sequence_id'] as int,
       ),
       _ => UnknownEvent(id: parsedId, eventType: eventType),
     };
@@ -59,15 +58,9 @@ class SessionUpdatedEvent extends SseEvent {
 
 class MessagesAppendedEvent extends SseEvent {
   final String sessionId;
-  final int latestSequenceId;
-  const MessagesAppendedEvent({
-    required super.id,
-    required this.sessionId,
-    required this.latestSequenceId,
-  });
+  const MessagesAppendedEvent({required super.id, required this.sessionId});
   @override
-  String toString() =>
-      'MessagesAppendedEvent(id=$id, session=$sessionId, sequenceId=$latestSequenceId)';
+  String toString() => 'MessagesAppendedEvent(id=$id, session=$sessionId)';
 }
 
 class UnknownEvent extends SseEvent {

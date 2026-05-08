@@ -85,7 +85,9 @@ class SettingsNotifier extends Notifier<Settings> {
     if (urlChanged) {
       await _credentialsManager.clearCredentials(state.simpleChatBaseUrl);
       await _credentialsManager.clearChatApiKey(state.simpleChatBaseUrl);
-      ref.read(chatProvider.notifier).clearChat();
+      Future.microtask(
+        () => ref.read(chatProvider.notifier).clearChat(),
+      );
     }
 
     state = state.copyWith(
@@ -218,7 +220,6 @@ class SettingsNotifier extends Notifier<Settings> {
       // Clear runtime state in dependent providers
       ref.read(engineHealthCheckProvider.notifier).clearResult();
       ref.read(sessionsProvider.notifier).clearSessions();
-      ref.read(agenticChatProvider.notifier).clearMessages();
     }
 
     state = state.copyWith(engineBaseUrl: url);

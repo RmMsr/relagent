@@ -39,9 +39,11 @@ The `SseNotifier.connect()` method already handles re-initialization cleanly (ca
 
 Additionally, `SseClient` needs a `resetReconnectAttempts()` method (or `connect()` needs to reset the counter) so that a fresh `connect()` after resume doesn't immediately hit the max attempts limit.
 
-### 4. Deduplicate messages by sequence ID in `loadHistory()`
+### 4. Deduplicate messages by sequence ID in `loadHistory()` — SUPERSEDED
 
-When `loadHistory(fromId:)` appends messages incrementally, filter out any messages whose `id` (sequence ID) already exists in `state.messages`. This uses the existing `AgenticMessage.id` field which maps to the engine's `sequence_id`. Messages without an ID (locally-created user messages before POST response) are never duplicated by this path since they don't come from the engine fetch.
+**Superseded by `uuid-message-identity`** — that change removes `sequence_id` from domain models and routes all ingestion through `_ingestMessages` with built-in dedup. This task's sequence-id-based approach will not work after uuid-message-identity lands.
+
+~~When `loadHistory(fromId:)` appends messages incrementally, filter out any messages whose `id` (sequence ID) already exists in `state.messages`. This uses the existing `AgenticMessage.id` field which maps to the engine's `sequence_id`. Messages without an ID (locally-created user messages before POST response) are never duplicated by this path since they don't come from the engine fetch.~~
 
 **Alternative considered**: Replacing all messages on every fetch instead of appending. Rejected because it would lose locally-added messages that haven't been confirmed by the engine yet (e.g., the optimistic user message added in `sendMessage()`).
 

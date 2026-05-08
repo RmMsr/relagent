@@ -100,10 +100,21 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         }
       },
     );
+    // Clear chat whenever the engine URL changes so stale messages from the
+    // previous server are not shown. This avoids the circular dependency that
+    // arises when SettingsNotifier tries to reach into agenticChatProvider.
+    ref.listen(
+      settingsProvider.select((s) => s.engineBaseUrl),
+      (previous, next) {
+        if (previous != null && previous != next) {
+          clearMessages();
+        }
+      },
+    );
     return AgenticChatState.initial();
   }
 
-  Future<void> loadHistory({int? fromId}) async {
+  Future<void> loadHistory({String? afterMessageId}) async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final sessionId = settings.agenticSessionId;
@@ -123,27 +134,31 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       final messages = await getMessageHistory(
         baseUrl: settings.engineBaseUrl,
         sessionId: sessionId,
-        fromId: fromId,
+        afterMessageId: afterMessageId,
         authType: settings.engineAuthType,
         username: settings.engineUsername,
         password: password,
         apiKey: apiKey,
       );
 
-      if (fromId != null && fromId > 0) {
-        final merged = _mergeRefresh(state.messages, messages);
-        state = state.copyWith(
-          messages: merged,
-          isLoadingHistory: false,
-        );
+      if (afterMessageId != null) {
+        _ingestMessages(messages);
+        state = state.copyWith(isLoadingHistory: false);
+        // If the fetch settled the in-flight cycle, clear the pending indicator
+        // before auto-dispatching so the UI doesn't flash real-message + bubble.
+        _clearPendingIfSettled();
         Logger.debug(
-          'AgenticChat: Refreshed from index $fromId — ${messages.length} fetched',
+          'AgenticChat: Refreshed after $afterMessageId — ${messages.length} fetched',
         );
         // Incremental refresh is SSE-driven and may settle the cycle.
         _dispatchQueuedIfAny();
       } else {
-        // Full load is not a settle event — do not auto-dispatch.
+        // Full load replaces state entirely — do not auto-dispatch.
         state = state.copyWith(messages: messages, isLoadingHistory: false);
+        // Same pending-clear for the full-load path (e.g. SSE fires before
+        // POST response for a new session, cursor is null → full load arrives
+        // with settled messages while showAssistantPending is still true).
+        _clearPendingIfSettled();
         Logger.debug(
           'AgenticChat: Loaded ${messages.length} messages for session $sessionId',
         );
@@ -168,19 +183,17 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       return;
     }
 
+    await _dispatchUserMessage(AgenticMessage.user(text));
+  }
+
+  Future<void> _dispatchUserMessage(AgenticMessage userMessage) async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final sessionId =
-        settings.agenticSessionId; // May be null for first message
+    final sessionId = settings.agenticSessionId;
 
-    // Add user message locally (in-flight: isFinal defaults to false)
-    final userMessage = AgenticMessage.user(text);
-    state = state.copyWith(
-      messages: [...state.messages, userMessage],
-      isLoading: true,
-      error: null,
-      showAssistantPending: true,
-    );
+    // Optimistic add (in-flight: isFinal defaults to false)
+    _ingestMessages([userMessage]);
+    state = state.copyWith(isLoading: true, error: null, showAssistantPending: true);
 
     try {
       final password = await settingsNotifier.getEnginePassword();
@@ -188,8 +201,9 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
       final chatResponse = await sendAgenticMessage(
         baseUrl: settings.engineBaseUrl,
-        sessionId: sessionId, // null on first message, engine will create one
-        content: text,
+        sessionId: sessionId,
+        content: userMessage.text,
+        messageId: userMessage.messageId,
         authType: settings.engineAuthType,
         username: settings.engineUsername,
         password: password,
@@ -198,22 +212,21 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
       final response = chatResponse.message;
 
-      // Store session_id from response if we got a new one
       if (response.sessionId != null && response.sessionId != sessionId) {
         await settingsNotifier.setAgenticSessionId(response.sessionId!);
-        Logger.debug(
-          'AgenticChat: Stored new session ID: ${response.sessionId}',
-        );
+        Logger.debug('AgenticChat: Stored new session ID: ${response.sessionId}');
       }
 
-      // Only flip the in-flight chain when the response itself settles the
-      // cycle. A SystemAction response (isFinal=false) keeps it in-flight.
-      final appended = [...state.messages, response];
-      final newMessages = response.isFinal
-          ? _markTrailingFinal(appended)
-          : appended;
+      if (response.isFinal) {
+        final settled = state.messages
+            .where((m) => !m.isFinal)
+            .map((m) => m.copyWith(isFinal: true))
+            .toList();
+        _ingestMessages([...settled, response]);
+      } else {
+        _ingestMessages([response]);
+      }
       state = state.copyWith(
-        messages: newMessages,
         isLoading: false,
         showAssistantPending: false,
         sensitivityLevel: chatResponse.sensitivityLevel,
@@ -222,36 +235,26 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       final preview = response.text.length > 50
           ? '${response.text.substring(0, 50)}...'
           : response.text;
-      Logger.debug(
-        'AgenticChat: Received response [id=${response.id}]: $preview',
-      );
+      Logger.debug('AgenticChat: Received response [id=${response.messageId}]: $preview');
 
-      // Auto-queue for TTS if in auto-playback mode (only for assistant text)
-      if (settings.isAutoPlayback &&
-          response.role == AgenticRole.assistant) {
+      if (settings.isAutoPlayback && response.role == AgenticRole.assistant) {
         ref.read(ttsProvider.notifier).enqueue(response.text, response.localId);
       }
 
       if (response.isFinal) _dispatchQueuedIfAny();
     } catch (e) {
       final errorText = e is EngineApiException ? e.userMessage : e.toString();
-      final technicalDetails = e is EngineApiException
-          ? e.technicalDetails
-          : null;
+      final technicalDetails = e is EngineApiException ? e.technicalDetails : null;
 
-      final errorMessage = AgenticMessage.error(
-        errorText,
-        technicalDetails: technicalDetails,
-      );
+      final errorMessage = AgenticMessage.error(errorText, technicalDetails: technicalDetails);
 
-      // Error settles the cycle: flip in-flight messages final so the user
-      // can retry without staying stuck in awaiting.
-      final appended = [...state.messages, errorMessage];
-      state = state.copyWith(
-        messages: _markTrailingFinal(appended),
-        isLoading: false,
-        showAssistantPending: false,
-      );
+      // Error settles the cycle so the user is not stuck in awaiting.
+      final settled = state.messages
+          .where((m) => !m.isFinal)
+          .map((m) => m.copyWith(isFinal: true))
+          .toList();
+      _ingestMessages([...settled, errorMessage]);
+      state = state.copyWith(isLoading: false, showAssistantPending: false);
 
       Logger.debug('AgenticChat: Error sending message: $e');
     }
@@ -266,48 +269,37 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     return text;
   }
 
-  /// Merge fetched messages into the cache. Cached `final=true` entries are
-  /// immutable and never overwritten; cached `final=false` entries are
-  /// replaced with the fetched version; absent entries are appended in
-  /// fetched order at the end.
-  List<AgenticMessage> _mergeRefresh(
-    List<AgenticMessage> current,
-    List<AgenticMessage> fetched,
-  ) {
-    final out = List<AgenticMessage>.from(current);
-    final indexById = <int, int>{
-      for (int i = 0; i < out.length; i++)
-        if (out[i].id != null) out[i].id!: i,
+  /// Merge incoming messages into state. Contract: append-if-new,
+  /// skip-if-known-and-final, replace-if-known-and-non-final.
+  void _ingestMessages(List<AgenticMessage> incoming) {
+    final out = List<AgenticMessage>.from(state.messages);
+    final indexById = <String, int>{
+      for (int i = 0; i < out.length; i++) out[i].messageId: i,
     };
-    for (final msg in fetched) {
-      final id = msg.id;
-      if (id == null) {
-        out.add(msg);
-        continue;
-      }
-      final idx = indexById[id];
+    for (final msg in incoming) {
+      final idx = indexById[msg.messageId];
       if (idx == null) {
-        indexById[id] = out.length;
+        indexById[msg.messageId] = out.length;
         out.add(msg);
       } else if (!out[idx].isFinal) {
         out[idx] = msg;
       }
     }
-    return out;
+    state = state.copyWith(messages: out);
   }
 
-  /// Settle the in-flight chain that ends in [messages.last]. The caller MUST
-  /// only invoke this after appending a settlement event (an AssistantMessage
-  /// or an error). Walks back from the second-to-last entry, flipping every
-  /// non-final message to final, stopping at the prior cycle boundary.
-  List<AgenticMessage> _markTrailingFinal(List<AgenticMessage> messages) {
-    final out = List<AgenticMessage>.from(messages);
-    if (out.isEmpty) return out;
-    for (int i = out.length - 2; i >= 0; i--) {
-      if (out[i].isFinal) break;
-      out[i] = out[i].copyWith(isFinal: true);
+  /// If a `loadHistory` fetch settled the pending cycle (trailing non-error
+  /// message is now final), clear the loading indicators so the UI does not
+  /// briefly render both the real assistant message and the pending bubble.
+  void _clearPendingIfSettled() {
+    if (!state.showAssistantPending) return;
+    for (int i = state.messages.length - 1; i >= 0; i--) {
+      if (state.messages[i].role == AgenticRole.error) continue;
+      if (state.messages[i].isFinal) {
+        state = state.copyWith(isLoading: false, showAssistantPending: false);
+      }
+      return;
     }
-    return out;
   }
 
   void _dispatchQueuedIfAny() {
@@ -478,7 +470,12 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       Logger.debug('AgenticChat: Granted approval $approvalId');
     } catch (e) {
       Logger.debug('AgenticChat: Failed to grant approval: $e');
-      rethrow;
+      final errorText = e is EngineApiException ? e.userMessage : e.toString();
+      final technicalDetails =
+          e is EngineApiException ? e.technicalDetails : null;
+      _ingestMessages([
+        AgenticMessage.error(errorText, technicalDetails: technicalDetails),
+      ]);
     }
   }
 
@@ -537,12 +534,8 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         apiKey: apiKey,
       );
 
-      final merged = _mergeRefresh(state.messages, settled);
-      state = state.copyWith(
-        messages: merged,
-        isLoading: false,
-        showAssistantPending: false,
-      );
+      _ingestMessages(settled);
+      state = state.copyWith(isLoading: false, showAssistantPending: false);
 
       Logger.debug('AgenticChat: Stopped cycle on session $sessionId');
       _dispatchQueuedIfAny();
@@ -579,12 +572,16 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       );
 
       final response = chatResponse.message;
-      final appended = [...state.messages, response];
-      final newMessages = response.isFinal
-          ? _markTrailingFinal(appended)
-          : appended;
+      if (response.isFinal) {
+        final settled = state.messages
+            .where((m) => !m.isFinal)
+            .map((m) => m.copyWith(isFinal: true))
+            .toList();
+        _ingestMessages([...settled, response]);
+      } else {
+        _ingestMessages([response]);
+      }
       state = state.copyWith(
-        messages: newMessages,
         isLoading: false,
         showAssistantPending: false,
         sensitivityLevel: chatResponse.sensitivityLevel,
@@ -607,11 +604,8 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       // mark the trailing chain final here — that would hide the stuck
       // state and make a /messages retry hit a 409. Recovery is handled
       // by retryFailedMessages re-issuing /continue.
-      state = state.copyWith(
-        messages: [...state.messages, errorMessage],
-        isLoading: false,
-        showAssistantPending: false,
-      );
+      _ingestMessages([errorMessage]);
+      state = state.copyWith(isLoading: false, showAssistantPending: false);
 
       Logger.debug('AgenticChat: Continuation failed: $e');
     }
@@ -645,14 +639,8 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
   void setStateForTest(AgenticChatState s) => state = s;
 
   @visibleForTesting
-  List<AgenticMessage> mergeRefreshForTest(
-    List<AgenticMessage> current,
-    List<AgenticMessage> fetched,
-  ) => _mergeRefresh(current, fetched);
-
-  @visibleForTesting
-  List<AgenticMessage> markTrailingFinalForTest(List<AgenticMessage> messages) =>
-      _markTrailingFinal(messages);
+  void ingestMessagesForTest(List<AgenticMessage> incoming) =>
+      _ingestMessages(incoming);
 
   /// Auto-continue once every approval in the latest actionable group is resolved.
   void _triggerContinuationIfAllResolved() {
@@ -677,7 +665,8 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
   }
 
   /// Recovery for the trailing error. Stuck continuation -> /continue.
-  /// Otherwise re-POST any trailing user messages with no engine id.
+  /// Otherwise re-POST any trailing user messages with no settled response.
+  /// Idempotent POST (keyed on messageId) handles engine-side dedup on retry.
   Future<void> retryFailedMessages() async {
     final messages = state.messages;
 
@@ -710,50 +699,50 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       return;
     }
 
-    // Otherwise: collect trailing user messages (no engine id) as the
-    // texts to resend, then strip them along with the errors and
-    // re-POST.
-    final unsentUserMessages = <String>[];
+    // Collect trailing user messages with no subsequent final engine response
+    // (assistant or system). Idempotent POST reuses the existing messageId.
+    final retryMessages = <AgenticMessage>[];
     for (int i = messages.length - 1; i >= 0; i--) {
       final msg = messages[i];
       if (msg.role == AgenticRole.error) continue;
-      if (msg.role == AgenticRole.user && msg.id == null) {
-        unsentUserMessages.insert(0, msg.text);
-        continue;
+      if (msg.role == AgenticRole.user) {
+        bool hasResponse = false;
+        for (int j = i + 1; j < messages.length; j++) {
+          if (messages[j].role == AgenticRole.error) continue;
+          if (messages[j].role == AgenticRole.assistant ||
+              messages[j].role == AgenticRole.system) {
+            hasResponse = true;
+          }
+          break;
+        }
+        if (!hasResponse) {
+          retryMessages.insert(0, msg);
+          continue;
+        }
       }
       break;
     }
 
-    if (unsentUserMessages.isEmpty) {
+    if (retryMessages.isEmpty) {
       Logger.debug('AgenticChat: No unsent messages to retry');
-      // Nothing to resend — at minimum drop the trailing error so the
-      // user is not stuck looking at a stale failure card.
       final cleanIndex = trailingNonErrorIndex + 1;
       if (cleanIndex < messages.length) {
-        state =
-            state.copyWith(messages: messages.sublist(0, cleanIndex));
+        state = state.copyWith(messages: messages.sublist(0, cleanIndex));
       }
       return;
     }
 
-    Logger.debug(
-      'AgenticChat: Retrying ${unsentUserMessages.length} unsent message(s)',
-    );
+    Logger.debug('AgenticChat: Retrying ${retryMessages.length} message(s)');
 
-    // Strip everything from the first unsent user message to the end
-    // (the user records + any trailing error).
-    final firstUnsentIndex = messages.length - unsentUserMessages.length;
-    // Walk back further to skip any error messages immediately before
-    // the user records (defensive — usually they're after).
-    int stripFrom = firstUnsentIndex;
-    while (stripFrom > 0 &&
-        messages[stripFrom - 1].role == AgenticRole.error) {
+    // Strip from the first retry message to the end (includes trailing errors).
+    int stripFrom = messages.indexOf(retryMessages.first);
+    while (stripFrom > 0 && messages[stripFrom - 1].role == AgenticRole.error) {
       stripFrom--;
     }
     state = state.copyWith(messages: messages.sublist(0, stripFrom));
 
-    for (final text in unsentUserMessages) {
-      await sendMessage(text);
+    for (final userMsg in retryMessages) {
+      await _dispatchUserMessage(userMsg);
       if (state.messages.isNotEmpty &&
           state.messages.last.role == AgenticRole.error) {
         break;

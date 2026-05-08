@@ -43,60 +43,6 @@ class SseState {
   }
 }
 
-/// Tracks pending messages.appended events and deduplicates them.
-///
-/// When multiple events arrive before a fetch completes, only the first
-/// triggers a fetch. The lowest sequence ID is kept as the fetch origin
-/// because a single fetch from the lowest point covers all higher ones.
-class MessageEventDedup {
-  int? _lastProcessedSequenceId;
-  bool _fetchInFlight = false;
-
-  /// Evaluate whether a messages.appended event should trigger a fetch.
-  ///
-  /// Returns the `fromId` to fetch from, or `null` to indicate a full load.
-  /// Returns `skip` if the event is a duplicate or a fetch is already in-flight.
-  /// Seed with the highest sequence ID already loaded locally.
-  ///
-  /// Events with sequence IDs at or below this value will be skipped.
-  void seed(int? sequenceId) {
-    if (sequenceId == null) return;
-    if (_lastProcessedSequenceId == null ||
-        sequenceId > _lastProcessedSequenceId!) {
-      _lastProcessedSequenceId = sequenceId;
-    }
-  }
-
-  ({int? fromId, bool skip}) onEvent(int latestSequenceId) {
-    if (_lastProcessedSequenceId != null &&
-        latestSequenceId <= _lastProcessedSequenceId!) {
-      return (fromId: null, skip: true);
-    }
-
-    if (_fetchInFlight) {
-      // A fetch is already in-flight from a lower sequence ID and will
-      // cover this event's data too. Just absorb the higher sequence ID.
-      _lastProcessedSequenceId = latestSequenceId;
-      return (fromId: null, skip: true);
-    }
-
-    final fromId = _lastProcessedSequenceId != null
-        ? _lastProcessedSequenceId! + 1
-        : null;
-    _lastProcessedSequenceId = latestSequenceId;
-    _fetchInFlight = true;
-    return (fromId: fromId, skip: false);
-  }
-
-  void fetchComplete() {
-    _fetchInFlight = false;
-  }
-
-  void reset() {
-    _lastProcessedSequenceId = null;
-    _fetchInFlight = false;
-  }
-}
 
 final sseProvider = NotifierProvider<SseNotifier, SseState>(() {
   return SseNotifier();
@@ -105,7 +51,8 @@ final sseProvider = NotifierProvider<SseNotifier, SseState>(() {
 class SseNotifier extends Notifier<SseState> {
   SseClient? _client;
   StreamSubscription<SseEvent>? _eventSubscription;
-  final _messageDedup = MessageEventDedup();
+  bool _fetchInFlight = false;
+  bool _refetchPending = false;
 
   @override
   SseState build() {
@@ -134,10 +81,11 @@ class SseNotifier extends Notifier<SseState> {
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final prefs = ref.read(sharedPreferencesProvider);
 
-    // Disconnect existing client and reset dedup state
+    // Disconnect existing client and reset fetch state
     _eventSubscription?.cancel();
     _client?.dispose();
-    _messageDedup.reset();
+    _fetchInFlight = false;
+    _refetchPending = false;
 
     final password = await settingsNotifier.getEnginePassword();
     final apiKey = await settingsNotifier.getEngineApiKey();
@@ -159,6 +107,31 @@ class SseNotifier extends Notifier<SseState> {
 
     await _client!.connect();
     state = state.copyWith(isConnected: true);
+  }
+
+  /// Fetch messages since the last final message (UUID cursor). Coalesces
+  /// concurrent calls: if a fetch is in-flight, marks a re-fetch pending so
+  /// one more fetch runs after the current one completes.
+  Future<void> fetchSinceCursor() async {
+    if (_fetchInFlight) {
+      _refetchPending = true;
+      return;
+    }
+    _fetchInFlight = true;
+    final messages = ref.read(agenticChatProvider).messages;
+    final finalMessages = messages.where((m) => m.isFinal);
+    final cursor = finalMessages.isEmpty ? null : finalMessages.last.messageId;
+    try {
+      await ref
+          .read(agenticChatProvider.notifier)
+          .loadHistory(afterMessageId: cursor);
+    } finally {
+      _fetchInFlight = false;
+      if (_refetchPending) {
+        _refetchPending = false;
+        unawaited(fetchSinceCursor());
+      }
+    }
   }
 
   Future<void> _handleEvent(SseEvent event) async {
@@ -243,28 +216,15 @@ class SseNotifier extends Notifier<SseState> {
         } catch (e) {
           Logger.debug('SSE: Failed to fetch updated session info: $e');
         }
-      case MessagesAppendedEvent(:final sessionId, :final latestSequenceId):
+      case MessagesAppendedEvent(:final sessionId):
         if (currentSessionId == null || sessionId != currentSessionId) {
           Logger.debug(
             'SSE: Ignoring messages.appended for different session: $sessionId',
           );
           return;
         }
-        _seedDedupFromChat();
-        final result = _messageDedup.onEvent(latestSequenceId);
-        if (result.skip) {
-          Logger.debug(
-            'SSE: Skipping messages.appended (sequenceId=$latestSequenceId)',
-          );
-          return;
-        }
-        Logger.debug(
-          'SSE: Messages appended, fetching from ${result.fromId ?? "start"} up to $latestSequenceId',
-        );
-        ref
-            .read(agenticChatProvider.notifier)
-            .loadHistory(fromId: result.fromId)
-            .whenComplete(_messageDedup.fetchComplete);
+        Logger.debug('SSE: Messages appended, fetching since cursor');
+        unawaited(fetchSinceCursor());
       case UnknownEvent(:final eventType):
         Logger.debug('SSE: Unknown event type: $eventType');
     }
@@ -273,13 +233,6 @@ class SseNotifier extends Notifier<SseState> {
   void _persistLastEventId(int eventId) {
     Logger.debug('SSE: Persisting lastEventId=$eventId');
     ref.read(sharedPreferencesProvider).setInt(_lastEventIdKey, eventId);
-  }
-
-  void _seedDedupFromChat() {
-    final messages = ref.read(agenticChatProvider).messages;
-    if (messages.isEmpty) return;
-    final maxId = messages.last.id;
-    if (maxId != null) _messageDedup.seed(maxId);
   }
 
   void disconnect() {

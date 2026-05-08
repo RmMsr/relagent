@@ -168,25 +168,23 @@ class TestPostMessages:
         )
 
         assert response.status_code == 200
-        assert response.json() == {
-            "session_id": str(session_id),
-            "sensitivity_level": SensitivityLevel.Personal.value,
-            "message": {
-                "sequence_id": None,
-                "role": "assistant",
-                "content": "Response",
-                "stats": {
-                    "agent_name": None,
-                    "answering_model_name": None,
-                    "duration_seconds": None,
-                    "input_tokens": 250,
-                    "output_tokens": 125,
-                    "requests_count": None,
-                    "tool_calls_count": None,
-                },
-                "timestamp": "2025-10-14T09:55:00",
-                "final": True,
-            },
+        data = response.json()
+        assert data["session_id"] == str(session_id)
+        assert data["sensitivity_level"] == SensitivityLevel.Personal.value
+        msg = data["message"]
+        assert msg["role"] == "assistant"
+        assert msg["content"] == "Response"
+        assert msg["timestamp"] == "2025-10-14T09:55:00"
+        assert msg["final"] is True
+        assert "message_id" in msg
+        assert msg["stats"] == {
+            "agent_name": None,
+            "answering_model_name": None,
+            "duration_seconds": None,
+            "input_tokens": 250,
+            "output_tokens": 125,
+            "requests_count": None,
+            "tool_calls_count": None,
         }
 
     def test_valid_chat_request_without_session_id(
@@ -268,26 +266,18 @@ class TestGetMessages:
         response = client_with_service_mock.get(f"/api/v1/messages/{session_id}")
 
         assert response.status_code == 200
-        assert response.json() == {
-            "session_id": str(session_id),
-            "messages": [
-                {
-                    "sequence_id": None,
-                    "role": "user",
-                    "content": "Hello",
-                    "timestamp": "2025-10-14T09:55:00",
-                    "final": False,
-                },
-                {
-                    "sequence_id": None,
-                    "role": "assistant",
-                    "content": "Hi!",
-                    "stats": None,
-                    "timestamp": "2025-10-14T09:57:00",
-                    "final": True,
-                },
-            ],
-        }
+        data = response.json()
+        assert data["session_id"] == str(session_id)
+        msgs = data["messages"]
+        assert len(msgs) == 2
+        assert msgs[0]["role"] == "user"
+        assert msgs[0]["content"] == "Hello"
+        assert msgs[0]["final"] is False
+        assert "message_id" in msgs[0]
+        assert msgs[1]["role"] == "assistant"
+        assert msgs[1]["content"] == "Hi!"
+        assert msgs[1]["final"] is True
+        assert "message_id" in msgs[1]
 
     def test_invalid_uuid_format(self, client_with_service_mock: TestClient):
         response = client_with_service_mock.get("/api/v1/messages/not-a-valid-uuid")
@@ -307,47 +297,47 @@ class TestGetMessages:
         assert response.status_code == 404
         assert response.json() == {"detail": "Session not found"}
 
-    def test_from_id_parameter_passed_to_service(
+    def test_after_parameter_passed_to_service(
         self, client_with_service_mock: TestClient, mock_chat_service: MagicMock
     ):
         session_id = uuid.uuid4()
+        cursor_id = uuid.uuid4()
         mock_chat_service.get_messages.return_value = MessagesResponse(
             session_id=session_id,
             messages=[
-                UserMessage(sequence_id=5, content="After"),
-                AssistantMessage(sequence_id=6, content="Response"),
+                UserMessage(content="After"),
+                AssistantMessage(content="Response"),
             ],
         )
 
         response = client_with_service_mock.get(
-            f"/api/v1/messages/{session_id}?from_id=5"
+            f"/api/v1/messages/{session_id}?after={cursor_id}"
         )
 
         assert response.status_code == 200
         mock_chat_service.get_messages.assert_called_once_with(
-            session_id=session_id, from_id=5
+            session_id=session_id, after=cursor_id
         )
 
-    def test_from_id_filters_response_messages(
+    def test_after_filters_response_messages(
         self, client_with_service_mock: TestClient, mock_chat_service: MagicMock
     ):
         session_id = uuid.uuid4()
+        cursor_id = uuid.uuid4()
         mock_chat_service.get_messages.return_value = MessagesResponse(
             session_id=session_id,
-            messages=[
-                UserMessage(sequence_id=5, content="Message 5"),
-            ],
+            messages=[UserMessage(content="After cursor")],
         )
 
         response = client_with_service_mock.get(
-            f"/api/v1/messages/{session_id}?from_id=5"
+            f"/api/v1/messages/{session_id}?after={cursor_id}"
         )
 
         assert response.status_code == 200
         messages = response.json()["messages"]
         assert len(messages) == 1
-        assert messages[0]["sequence_id"] == 5
-        assert messages[0]["content"] == "Message 5"
+        assert messages[0]["content"] == "After cursor"
+        assert "message_id" in messages[0]
 
 
 class TestGetStatus:

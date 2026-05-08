@@ -201,6 +201,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                               .changeSensitivity(level);
                         },
                         onGrantApproval: (approval, grant, isGlobal) {
+                          // ignore: discarded_futures
                           ref
                               .read(agenticChatProvider.notifier)
                               .grantApproval(

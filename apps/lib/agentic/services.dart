@@ -92,11 +92,11 @@ class EngineApiException implements Exception {
 /// neutral — the right user action is the same in either case.
 class SessionInFlightException extends EngineApiException {
   final String sessionId;
-  final int? trailingSequenceId;
+  final String? trailingMessageId;
 
   SessionInFlightException({
     required this.sessionId,
-    required this.trailingSequenceId,
+    required this.trailingMessageId,
     required super.technicalDetails,
     super.url,
   }) : super(
@@ -170,20 +170,20 @@ Future<SessionInfo> getSessionInfo({
 
 /// Fetches message history for a session.
 ///
-/// If [fromId] is provided, only messages starting from that index are returned.
-/// This enables incremental fetching when new messages are appended.
+/// If [afterMessageId] is provided, only messages after that UUID cursor are
+/// returned. This enables incremental fetching when new messages are appended.
 Future<List<AgenticMessage>> getMessageHistory({
   required String baseUrl,
   required String sessionId,
-  int? fromId,
+  String? afterMessageId,
   AuthType authType = AuthType.none,
   String? username,
   String? password,
   String? apiKey,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
-  final uriString = fromId != null
-      ? '$normalizedUrl/api/v1/messages/$sessionId?from_id=$fromId'
+  final uriString = afterMessageId != null
+      ? '$normalizedUrl/api/v1/messages/$sessionId?after=$afterMessageId'
       : '$normalizedUrl/api/v1/messages/$sessionId';
   final uri = Uri.parse(uriString);
   final headers = _buildHeaders(
@@ -216,6 +216,7 @@ Future<ChatResponseData> sendAgenticMessage({
   required String baseUrl,
   String? sessionId, // null for first message, engine creates session
   required String content,
+  String? messageId, // stable UUID for idempotent POST on retry
   AuthType authType = AuthType.none,
   String? username,
   String? password,
@@ -236,6 +237,7 @@ Future<ChatResponseData> sendAgenticMessage({
         'role': 'user',
         'content': content,
         'timestamp': DateTime.now().toUtc().toIso8601String(),
+        if (messageId != null) 'message_id': messageId,
       },
     ],
     'session_id': ?sessionId,
@@ -627,7 +629,7 @@ EngineApiException? tryParseConflict(String body, Uri uri) {
     if (error == 'session_in_flight') {
       return SessionInFlightException(
         sessionId: sessionId,
-        trailingSequenceId: detail['trailing_sequence_id'] as int?,
+        trailingMessageId: detail['trailing_message_id'] as String?,
         technicalDetails: body,
         url: uri.toString(),
       );

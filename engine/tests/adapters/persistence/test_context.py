@@ -153,27 +153,27 @@ class TestFinalImmutabilityGuard:
 
     def test_mutating_a_final_message_raises(self, persistence: Persistence):
         session = SessionInfo()
-        # Assign sequence_ids the way services.py would; the guard matches by id.
-        user = UserMessage(sequence_id=0, content="hi", final=True)
-        assistant = AssistantMessage(sequence_id=1, content="reply")
+        user_id = uuid.uuid4()
+        user = UserMessage(message_id=user_id, content="hi", final=True)
+        assistant = AssistantMessage(content="reply")
         persistence.save_context(
             session_id=session.session_id,
             context=ChatContext(messages=[user, assistant]),
         )
 
-        # Try to rewrite the user message's content while it is on disk as final.
-        mutated = UserMessage(sequence_id=0, content="EDITED", final=True)
+        mutated = UserMessage(message_id=user_id, content="EDITED", final=True)
         with pytest.raises(MessageImmutabilityError) as exc_info:
             persistence.save_context(
                 session_id=session.session_id,
                 context=ChatContext(messages=[mutated, assistant]),
             )
-        assert exc_info.value.sequence_id == 0
+        assert exc_info.value.message_id == user_id
 
     def test_removing_a_final_message_raises(self, persistence: Persistence):
         session = SessionInfo()
-        user = UserMessage(sequence_id=0, content="hi", final=True)
-        assistant = AssistantMessage(sequence_id=1, content="reply")
+        user_id = uuid.uuid4()
+        user = UserMessage(message_id=user_id, content="hi", final=True)
+        assistant = AssistantMessage(content="reply")
         persistence.save_context(
             session_id=session.session_id,
             context=ChatContext(messages=[user, assistant]),
@@ -184,7 +184,7 @@ class TestFinalImmutabilityGuard:
                 session_id=session.session_id,
                 context=ChatContext(messages=[assistant]),
             )
-        assert exc_info.value.sequence_id == 0
+        assert exc_info.value.message_id == user_id
 
     def test_flipping_final_false_to_true_is_allowed(
         self, persistence: Persistence
@@ -192,14 +192,15 @@ class TestFinalImmutabilityGuard:
         # Settlement: a previously in-flight UserMessage is flipped to final=True
         # alongside the appended AssistantMessage. The guard MUST permit this.
         session = SessionInfo()
-        user_inflight = UserMessage(sequence_id=0, content="hi", final=False)
+        user_id = uuid.uuid4()
+        user_inflight = UserMessage(message_id=user_id, content="hi", final=False)
         persistence.save_context(
             session_id=session.session_id,
             context=ChatContext(messages=[user_inflight]),
         )
 
-        user_settled = UserMessage(sequence_id=0, content="hi", final=True)
-        assistant = AssistantMessage(sequence_id=1, content="reply")
+        user_settled = UserMessage(message_id=user_id, content="hi", final=True)
+        assistant = AssistantMessage(content="reply")
         persistence.save_context(
             session_id=session.session_id,
             context=ChatContext(messages=[user_settled, assistant]),
@@ -213,14 +214,14 @@ class TestFinalImmutabilityGuard:
         self, persistence: Persistence
     ):
         session = SessionInfo()
-        user = UserMessage(sequence_id=0, content="hi", final=True)
-        assistant = AssistantMessage(sequence_id=1, content="reply")
+        user = UserMessage(content="hi", final=True)
+        assistant = AssistantMessage(content="reply")
         persistence.save_context(
             session_id=session.session_id,
             context=ChatContext(messages=[user, assistant]),
         )
 
-        next_user = UserMessage(sequence_id=2, content="follow-up")
+        next_user = UserMessage(content="follow-up")
         persistence.save_context(
             session_id=session.session_id,
             context=ChatContext(messages=[user, assistant, next_user]),
@@ -236,14 +237,15 @@ class TestFinalImmutabilityGuard:
         # Granting an approval mutates the trailing in-flight SystemAction
         # in place; the guard MUST NOT trip on final=False records.
         session = SessionInfo()
-        user = UserMessage(sequence_id=0, content="hi", final=False)
+        user = UserMessage(content="hi", final=False)
         approval = Approval(
             type=ApprovalType.OutgoingData,
             component="web_search",
             purpose="p",
         )
+        sys_id = uuid.uuid4()
         sys_action = SystemAction(
-            sequence_id=1, approvals=[approval], final=False
+            message_id=sys_id, approvals=[approval], final=False
         )
         persistence.save_context(
             session_id=session.session_id,
@@ -252,7 +254,7 @@ class TestFinalImmutabilityGuard:
 
         granted_approval = approval.model_copy(update={"granted": True})
         sys_after = SystemAction(
-            sequence_id=1, approvals=[granted_approval], final=False
+            message_id=sys_id, approvals=[granted_approval], final=False
         )
         persistence.save_context(
             session_id=session.session_id,

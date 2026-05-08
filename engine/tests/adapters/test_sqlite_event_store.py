@@ -40,23 +40,18 @@ class TestSqliteEventStore:
     def test_publish_messages_appended(
         self, event_store: SqliteEventStoreAdapter, sample_session_id: uuid.UUID
     ) -> None:
-        event = SessionMessagesAppendedEvent(
-            session_id=sample_session_id,
-            latest_sequence_id=123,
-        )
+        event = SessionMessagesAppendedEvent(session_id=sample_session_id)
         event_store.publish(event)
 
         assert event.id == 1
-        assert event.latest_sequence_id == 123
+        assert event.session_id == sample_session_id
 
     def test_publish_increments_id(
         self, event_store: SqliteEventStoreAdapter, sample_session_id: uuid.UUID
     ) -> None:
         event1 = SessionUpdatedEvent(session_id=sample_session_id)
         event2 = SessionUpdatedEvent(session_id=sample_session_id)
-        event3 = SessionMessagesAppendedEvent(
-            session_id=sample_session_id, latest_sequence_id=1
-        )
+        event3 = SessionMessagesAppendedEvent(session_id=sample_session_id)
 
         event_store.publish(event1)
         event_store.publish(event2)
@@ -95,11 +90,7 @@ class TestSqliteEventStore:
     ) -> None:
         event_store.publish(SessionUpdatedEvent(session_id=sample_session_id))
         event_store.publish(SessionUpdatedEvent(session_id=sample_session_id))
-        event_store.publish(
-            SessionMessagesAppendedEvent(
-                session_id=sample_session_id, latest_sequence_id=1
-            )
-        )
+        event_store.publish(SessionMessagesAppendedEvent(session_id=sample_session_id))
 
         events = event_store.get_events_after(last_id=1)
 
@@ -156,11 +147,7 @@ class TestGenerateServerSentEvents:
 
         event_store.publish(SessionUpdatedEvent(session_id=sample_session_id))
         event_store.publish(SessionUpdatedEvent(session_id=sample_session_id))
-        event_store.publish(
-            SessionMessagesAppendedEvent(
-                session_id=sample_session_id, latest_sequence_id=1
-            )
-        )
+        event_store.publish(SessionMessagesAppendedEvent(session_id=sample_session_id))
 
         sse1 = await generator.__anext__()
         sse2 = await generator.__anext__()
@@ -209,9 +196,7 @@ class TestGenerateServerSentEvents:
             await asyncio.sleep(0.1)
             event_store.publish(SessionUpdatedEvent(session_id=sample_session_id))
             event_store.publish(
-                SessionMessagesAppendedEvent(
-                    session_id=sample_session_id, latest_sequence_id=42
-                )
+                SessionMessagesAppendedEvent(session_id=sample_session_id)
             )
 
         asyncio.create_task(publish_events())

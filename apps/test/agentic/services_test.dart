@@ -12,7 +12,7 @@ void main() {
         'detail': {
           'error': 'session_in_flight',
           'session_id': 's-1',
-          'trailing_sequence_id': 42,
+          'trailing_message_id': 'some-uuid-here',
         },
       });
 
@@ -21,12 +21,12 @@ void main() {
       expect(result, isA<SessionInFlightException>());
       final ex = result as SessionInFlightException;
       expect(ex.sessionId, 's-1');
-      expect(ex.trailingSequenceId, 42);
+      expect(ex.trailingMessageId, 'some-uuid-here');
       expect(ex.url, uri.toString());
       expect(ex.technicalDetails, body);
     });
 
-    test('session_in_flight without trailing_sequence_id keeps null', () {
+    test('session_in_flight without trailing_message_id keeps null', () {
       final body = jsonEncode({
         'detail': {
           'error': 'session_in_flight',
@@ -37,7 +37,7 @@ void main() {
       final ex = tryParseConflict(body, uri) as SessionInFlightException;
 
       expect(ex.sessionId, 's-2');
-      expect(ex.trailingSequenceId, isNull);
+      expect(ex.trailingMessageId, isNull);
     });
 
     test('maps no_in_flight_cycle to NoInFlightCycleException with fields', () {

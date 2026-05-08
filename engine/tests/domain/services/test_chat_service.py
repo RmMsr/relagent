@@ -110,9 +110,6 @@ class TestPerformUserInput:
         assert events[0].session_id == sample_session.session_id
         assert events[1].event_name == EventNames.SESSION_MESSAGES_APPENDED
         assert events[1].session_id == sample_session.session_id
-        # Settlement publishes the cycle-start UserMessage id, not the AssistantMessage id
-        user_msg = context.messages[-2]
-        assert events[1].latest_sequence_id == user_msg.sequence_id
 
     async def test_processes_message_with_new_session(
         self,
@@ -141,10 +138,8 @@ class TestPerformUserInput:
         assert events[0].event_name == EventNames.SESSION_CREATED
         assert events[1].event_name == EventNames.SESSION_MESSAGES_APPENDED
         assert events[1].session_id == response.session_id
-        user_msg = context.messages[-2]
-        assert events[1].latest_sequence_id == user_msg.sequence_id
 
-    async def test_perform_user_input_increases_message_sequence_per_session(
+    async def test_perform_user_input_accumulates_messages_per_session(
         self,
         chat_service: ChatService,
         persistence: Persistence,
@@ -154,8 +149,6 @@ class TestPerformUserInput:
 
         session_2 = chat_service.ensure_session()
         persistence.save_session(session=session_2)
-
-        # Perform 3 requests on 2 sessions with 1, 1 and 2 messages
 
         await chat_service.perform_user_input(
             ChatRequest(
@@ -181,33 +174,21 @@ class TestPerformUserInput:
             )
         )
 
-        # Session 1: Expect 5 messages (3 User + 2 Assistant)
-
+        # Session 1: Expect 5 messages (3 User + 2 Assistant), each with a unique UUID
         messages_response = chat_service.get_messages(session_id=session_1.session_id)
         messages = messages_response.messages
 
         assert len(messages) == 5
-        assert isinstance(messages[0], UserMessage)
-        assert messages[0].sequence_id == 0
-        assert isinstance(messages[1], AssistantMessage)
-        assert messages[1].sequence_id == 1
-        assert isinstance(messages[2], UserMessage)
-        assert messages[2].sequence_id == 2
-        assert isinstance(messages[3], UserMessage)
-        assert messages[3].sequence_id == 3
-        assert isinstance(messages[4], AssistantMessage)
-        assert messages[4].sequence_id == 4
+        assert all(m.message_id is not None for m in messages)
+        assert len({m.message_id for m in messages}) == 5  # all UUIDs unique
 
         # Session 2: Expect 2 messages (1 User + 1 Assistant)
-
         messages_response = chat_service.get_messages(session_id=session_2.session_id)
         messages = messages_response.messages
 
         assert len(messages) == 2
         assert isinstance(messages[0], UserMessage)
-        assert messages[0].sequence_id == 0
         assert isinstance(messages[1], AssistantMessage)
-        assert messages[1].sequence_id == 1
 
 
 class TestEnsureSessionTitle:
@@ -261,29 +242,29 @@ class TestGetMessages:
         assert result.session_id == response.session_id
         assert len(result.messages) == 2
 
-    async def test_from_id_filters_messages(
+    async def test_after_uuid_filters_messages(
         self,
         chat_service: ChatService,
         persistence: Persistence,
     ):
         session = SessionInfo()
         persistence.save_session(session)
-        context = ChatContext(
-            messages=[
-                UserMessage(content="First", sequence_id=0),
-                AssistantMessage(content="Reply", sequence_id=1),
-                UserMessage(content="Second", sequence_id=2),
-                AssistantMessage(content="Reply 2", sequence_id=3),
-            ]
-        )
+        msg_a = UserMessage(content="First")
+        msg_b = AssistantMessage(content="Reply")
+        msg_c = UserMessage(content="Second")
+        msg_d = AssistantMessage(content="Reply 2")
+        context = ChatContext(messages=[msg_a, msg_b, msg_c, msg_d])
         persistence.save_context(session.session_id, context)
 
-        result = chat_service.get_messages(session_id=session.session_id, from_id=2)
+        result = chat_service.get_messages(
+            session_id=session.session_id, after=msg_b.message_id
+        )
 
         assert len(result.messages) == 2
-        assert all((m.sequence_id or 0) >= 2 for m in result.messages)
+        assert result.messages[0].message_id == msg_c.message_id
+        assert result.messages[1].message_id == msg_d.message_id
 
-    async def test_from_id_zero_returns_all(
+    async def test_after_none_returns_all(
         self,
         chat_service: ChatService,
         persistence: Persistence,
@@ -291,14 +272,11 @@ class TestGetMessages:
         session = SessionInfo()
         persistence.save_session(session)
         context = ChatContext(
-            messages=[
-                UserMessage(content="A", sequence_id=0),
-                AssistantMessage(content="B", sequence_id=1),
-            ]
+            messages=[UserMessage(content="A"), AssistantMessage(content="B")]
         )
         persistence.save_context(session.session_id, context)
 
-        result = chat_service.get_messages(session_id=session.session_id, from_id=0)
+        result = chat_service.get_messages(session_id=session.session_id)
 
         assert len(result.messages) == 2
 

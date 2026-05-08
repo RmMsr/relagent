@@ -16,6 +16,7 @@ class _FakeVoiceCapabilities implements VoiceCapabilities {
 }
 
 AgenticMessage _settledUserMsg() => AgenticMessage(
+      messageId: 'seed-user',
       localId: 'seed-user',
       text: 'seed',
       role: AgenticRole.user,
@@ -50,6 +51,7 @@ AgenticMessage _systemAction({
   bool isStale = false,
 }) {
   return AgenticMessage(
+    messageId: 'sys-$isFinal-$isStale',
     localId: 'sys-$isFinal-$isStale',
     text: '',
     role: AgenticRole.system,
@@ -385,6 +387,7 @@ void main() {
             child: AgenticChatHistory(
               messages: [
                 AgenticMessage(
+                  messageId: 'm',
                   localId: 'm',
                   text: 'hello',
                   role: AgenticRole.user,

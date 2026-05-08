@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import shutil
 from typing import Any, Iterable, Sequence
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import portalocker
 import yaml
@@ -94,8 +94,13 @@ class YamlPersistenceAdapter(Persistence):
 
         # Remaining documents are chat messages
         messages: list[ChatMessage] = []
+        needs_writeback = False
         for num, doc in enumerate(docs[1:], start=1):
-            # Pre-cutover records: treat as settled.
+            # BACKWARD COMPAT before introducing message_id: Can be removed after a few releases
+            if isinstance(doc, dict) and "message_id" not in doc:
+                doc["message_id"] = str(uuid4())
+                needs_writeback = True
+            # BACKWARD COMPAT before introducing final: Can be removed after a few releases
             if isinstance(doc, dict) and "final" not in doc:
                 doc["final"] = True
             try:
@@ -118,6 +123,10 @@ class YamlPersistenceAdapter(Persistence):
                     "Failed to load chat message (#%d). See file: %s", num, file_path
                 )
                 raise ChatContextNotFound(session_id=session_id) from exc
+
+        if needs_writeback and metadata is not None:
+            documents: list[BaseModel] = [metadata, *messages]
+            self._write_documents_with_lock(file_path=file_path, documents=documents)
 
         sensitivity_level = metadata.sensitivity_level if metadata else None
         if sensitivity_level is not None:

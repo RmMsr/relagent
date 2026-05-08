@@ -85,6 +85,23 @@ In general the Interface should be simple, intuitive and require minimal attenti
 
 Buttons should show the state that they will activate on press.
 
+## Project tools
+
+A handful of tools and extensions that are frequently used:
+
+### MCP servers
+
+Proven:
+
+- dart_flutter: `fvm dart mcp-server`
+- [phoenix_tracing](https://arize.com/docs/phoenix/integrations/phoenix-mcp-server): `npx -y @arizeai/phoenix-mcp@latest --baseUrl $PHOENIX_URL`
+
+In evaluation:
+
+- [gitlab](https://github.com/zereight/gitlab-mcp): local `npx -y @zereight/mcp-gitlab`
+- [android](https://github.com/minhalvp/android-mcp-server): stdio `npx -y android-mcp-server`
+- [mobile](https://github.com/mobile-next/mobile-mcp): stdio `npx @mobilenext/mobile-mcp@latest` (requires .env)
+
 ## Debugging
 
 **Preferred Method**: Use Flutter MCP tools for debugging:

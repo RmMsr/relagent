@@ -42,9 +42,6 @@ class SessionMessagesAppendedEvent(BaseEvent):
     event_name: Literal[EventNames.SESSION_MESSAGES_APPENDED] = (
         EventNames.SESSION_MESSAGES_APPENDED
     )
-    latest_sequence_id: int = Field(
-        description="Sequence ID of the latest message in the session"
-    )
 
 
 Event = (

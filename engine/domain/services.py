@@ -73,6 +73,27 @@ class ChatService:
                 session_id=request.session_id
             )
 
+            # Idempotent POST: if the user message already exists, return the prior response.
+            if existing_context and request.messages:
+                incoming_id = request.messages[-1].message_id
+                for i, msg in enumerate(existing_context.messages):
+                    if isinstance(msg, UserMessage) and msg.message_id == incoming_id:
+                        response_msg = next(
+                            (
+                                m
+                                for m in existing_context.messages[i + 1 :]
+                                if isinstance(m, (AssistantMessage, SystemAction))
+                            ),
+                            None,
+                        )
+                        if response_msg is not None:
+                            return ChatResponse(
+                                session_id=request.session_id,
+                                message=response_msg,
+                                sensitivity_level=existing_context.sensitivity_level,
+                            )
+                        break
+
         if session is None:
             session = SessionInfo()
             new_session = True
@@ -88,9 +109,8 @@ class ChatService:
             session_id=session.session_id,
         )
 
-        self._add_messages_to_context_with_sequence_ids(context, request.messages)
-        self._add_messages_to_context_with_sequence_ids(context, [ai_response])
-        cycle_start_id = self._get_trailing_cycle_start_id(context)
+        self._append_messages_to_context(context, request.messages)
+        self._append_messages_to_context(context, [ai_response])
         if isinstance(ai_response, AssistantMessage):
             self._settle_cycle(context)
 
@@ -107,14 +127,7 @@ class ChatService:
             session_id=session.session_id, context=context
         )
 
-        # Publish from the cycle's UserMessage so the app reloads the
-        # whole affected range (final flag flips, approval grants).
-        self._publish_messages_appended(
-            session_id=session.session_id,
-            latest_message_id=cycle_start_id
-            if cycle_start_id is not None
-            else ai_response.sequence_id,
-        )
+        self._publish_messages_appended(session_id=session.session_id)
 
         return ChatResponse(
             session_id=session.session_id,
@@ -140,8 +153,7 @@ class ChatService:
             # approvals are still unresolved after a sensitivity change.
             self._remove_trailing_system_actions(context)
 
-        self._add_messages_to_context_with_sequence_ids(context, [ai_response])
-        cycle_start_id = self._get_trailing_cycle_start_id(context)
+        self._append_messages_to_context(context, [ai_response])
         if isinstance(ai_response, AssistantMessage):
             self._settle_cycle(context)
 
@@ -149,12 +161,7 @@ class ChatService:
             session_id=session.session_id, context=context
         )
 
-        self._publish_messages_appended(
-            session_id=session.session_id,
-            latest_message_id=cycle_start_id
-            if cycle_start_id is not None
-            else ai_response.sequence_id,
-        )
+        self._publish_messages_appended(session_id=session.session_id)
 
         return ChatResponse(
             session_id=session.session_id,
@@ -204,23 +211,23 @@ class ChatService:
             return ChatContext()
 
     def get_messages(
-        self, session_id: UUID, from_id: int | None = None
+        self, session_id: UUID, after: UUID | None = None
     ) -> MessagesResponse:
         logger.info(
-            "Fetching messages for session %s from sequence ID: %s",
+            "Fetching messages for session %s after message_id: %s",
             str(session_id),
-            from_id,
+            after,
         )
         context: ChatContext = self.persistence_repository.load_context(
             session_id=session_id
         )
-        messages = context.messages
-        if from_id is not None:
-            messages = [
-                m
-                for m in messages
-                if m.sequence_id is not None and m.sequence_id >= from_id
-            ]
+        messages = list(context.messages)
+        if after is not None:
+            idx = next(
+                (i for i, m in enumerate(messages) if m.message_id == after), None
+            )
+            if idx is not None:
+                messages = messages[idx + 1 :]
         return MessagesResponse(session_id=session_id, messages=messages)
 
     def get_session(self, session_id: UUID) -> SessionInfo:
@@ -277,19 +284,11 @@ class ChatService:
             )
         )
 
-    def _publish_messages_appended(
-        self, session_id: UUID, latest_message_id: int | None
-    ) -> None:
+    def _publish_messages_appended(self, session_id: UUID) -> None:
         if self.event_store is None:
             return
-        if latest_message_id is None:
-            logger.warning("Cannot publish messages.appended without message ID")
-            return
         self.event_store.publish(
-            SessionMessagesAppendedEvent(
-                session_id=session_id,
-                latest_sequence_id=latest_message_id,
-            )
+            SessionMessagesAppendedEvent(session_id=session_id)
         )
 
     def _resolve_pending_approvals(
@@ -351,18 +350,6 @@ class ChatService:
             if isinstance(msg, UserMessage):
                 return
 
-    @staticmethod
-    def _get_trailing_cycle_start_id(context: ChatContext) -> int | None:
-        """Return sequence_id of the UserMessage that opened the trailing cycle.
-
-        Returns None if the trailing cycle is already settled (UserMessage final=True)
-        or there is no UserMessage in history.
-        """
-        for msg in reversed(context.messages):
-            if isinstance(msg, UserMessage):
-                return msg.sequence_id if not msg.final else None
-        return None
-
     async def wait_for_settled(
         self,
         session_id: UUID,
@@ -405,7 +392,7 @@ class ChatService:
             if time.monotonic() >= deadline:
                 raise SessionInFlightTimeout(
                     session_id=session_id,
-                    trailing_sequence_id=context.messages[-1].sequence_id,
+                    trailing_message_id=context.messages[-1].message_id,
                 )
             await asyncio.sleep(poll_interval)
 
@@ -415,8 +402,6 @@ class ChatService:
 
         if not context.messages or context.messages[-1].final:
             raise NoInFlightCycleToStop(session_id=session_id)
-
-        cycle_start_id = self._get_trailing_cycle_start_id(context)
 
         for msg in reversed(context.messages):
             if msg.final:
@@ -430,12 +415,7 @@ class ChatService:
         self.persistence_repository.save_context(
             session_id=session_id, context=context
         )
-        self._publish_messages_appended(
-            session_id=session_id,
-            latest_message_id=cycle_start_id
-            if cycle_start_id is not None
-            else context.messages[-1].sequence_id,
-        )
+        self._publish_messages_appended(session_id=session_id)
         return context
 
     @staticmethod
@@ -446,24 +426,11 @@ class ChatService:
             messages.pop()
         context.messages = messages
 
-    def _add_messages_to_context_with_sequence_ids(
-        self, context: ChatContext, messages: Sequence[ChatMessage]
+    @staticmethod
+    def _append_messages_to_context(
+        context: ChatContext, messages: Sequence[ChatMessage]
     ) -> None:
-        next_sequence_id: int = 0
-
-        # Find last used sequence_id
-        if context.messages:
-            last_message = context.messages[-1]
-            if last_message.sequence_id is not None:
-                next_sequence_id = last_message.sequence_id + 1
-
-        # Add sequence ID and append to context
-        new_messages: Sequence[ChatMessage] = []
-        for m in messages:
-            m.sequence_id = next_sequence_id
-            next_sequence_id += 1
-            new_messages.append(m)
-        context.messages = list(context.messages) + list(new_messages)
+        context.messages = list(context.messages) + list(messages)
 
 
 class ApprovalService:

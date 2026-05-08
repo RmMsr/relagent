@@ -38,14 +38,13 @@ void main() {
       final event = SseEvent.fromSse(
         'session.messages.appended',
         '42',
-        '{"session_id": "sess-1", "latest_sequence_id": 99}',
+        '{"session_id": "sess-1"}',
       );
 
       expect(event, isA<MessagesAppendedEvent>());
       final typed = event as MessagesAppendedEvent;
       expect(typed.id, 42);
       expect(typed.sessionId, 'sess-1');
-      expect(typed.latestSequenceId, 99);
     });
 
     test('parses unknown event type into UnknownEvent', () {

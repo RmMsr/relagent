@@ -92,7 +92,7 @@ async def messages(
             detail={
                 "error": "session_in_flight",
                 "session_id": str(exc.session_id),
-                "trailing_sequence_id": exc.trailing_sequence_id,
+                "trailing_message_id": str(exc.trailing_message_id),
             },
         )
 
@@ -111,10 +111,12 @@ async def messages(
 
 @api_router.get("/messages/{session_id}")
 def get_messages(
-    session_id: UUID, service: ChatServiceDepends, from_id: int | None = None
+    session_id: UUID, service: ChatServiceDepends, after: str | None = None
 ) -> MessagesResponse:
     try:
-        return service.get_messages(session_id=session_id, from_id=from_id)
+        return service.get_messages(
+            session_id=session_id, after=UUID(after) if after else None
+        )
     except ChatContextNotFound:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -339,7 +341,7 @@ def get_global_grants(approval: ApprovalServiceDepends) -> list[Grant]:
                         "event: session.messages.appended\n"
                         "id: 44\n"
                         'data: {"session_id": "151a0cfb-74bb-4978-8881-3d15e4017a5e", '
-                        '"latest_sequence_id": 5, "created_at": "2024-01-15T10:30:01Z"}\n\n'
+                        '"created_at": "2024-01-15T10:30:01Z"}\n\n'
                         ": ping - 2024-01-15T10:30:15Z"
                     ),
                 }

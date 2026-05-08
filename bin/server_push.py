@@ -38,7 +38,7 @@ if __name__ == "__main__":
     framework = find_container_framework()
     ensure_registry_login()
 
-    version = build_with_framework(framework, allow_cache=False)
+    version = build_with_framework(framework, allow_cache=True)
     additional_versions: list[str] = ["any"]
 
     # Avoid anyone receives an unstable version by mistake

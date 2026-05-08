@@ -339,12 +339,12 @@ class TestContinueSession:
         assert isinstance(history.messages[2], AssistantMessage)
         assert history.messages[2].content == "Continued response"
 
-    async def test_continue_assigns_sequence_ids(
+    async def test_continue_returns_message_with_id(
         self,
         chat_service: ChatService,
         echo_agent_execution: StubAgentExecution,
     ):
-        """Messages from continue get sequential IDs."""
+        """Messages from continue have a UUID message_id."""
         echo_agent_execution.prime_basic_query(AssistantMessage(content="First"))
         echo_agent_execution.prime_basic_query(AssistantMessage(content="Second"))
 
@@ -354,7 +354,7 @@ class TestContinueSession:
         session_id = response.session_id
 
         cont_response = await chat_service.continue_session(session_id)
-        assert cont_response.message.sequence_id == 2
+        assert cont_response.message.message_id is not None
 
     async def test_continue_publishes_messages_appended_event(
         self,

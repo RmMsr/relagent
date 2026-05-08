@@ -48,7 +48,7 @@ class TestPydanticExecutionAdapterQueries:
             result = await adapter.run_basic_query(context=context, query="test")
 
         assert isinstance(result, AssistantMessage)
-        assert result.sequence_id is None
+        assert result.message_id is not None
         assert result.stats is not None
         assert result.stats.answering_model_name == "test"
         assert result.content == "Test response"
@@ -78,7 +78,7 @@ class TestPydanticExecutionAdapterQueries:
             )
 
         assert isinstance(result, AssistantMessage)
-        assert result.sequence_id is None
+        assert result.message_id is not None
         assert result.stats is not None
         assert result.content == "Test response"
 
@@ -309,7 +309,9 @@ class TestGetHistoryFromMessages:
         assert isinstance(result[1].parts[0], ToolCallPart)
 
     def test_trailing_denied_action_is_included(self, adapter: PydanticAgentAdapter):
-        """A denied SystemAction at the tail is included for DeferredToolResults."""
+        """A denied SystemAction at the tail is included as a ToolCallPart so that
+        DeferredToolResults can supply the denial and the agent can respond without
+        the tool result."""
         denied = _tool_approval()
         denied.granted = False
         messages = [
@@ -435,6 +437,67 @@ class TestGetHistoryFromMessages:
         assert isinstance(result[3], ModelResponse)
         assert isinstance(result[3].parts[0], ToolCallPart)
         assert result[3].parts[0].tool_call_id == "call_2"
+
+
+class TestGetTrailingApprovals:
+    def test_returns_empty_when_no_system_action(
+        self, adapter: PydanticAgentAdapter
+    ):
+        context = ChatContext(messages=[UserMessage(content="hi")])
+        assert adapter._get_trailing_approvals(context) == []
+
+    def test_returns_approvals_from_in_flight_tail_system_action(
+        self, adapter: PydanticAgentAdapter
+    ):
+        approval = _tool_approval()
+        context = ChatContext(messages=[
+            UserMessage(content="hi"),
+            SystemAction(approvals=[approval], final=False),
+        ])
+        result = adapter._get_trailing_approvals(context)
+        assert result == [approval]
+
+    def test_does_not_collect_from_settled_system_action(
+        self, adapter: PydanticAgentAdapter
+    ):
+        """A final=True SystemAction is a settled cycle. Collecting its approvals
+        would supply DeferredToolResults for a tool call that the history builder
+        already skipped, causing pydantic_ai to raise:
+          'Tool call results were provided, but the message history does not
+           contain any unprocessed tool calls.'"""
+        denied = _tool_approval()
+        denied.granted = False
+        context = ChatContext(messages=[
+            UserMessage(content="Any european embassy?"),
+            SystemAction(approvals=[denied], final=True),
+        ])
+        assert adapter._get_trailing_approvals(context) == []
+
+    def test_stops_at_settled_system_action_while_collecting_in_flight(
+        self, adapter: PydanticAgentAdapter
+    ):
+        """Walking backwards stops as soon as a non-SystemAction or a final
+        SystemAction is encountered."""
+        pending = _tool_approval(tool_call_id="call_pending")
+        settled = _tool_approval(tool_call_id="call_settled")
+        settled.granted = True
+        context = ChatContext(messages=[
+            UserMessage(content="hi"),
+            SystemAction(approvals=[settled], final=True),
+            SystemAction(approvals=[pending], final=False),
+        ])
+        result = adapter._get_trailing_approvals(context)
+        assert result == [pending]
+
+    def test_stops_at_assistant_message(
+        self, adapter: PydanticAgentAdapter
+    ):
+        context = ChatContext(messages=[
+            UserMessage(content="Hi"),
+            AssistantMessage(content="Hello"),
+            UserMessage(content="Next"),
+        ])
+        assert adapter._get_trailing_approvals(context) == []
 
 
 class TestExecutionLoop:

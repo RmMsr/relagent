@@ -12,7 +12,10 @@ class _StubSettingsNotifier extends SettingsNotifier {
   _StubSettingsNotifier({this.sessionId});
 
   @override
-  Settings build() => Settings.defaults().copyWith(agenticSessionId: sessionId);
+  Settings build() => Settings.defaults().copyWith(
+        agenticSessionId: sessionId,
+        engineBaseUrl: 'http://localhost:0',
+      );
 
   @override
   Future<String?> getEnginePassword() async => null;
@@ -23,6 +26,7 @@ class _StubSettingsNotifier extends SettingsNotifier {
 
 AgenticMessage _systemMessageWithApprovals(List<ApprovalData> approvals) {
   return AgenticMessage(
+    messageId: 'msg-test',
     localId: 'msg-test',
     text: '',
     role: AgenticRole.system,
@@ -197,6 +201,7 @@ void main() {
       // an in-flight cycle that the engine still owns (the failed-
       // continuation case).
       final inflightSys = AgenticMessage(
+        messageId: 'msg-sys',
         localId: 'sys',
         text: '',
         role: AgenticRole.system,
@@ -267,18 +272,18 @@ void main() {
         resolution: ApprovalResolution.granted,
       );
       final user = AgenticMessage(
+        messageId: 'msg-user-0',
         localId: 'u',
         text: 'go',
         role: AgenticRole.user,
-        id: 0,
         isFinal: false,
       );
       final stuckSys = AgenticMessage(
+        messageId: 'msg-sys-1',
         localId: 'sys',
         text: '',
         role: AgenticRole.system,
         approvals: [granted],
-        id: 1,
         isFinal: false,
       );
       final error = AgenticMessage.error('inference failed');
@@ -294,17 +299,25 @@ void main() {
       await notifier.retryFailedMessages().catchError((_) {});
 
       final messages = container.read(agenticChatProvider).messages;
-      // SystemAction (id=1) survived the strip.
-      expect(messages.any((m) => m.id == 1 && m.role == AgenticRole.system),
-          isTrue);
-      // Original user message (id=0) survived too.
-      expect(messages.any((m) => m.id == 0 && m.role == AgenticRole.user),
-          isTrue);
-      // No new local user record was appended (no re-POST of "go").
-      final localUsers = messages
-          .where((m) => m.role == AgenticRole.user && m.id == null)
-          .toList();
-      expect(localUsers, isEmpty);
+      // SystemAction (msg-sys-1) survived the strip.
+      expect(
+        messages.any(
+          (m) => m.messageId == 'msg-sys-1' && m.role == AgenticRole.system,
+        ),
+        isTrue,
+      );
+      // Original user message (msg-user-0) survived too.
+      expect(
+        messages.any(
+          (m) => m.messageId == 'msg-user-0' && m.role == AgenticRole.user,
+        ),
+        isTrue,
+      );
+      // No new user message was appended (no re-POST of "go").
+      final userMessages =
+          messages.where((m) => m.role == AgenticRole.user).toList();
+      expect(userMessages.length, 1);
+      expect(userMessages.first.messageId, 'msg-user-0');
     });
 
     test('preserves queued message when active session id is unchanged', () {
@@ -377,7 +390,7 @@ void main() {
     });
   });
 
-  group('AgenticChatNotifier — refresh policy', () {
+  group('AgenticChatNotifier — _ingestMessages', () {
     late ProviderContainer container;
     late AgenticChatNotifier notifier;
 
@@ -388,81 +401,84 @@ void main() {
 
     tearDown(() => container.dispose());
 
-    AgenticMessage msg(int? id, AgenticRole role, {bool isFinal = true,
-        String text = ''}) {
+    AgenticMessage _msg(
+      String messageId,
+      AgenticRole role, {
+      bool isFinal = true,
+      String text = '',
+    }) {
       return AgenticMessage(
-        id: id,
-        localId: 'lid-$id-${role.name}-$isFinal',
+        messageId: messageId,
+        localId: 'lid-$messageId',
         text: text,
         role: role,
         isFinal: isFinal,
       );
     }
 
-    test('cached final=true is preserved against an updated fetched copy', () {
-      final cached = [msg(1, AgenticRole.assistant, text: 'cached')];
-      final fetched = [msg(1, AgenticRole.assistant, text: 'CHANGED')];
+    test('new message is appended', () {
+      notifier.setStateForTest(AgenticChatState(messages: []));
 
-      final merged = notifier.mergeRefreshForTest(cached, fetched);
+      notifier.ingestMessagesForTest([_msg('m1', AgenticRole.user, text: 'hi')]);
 
-      expect(merged.length, 1);
-      expect(merged[0].text, 'cached');
+      final msgs = container.read(agenticChatProvider).messages;
+      expect(msgs.length, 1);
+      expect(msgs[0].messageId, 'm1');
     });
 
-    test('cached final=false is overwritten by fetched copy', () {
-      final cached = [msg(1, AgenticRole.system, isFinal: false, text: 'cached')];
-      final fetched = [msg(1, AgenticRole.system, text: 'updated')];
+    test('present-and-final message is skipped (not overwritten)', () {
+      final existing = _msg('m1', AgenticRole.assistant, text: 'original');
+      notifier.setStateForTest(AgenticChatState(messages: [existing]));
 
-      final merged = notifier.mergeRefreshForTest(cached, fetched);
+      notifier.ingestMessagesForTest(
+        [_msg('m1', AgenticRole.assistant, text: 'CHANGED')],
+      );
 
-      expect(merged.length, 1);
-      expect(merged[0].text, 'updated');
-      expect(merged[0].isFinal, isTrue);
+      final msgs = container.read(agenticChatProvider).messages;
+      expect(msgs.length, 1);
+      expect(msgs[0].text, 'original');
     });
 
-    test('absent fetched messages are appended in order', () {
-      final cached = [msg(1, AgenticRole.user, text: 'one')];
-      final fetched = [
-        msg(2, AgenticRole.system, text: 'two'),
-        msg(3, AgenticRole.assistant, text: 'three'),
-      ];
+    test('present-and-non-final message is replaced', () {
+      final existing =
+          _msg('m1', AgenticRole.system, isFinal: false, text: 'old');
+      notifier.setStateForTest(AgenticChatState(messages: [existing]));
 
-      final merged = notifier.mergeRefreshForTest(cached, fetched);
+      notifier.ingestMessagesForTest(
+        [_msg('m1', AgenticRole.system, text: 'updated')],
+      );
 
-      expect(merged.map((m) => m.text).toList(), ['one', 'two', 'three']);
+      final msgs = container.read(agenticChatProvider).messages;
+      expect(msgs.length, 1);
+      expect(msgs[0].text, 'updated');
+      expect(msgs[0].isFinal, isTrue);
     });
 
-    test('mixed cached/new is handled in a single pass', () {
-      final cached = [
-        msg(1, AgenticRole.user, text: 'u-cached'),       // final=true → keep
-        msg(2, AgenticRole.system, isFinal: false, text: 'sys-cached'),
-      ];
-      final fetched = [
-        msg(1, AgenticRole.user, text: 'u-engine'),       // skipped
-        msg(2, AgenticRole.system, text: 'sys-engine'),   // overwrites
-        msg(3, AgenticRole.assistant, text: 'a-engine'),  // appended
-      ];
+    test('repeated call with same message is idempotent', () {
+      final msg = _msg('m1', AgenticRole.user, text: 'hello');
+      notifier.setStateForTest(AgenticChatState(messages: [msg]));
 
-      final merged = notifier.mergeRefreshForTest(cached, fetched);
+      notifier.ingestMessagesForTest([msg]);
+      notifier.ingestMessagesForTest([msg]);
 
-      expect(merged.map((m) => m.text).toList(),
-          ['u-cached', 'sys-engine', 'a-engine']);
+      expect(container.read(agenticChatProvider).messages.length, 1);
     });
 
-    test('markTrailingFinal flips in-flight chain back to prior boundary', () {
-      final messages = [
-        msg(1, AgenticRole.assistant, text: 'prev cycle'),       // final=true
-        msg(2, AgenticRole.user, isFinal: false, text: 'u'),
-        msg(3, AgenticRole.system, isFinal: false, text: 's'),
-        msg(4, AgenticRole.assistant, text: 'settled'),          // final=true
-      ];
+    test('multiple new messages appended in order', () {
+      notifier.setStateForTest(
+        AgenticChatState(
+          messages: [_msg('m1', AgenticRole.user, text: 'first')],
+        ),
+      );
 
-      final flipped = notifier.markTrailingFinalForTest(messages);
+      notifier.ingestMessagesForTest([
+        _msg('m2', AgenticRole.assistant, text: 'second'),
+        _msg('m3', AgenticRole.system, text: 'third'),
+      ]);
 
-      // Prior boundary (#1) untouched, in-flight chain (#2, #3) now final,
-      // settlement (#4) untouched.
-      expect(flipped.map((m) => m.isFinal).toList(),
-          [true, true, true, true]);
+      final texts =
+          container.read(agenticChatProvider).messages.map((m) => m.text);
+      expect(texts.toList(), ['first', 'second', 'third']);
     });
 
     test('AgenticMessage.assistant defaults to final', () {

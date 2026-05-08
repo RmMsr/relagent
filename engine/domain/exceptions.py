@@ -20,12 +20,12 @@ class ChatContextNotFound(PersistenceError):
 
 
 class SessionInFlightTimeout(Exception):
-    def __init__(self, session_id: UUID, trailing_sequence_id: int | None):
+    def __init__(self, session_id: UUID, trailing_message_id: UUID | None):
         self.session_id = session_id
-        self.trailing_sequence_id = trailing_sequence_id
+        self.trailing_message_id = trailing_message_id
         super().__init__(
-            f"Session '{session_id}' still in-flight at trailing sequence "
-            f"{trailing_sequence_id}"
+            f"Session '{session_id}' still in-flight at trailing message "
+            f"{trailing_message_id}"
         )
 
 
@@ -39,8 +39,8 @@ class MessageImmutabilityError(PersistenceError):
     """Raised when a write would mutate or remove a message that is final=True
     on the persistence boundary. Mirrors the universal-final invariant."""
 
-    def __init__(self, sequence_id: int | None, reason: str):
-        self.sequence_id = sequence_id
+    def __init__(self, message_id: UUID | None, reason: str):
+        self.message_id = message_id
         super().__init__(
-            f"Refusing to mutate final message (sequence_id={sequence_id}): {reason}"
+            f"Refusing to mutate final message (message_id={message_id}): {reason}"
         )

@@ -3,7 +3,7 @@ from typing import Protocol
 
 from sse_starlette import ServerSentEvent
 
-from engine.domain.ports.events import Event, SessionMessagesAppendedEvent
+from engine.domain.ports.events import Event
 
 
 class EventConverter(Protocol):
@@ -20,13 +20,8 @@ class BaseEventConverter:
             data=json.dumps(self._extract_event_data(event)),
         )
 
-    def _extract_event_data(self, event: Event) -> dict[str, str | int]:
-        base_data: dict[str, str | int] = {
+    def _extract_event_data(self, event: Event) -> dict[str, str]:
+        return {
             "session_id": str(event.session_id),
             "created_at": event.created_at.isoformat(),
         }
-
-        if isinstance(event, SessionMessagesAppendedEvent):
-            base_data["latest_sequence_id"] = event.latest_sequence_id
-
-        return base_data

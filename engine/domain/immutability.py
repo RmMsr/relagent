@@ -8,19 +8,17 @@ def check_final_immutability(
     prior: Sequence[ChatMessage], next_: Sequence[ChatMessage]
 ) -> None:
     """Universal-final guard: a final=True record must round-trip unchanged."""
-    next_by_seq = {
-        msg.sequence_id: msg for msg in next_ if msg.sequence_id is not None
-    }
+    next_by_id = {msg.message_id: msg for msg in next_}
     for prev in prior:
-        if not prev.final or prev.sequence_id is None:
+        if not prev.final:
             continue
-        new = next_by_seq.get(prev.sequence_id)
+        new = next_by_id.get(prev.message_id)
         if new is None:
             raise MessageImmutabilityError(
-                prev.sequence_id, "message with final=True was removed"
+                prev.message_id, "message with final=True was removed"
             )
         if new.model_dump(mode="json") != prev.model_dump(mode="json"):
             raise MessageImmutabilityError(
-                prev.sequence_id,
+                prev.message_id,
                 "in-memory copy differs from the stored final=True record",
             )

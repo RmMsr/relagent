@@ -16,8 +16,10 @@
 
 ## 4. Fix duplicate messages on incremental history load
 
-- [x] 4.1 In `AgenticChatNotifier.loadHistory(fromId:)`, filter out fetched messages whose `id` already exists in `state.messages` before appending
-- [ ] 4.2 Verify: send messages from two devices to the same session, confirm no duplicates appear on either device
+**SUPERSEDED by `uuid-message-identity`** — that change removes `sequence_id` from domain models and routes all ingestion through a single `_ingestMessages` function with built-in dedup (skip-final / replace-non-final / append-new). Task 4's sequence-id-based dedup will not work after uuid-message-identity lands.
+
+- [x] 4.1 ~~In `AgenticChatNotifier.loadHistory(fromId:)`, filter out fetched messages whose `id` already exists in `state.messages` before appending~~ (skip — sequence_id removed)
+- [ ] 4.2 ~~Verify: send messages from two devices to the same session, confirm no duplicates appear on either device~~ (covered by uuid-message-identity)
 
 ## 5. Real-time session list updates (from session-management)
 

@@ -54,7 +54,6 @@ class TestEventConversion:
         event = SessionMessagesAppendedEvent(
             id=1,
             session_id=session_id,
-            latest_sequence_id=42,
             created_at=datetime(2025, 1, 1, 0, 0, 0),
         )
 
@@ -66,7 +65,6 @@ class TestEventConversion:
         assert sse.data is not None
         assert json.loads(sse.data) == {
             "session_id": str(session_id),
-            "latest_sequence_id": 42,
             "created_at": "2025-01-01T00:00:00",
         }
 

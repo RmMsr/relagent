@@ -332,8 +332,8 @@ class TestLoadCountOptimization:
             session.session_id,
             ChatContext(
                 messages=[
-                    UserMessage(content="prev", final=True, sequence_id=0),
-                    AssistantMessage(content="reply", sequence_id=1),
+                    UserMessage(content="prev", final=True),
+                    AssistantMessage(content="reply"),
                 ]
             ),
         )
@@ -364,7 +364,7 @@ class TestLoadCountOptimization:
 
 
 class TestCycleStartPublish:
-    def test_perform_user_input_publishes_user_message_id(
+    def test_perform_user_input_publishes_messages_appended_event(
         self,
         chat_service: ChatService,
         event_store: MemoryEventStoreAdapter,
@@ -372,7 +372,7 @@ class TestCycleStartPublish:
         echo: StubAgentExecution = chat_service.agent_execution  # type: ignore[assignment]
         echo.prime_basic_query(AssistantMessage(content="reply"))
 
-        response = asyncio.run(
+        asyncio.run(
             chat_service.perform_user_input(
                 ChatRequest(messages=[UserMessage(content="hi")])
             )
@@ -382,11 +382,8 @@ class TestCycleStartPublish:
             e for e in event_store.events if isinstance(e, SessionMessagesAppendedEvent)
         ]
         assert len(appended) == 1
-        # Cycle starts at the new UserMessage (sequence_id=0), AssistantMessage is 1
-        assert appended[0].latest_sequence_id == 0
-        assert response.message.sequence_id == 1
 
-    def test_continue_session_settle_publishes_user_message_id(
+    def test_continue_session_settle_publishes_messages_appended_event(
         self,
         chat_service: ChatService,
         persistence: Persistence,
@@ -398,12 +395,8 @@ class TestCycleStartPublish:
             session.session_id,
             ChatContext(
                 messages=[
-                    UserMessage(content="hi", final=False, sequence_id=0),
-                    SystemAction(
-                        approvals=[_approval(granted=True)],
-                        final=False,
-                        sequence_id=1,
-                    ),
+                    UserMessage(content="hi", final=False),
+                    SystemAction(approvals=[_approval(granted=True)], final=False),
                 ]
             ),
         )
@@ -417,9 +410,8 @@ class TestCycleStartPublish:
             e for e in event_store.events if isinstance(e, SessionMessagesAppendedEvent)
         ]
         assert len(appended) == 1
-        assert appended[0].latest_sequence_id == 0  # cycle's UserMessage
 
-    def test_continue_session_appending_system_action_publishes_user_message_id(
+    def test_continue_session_appending_system_action_publishes_messages_appended_event(
         self,
         chat_service: ChatService,
         persistence: Persistence,
@@ -431,12 +423,8 @@ class TestCycleStartPublish:
             session.session_id,
             ChatContext(
                 messages=[
-                    UserMessage(content="hi", final=False, sequence_id=0),
-                    SystemAction(
-                        approvals=[_approval(granted=True)],
-                        final=False,
-                        sequence_id=1,
-                    ),
+                    UserMessage(content="hi", final=False),
+                    SystemAction(approvals=[_approval(granted=True)], final=False),
                 ]
             ),
         )
@@ -450,9 +438,8 @@ class TestCycleStartPublish:
             e for e in event_store.events if isinstance(e, SessionMessagesAppendedEvent)
         ]
         assert len(appended) == 1
-        assert appended[0].latest_sequence_id == 0  # still the original UserMessage
 
-    def test_stop_cycle_publishes_user_message_id(
+    def test_stop_cycle_publishes_messages_appended_event(
         self,
         chat_service: ChatService,
         persistence: Persistence,
@@ -461,12 +448,8 @@ class TestCycleStartPublish:
         session_id = _persist_context(
             persistence,
             [
-                UserMessage(content="hi", final=False, sequence_id=0),
-                SystemAction(
-                    approvals=[_approval(granted=None)],
-                    final=False,
-                    sequence_id=1,
-                ),
+                UserMessage(content="hi", final=False),
+                SystemAction(approvals=[_approval(granted=None)], final=False),
             ],
         )
         event_store.events.clear()
@@ -477,6 +460,5 @@ class TestCycleStartPublish:
             e for e in event_store.events if isinstance(e, SessionMessagesAppendedEvent)
         ]
         assert len(appended) == 1
-        assert appended[0].latest_sequence_id == 0
 
 

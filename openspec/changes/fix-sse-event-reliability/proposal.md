@@ -7,7 +7,7 @@ Three reliability bugs in the SSE event handling cause inconsistent state across
 - **Fix `session.created` handler missing chat title update**: The `session.created` SSE handler updates the sessions list but never calls `loadSessionInfo()` on the `agenticChatProvider`, so the chat page title stays empty. The `session.updated` handler already does this correctly — the same pattern needs to apply to `session.created`.
 - **Fix SSE reconnection resource leak**: On reconnect, `SseClient._doConnect()` creates a new `http.Client` without closing the old one or cancelling the old stream subscription. This can cause dangling connections and missed events.
 - **Fix SSE connection lost after app backgrounding**: After 10 failed reconnect attempts, the SSE client gives up permanently. When the mobile app resumes from background, nothing re-triggers `connect()`, so events are never received again.
-- **Fix duplicate messages on incremental history load**: `AgenticChatNotifier.loadHistory(fromId:)` appends fetched messages without checking if they already exist locally. When two devices both send messages to the same session, the SSE `messages.appended` event triggers a fetch that may return messages already present from the local POST response.
+- **Fix duplicate messages on incremental history load**: `AgenticChatNotifier.loadHistory(fromId:)` appends fetched messages without checking if they already exist locally. When two devices both send messages to the same session, the SSE `messages.appended` event triggers a fetch that may return messages already present from the local POST response. **(SUPERSEDED by `uuid-message-identity` — that change removes `sequence_id` and routes all ingestion through a single dedup function)**
 
 ## Capabilities
 

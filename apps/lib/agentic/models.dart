@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 enum AgenticRole { user, assistant, system, error }
@@ -144,9 +146,11 @@ class ApprovalData {
           ? DateTime.tryParse(json['expires_at'] as String)
           : null,
       note: json['note'] as String?,
-      resolution: (json['granted'] as bool? ?? false)
-          ? ApprovalResolution.granted
-          : ApprovalResolution.pending,
+      resolution: switch (json['granted'] as bool?) {
+        true => ApprovalResolution.granted,
+        false => ApprovalResolution.declined,
+        null => ApprovalResolution.pending,
+      },
     );
   }
 }
@@ -268,8 +272,7 @@ class AgentStats {
 }
 
 class AgenticMessage {
-  final int?
-  id; // API message ID for synchronization (null for local-only messages)
+  final String messageId; // Non-nullable UUID: generated locally or read from engine
   final String localId; // Internal ID for UI tracking (TTS, etc.)
   final String text;
   final AgenticRole role;
@@ -287,7 +290,7 @@ class AgenticMessage {
   final bool isFinal;
 
   AgenticMessage({
-    this.id,
+    required this.messageId,
     required this.localId,
     required this.text,
     required this.role,
@@ -308,7 +311,7 @@ class AgenticMessage {
     bool? isFinal,
   }) {
     return AgenticMessage(
-      id: id,
+      messageId: messageId,
       localId: localId,
       text: text,
       role: role,
@@ -326,6 +329,7 @@ class AgenticMessage {
 
   factory AgenticMessage.user(String text) {
     return AgenticMessage(
+      messageId: _generateUuid(),
       localId: _generateLocalId(),
       text: text,
       role: AgenticRole.user,
@@ -334,6 +338,7 @@ class AgenticMessage {
 
   factory AgenticMessage.assistant(String text) {
     return AgenticMessage(
+      messageId: _generateUuid(),
       localId: _generateLocalId(),
       text: text,
       role: AgenticRole.assistant,
@@ -343,6 +348,7 @@ class AgenticMessage {
 
   factory AgenticMessage.error(String text, {String? technicalDetails}) {
     return AgenticMessage(
+      messageId: _generateUuid(),
       localId: _generateLocalId(),
       text: text,
       role: AgenticRole.error,
@@ -393,7 +399,7 @@ class AgenticMessage {
         (role == AgenticRole.system ? '' : '');
 
     return AgenticMessage(
-      id: json['sequence_id'] as int? ?? json['id'] as int?,
+      messageId: json['message_id'] as String? ?? _generateUuid(),
       localId: _generateLocalId(),
       text: text,
       role: role,
@@ -409,6 +415,7 @@ class AgenticMessage {
 
   Map<String, dynamic> toJson() {
     return {
+      'message_id': messageId,
       'content': text,
       'role': role.name,
       'timestamp': timestamp.toIso8601String(),
@@ -421,5 +428,18 @@ class AgenticMessage {
     final timestamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
     final counter = (_localIdCounter++).toRadixString(36);
     return '$timestamp-$counter';
+  }
+
+  static final _rng = Random.secure();
+
+  static String _generateUuid() {
+    final bytes = List.generate(16, (_) => _rng.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex =
+        bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
+        '${hex.substring(20, 32)}';
   }
 }

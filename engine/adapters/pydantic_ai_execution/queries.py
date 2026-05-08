@@ -142,14 +142,18 @@ class PydanticAgentAdapter(AgentExecution):
         return final_message
 
     def _get_trailing_approvals(self, context: ChatContext) -> list[Approval]:
-        """Return all approvals from trailing SystemActions.
+        """Return all approvals from trailing in-flight SystemActions.
 
-        Walks backwards from the end of the message list, collecting approvals
-        from SystemActions until a non-SystemAction message is encountered.
+        Only SystemActions with final=False are collected. A final=True
+        SystemAction is a settled cycle — its deferred tool results must not be
+        replayed. Doing so would supply DeferredToolResults for a tool that
+        causes pydantic_ai to raise:
+          "Tool call results were provided, but the message history does not
+           contain any unprocessed tool calls."
         """
         approvals: list[Approval] = []
         for msg in reversed(context.messages):
-            if isinstance(msg, SystemAction):
+            if isinstance(msg, SystemAction) and not msg.final:
                 approvals.extend(msg.approvals)
             else:
                 break

@@ -48,7 +48,7 @@ void main() {
     test('parses system role with approvals', () {
       final json = {
         'role': 'system',
-        'sequence_id': 5,
+        'message_id': 'abc-uuid-001',
         'timestamp': '2024-01-15T10:00:00Z',
         'notification': 'Additional permissions required',
         'approvals': [
@@ -67,7 +67,7 @@ void main() {
       final msg = AgenticMessage.fromJson(json);
 
       expect(msg.role, AgenticRole.system);
-      expect(msg.id, 5);
+      expect(msg.messageId, 'abc-uuid-001');
       expect(msg.notification, 'Additional permissions required');
       expect(msg.approvals, isNotNull);
       expect(msg.approvals!.length, 1);
@@ -79,7 +79,7 @@ void main() {
       expect(approval.purpose, "Searching the web for 'flutter'");
       expect(approval.sensitivity, SensitivityLevel.personal);
       expect(approval.granted, false);
-      expect(approval.resolution, ApprovalResolution.pending);
+      expect(approval.resolution, ApprovalResolution.declined);
     });
 
     test('parses system role with granted approval', () {
@@ -154,6 +154,30 @@ void main() {
         msg.approvals!.first.sensitivity,
         SensitivityLevel.confidential,
       );
+    });
+  });
+
+  group('AgenticMessage UUID identity', () {
+    test('user() generates non-empty messageId', () {
+      final msg = AgenticMessage.user('hello');
+      expect(msg.messageId, isNotEmpty);
+    });
+
+    test('error() generates non-empty messageId', () {
+      final msg = AgenticMessage.error('oops');
+      expect(msg.messageId, isNotEmpty);
+    });
+
+    test('fromJson generates UUID when message_id is absent', () {
+      final json = {'role': 'user', 'content': 'hi'};
+      final msg = AgenticMessage.fromJson(json);
+      expect(msg.messageId, isNotEmpty);
+    });
+
+    test('two user() messages have distinct messageIds', () {
+      final a = AgenticMessage.user('hi');
+      final b = AgenticMessage.user('hi');
+      expect(a.messageId, isNot(equals(b.messageId)));
     });
   });
 

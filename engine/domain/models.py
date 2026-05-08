@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Literal, NamedTuple, Sequence
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from engine.domain.types import ApprovalType, SensitivityLevel
 
@@ -159,9 +159,7 @@ class UserMessage(BaseModel):
 
     model_config = ConfigDict(use_enum_values=True)
 
-    sequence_id: int | None = Field(
-        default=None, description="Chronological ID within session"
-    )
+    message_id: UUID = Field(default_factory=uuid4, description="Unique message identity")
     role: Literal["user"] = "user"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     content: str
@@ -176,9 +174,7 @@ class AssistantMessage(BaseModel):
 
     model_config = ConfigDict(use_enum_values=True)
 
-    sequence_id: int | None = Field(
-        default=None, description="Chronological ID within session"
-    )
+    message_id: UUID = Field(default_factory=uuid4, description="Unique message identity")
     role: Literal["assistant"] = "assistant"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     content: str
@@ -199,9 +195,7 @@ class SystemAction(BaseModel):
 
     model_config = ConfigDict(use_enum_values=True)
 
-    sequence_id: int | None = Field(
-        default=None, description="Chronological ID within session"
-    )
+    message_id: UUID = Field(default_factory=uuid4, description="Unique message identity")
     role: Literal["system"] = "system"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     approvals: list[Approval] = Field(
@@ -229,7 +223,6 @@ class ChatContext(BaseModel):
         default=SensitivityLevel.Personal,
         description="The highest sensitivity present in this context",
     )
-    _next_sequence_id: int = PrivateAttr(default=0)
 
     def all_messages(self) -> list[UserMessage | AssistantMessage]:
         return [
