@@ -82,16 +82,24 @@ android {
             buildConfigField("boolean", "DEBUG", "false")
             if (hasSigningConfig) {
                 signingConfig = signingConfigs.getByName("release")
-            } else if (allowUnsignedRelease) {
-                println("Warning: building unsigned release (ANDROID_ALLOW_UNSIGNED_RELEASE=true)")
-            } else {
-                throw GradleException(
-                    "Signing config missing for release build. " +
-                    "Provide ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD env or key.properties file. " +
-                    "For an unsigned build set ANDROID_ALLOW_UNSIGNED_RELEASE=true."
-                )
             }
         }
+    }
+}
+
+// Deferred check: only validate signing when actually building release
+// (avoid throwing during configuration phase which breaks debug builds)
+gradle.taskGraph.whenReady {
+    if (hasSigningConfig) return@whenReady
+    if (!hasTask(":app:assembleRelease") && !hasTask(":app:bundleRelease")) return@whenReady
+    if (allowUnsignedRelease) {
+        println("Warning: building unsigned release (ANDROID_ALLOW_UNSIGNED_RELEASE=true)")
+    } else {
+        throw GradleException(
+            "Signing config missing for release build. " +
+            "Provide ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD env or key.properties file. " +
+            "For an unsigned build set ANDROID_ALLOW_UNSIGNED_RELEASE=true."
+        )
     }
 }
 
