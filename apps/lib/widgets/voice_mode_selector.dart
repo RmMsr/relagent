@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
+import '/theme/app_colors.dart';
 
 class VoiceModeSelector extends ConsumerWidget {
   const VoiceModeSelector({super.key});
@@ -14,9 +15,7 @@ class VoiceModeSelector extends ConsumerWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Playback control (speaker)
-        _ToggleControl(
-          label: 'Playback',
+        _VoiceToggleButton(
           isOn: settings.isAutoPlayback,
           iconOn: Icons.volume_up,
           iconOff: Icons.volume_off,
@@ -33,10 +32,7 @@ class VoiceModeSelector extends ConsumerWidget {
             ref.read(settingsProvider.notifier).updateVoiceMode(newMode);
           },
         ),
-        const SizedBox(width: 8),
-        // Listening control (microphone)
-        _ToggleControl(
-          label: 'Listening',
+        _VoiceToggleButton(
           isOn: settings.isContinuousRecording,
           iconOn: Icons.mic,
           iconOff: Icons.mic_off,
@@ -58,8 +54,7 @@ class VoiceModeSelector extends ConsumerWidget {
   }
 }
 
-class _ToggleControl extends StatelessWidget {
-  final String label;
+class _VoiceToggleButton extends StatelessWidget {
   final bool isOn;
   final IconData iconOn;
   final IconData iconOff;
@@ -67,8 +62,7 @@ class _ToggleControl extends StatelessWidget {
   final String tooltipOff;
   final VoidCallback onToggle;
 
-  const _ToggleControl({
-    required this.label,
+  const _VoiceToggleButton({
     required this.isOn,
     required this.iconOn,
     required this.iconOff,
@@ -79,105 +73,28 @@ class _ToggleControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.2),
-          width: 1,
-        ),
+    return IconButton(
+      icon: Icon(
+        isOn ? iconOn : iconOff,
+        color: isOn ? RelagentColors.primaryIndigo : RelagentColors.toggleOffMuted,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _ToggleButton(
-            icon: iconOff,
-            tooltip: tooltipOff,
-            isSelected: !isOn,
-            isLeft: true,
-            onTap: isOn ? onToggle : null,
-          ),
-          Container(
-            width: 1,
-            height: 28,
-            color: theme.colorScheme.outline.withValues(alpha: 0.2),
-          ),
-          _ToggleButton(
-            icon: iconOn,
-            tooltip: tooltipOn,
-            isSelected: isOn,
-            isRight: true,
-            onTap: !isOn ? onToggle : null,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToggleButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final bool isSelected;
-  final bool isLeft;
-  final bool isRight;
-  final VoidCallback? onTap;
-
-  const _ToggleButton({
-    required this.icon,
-    required this.tooltip,
-    required this.isSelected,
-    this.isLeft = false,
-    this.isRight = false,
-    this.onTap,
-  });
-
-  BorderRadius _getBorderRadius() {
-    if (isLeft) {
-      return const BorderRadius.only(
-        topLeft: Radius.circular(7),
-        bottomLeft: Radius.circular(7),
-      );
-    } else if (isRight) {
-      return const BorderRadius.only(
-        topRight: Radius.circular(7),
-        bottomRight: Radius.circular(7),
-      );
-    }
-    return BorderRadius.zero;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final borderRadius = _getBorderRadius();
-
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: borderRadius,
-        child: Container(
-          width: 36,
-          height: 28,
-          decoration: isSelected
-              ? BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: borderRadius,
-                )
-              : null,
-          child: Icon(
-            icon,
-            size: 18,
-            color: isSelected
-                ? theme.colorScheme.onPrimaryContainer
-                : theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ),
+      style: isOn
+          ? IconButton.styleFrom(
+              backgroundColor: RelagentColors.indigoTint,
+              shape: const StadiumBorder(),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            )
+          : IconButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shape: const StadiumBorder(),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            ),
+      tooltip: isOn ? tooltipOn : tooltipOff,
+      onPressed: onToggle,
     );
   }
 }

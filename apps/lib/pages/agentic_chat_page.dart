@@ -12,6 +12,7 @@ import '/providers/settings_provider.dart';
 import '/providers/sse_provider.dart';
 import '/providers/tts_provider.dart';
 import '/providers/voice_service_provider.dart';
+import '/theme/app_colors.dart';
 import '/widgets/voice_mode_selector.dart';
 
 class AgenticChatPage extends ConsumerStatefulWidget {
@@ -313,12 +314,17 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
     }
 
     return Container(
-      margin: const EdgeInsets.all(12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.error, width: 1),
+        color: context.errorBg,
+        border: Border(
+          left: BorderSide(color: context.errorBorder, width: 4),
+        ),
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(10),
+          bottomRight: Radius.circular(10),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,14 +334,14 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
             children: [
               Icon(
                 isAuthIssue ? Icons.lock : Icons.warning,
-                color: theme.colorScheme.onErrorContainer,
+                color: context.errorText,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   title,
                   style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onErrorContainer,
+                    color: context.errorText,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -343,7 +349,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
               IconButton(
                 icon: Icon(
                   Icons.close,
-                  color: theme.colorScheme.onErrorContainer,
+                  color: context.errorText,
                 ),
                 onPressed: () {
                   setState(() {
@@ -358,7 +364,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
           Text(
             message,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onErrorContainer,
+              color: context.errorText,
             ),
           ),
           const SizedBox(height: 12),
@@ -377,8 +383,8 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                 icon: const Icon(Icons.refresh),
                 label: const Text('Retry'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: theme.colorScheme.onErrorContainer,
-                  side: BorderSide(color: theme.colorScheme.onErrorContainer),
+                  foregroundColor: context.errorText,
+                  side: BorderSide(color: context.errorText),
                 ),
               ),
               const SizedBox(width: 8),

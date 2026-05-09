@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 import '/chat/models.dart';
+import '/theme/app_colors.dart';
 
 import '/models/app_info.dart';
 import '/providers/chat_provider.dart';
@@ -154,8 +155,11 @@ class ChatInputState extends ConsumerState<ChatInput>
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
-      decoration: const BoxDecoration(border: Border(top: BorderSide())),
+      padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -166,6 +170,7 @@ class ChatInputState extends ConsumerState<ChatInput>
               decoration: InputDecoration(
                 border: InputBorder.none,
                 hintText: 'Type a message...',
+                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               minLines: 1,
               maxLines: null,
@@ -174,13 +179,13 @@ class ChatInputState extends ConsumerState<ChatInput>
               onSubmitted: (_) => _submitText(),
             ),
           ),
+          if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable)
+            RecorderButton(),
           IconButton(
-            icon: const Icon(Icons.send),
+            icon: Icon(Icons.send, color: Theme.of(context).colorScheme.primary),
             onPressed: _submitText,
             tooltip: 'Send message',
           ),
-          if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable)
-            RecorderButton(),
         ],
       ),
     );
@@ -453,87 +458,96 @@ class ChatMessageBubble extends StatelessWidget {
               ),
             ),
           // Message bubble
-          Container(
-            padding: isUser
-                ? const EdgeInsets.fromLTRB(10, 10, 16, 10)
-                : const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              shape: BoxShape.rectangle,
-              borderRadius: isUser
-                  ? const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
-                      topRight: Radius.zero,
-                      bottomRight: Radius.zero,
-                    )
-                  : const BorderRadius.all(Radius.circular(5)),
-              color: switch (message.role) {
-                ChatRole.user => theme.colorScheme.onInverseSurface.withValues(
-                  alpha: 0.6,
+          switch (message.role) {
+            ChatRole.user => ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.8,
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(10, 10, 16, 10),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: RelagentColors.indigoBorder,
+                    width: 1.5,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(14),
+                    bottomLeft: Radius.circular(14),
+                    topRight: Radius.circular(14),
+                    bottomRight: Radius.circular(4),
+                  ),
                 ),
-                ChatRole.assistant => null,
-                ChatRole.error => theme.colorScheme.errorContainer.withValues(
-                  alpha: 0.3,
-                ),
-              },
-              boxShadow: isUser
-                  ? [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 4,
-                        offset: const Offset(-2, 2),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Message content
-                isError
-                    ? ErrorMessageWithDetails(message: message, theme: theme)
-                    : SelectableRegion(
-                        selectionControls: MaterialTextSelectionControls(),
-                        child: GptMarkdown(
-                          message.text,
-                          style: theme.textTheme.bodyMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SelectableRegion(
+                      selectionControls: MaterialTextSelectionControls(),
+                      child: GptMarkdown(
+                        message.text,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.primary,
                         ),
                       ),
-                // Action buttons footer
-                if ((message.role == ChatRole.assistant && onSpeak != null) ||
-                    (isUser && onRetry != null))
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: message.role == ChatRole.assistant
-                          ? MainAxisAlignment.start
-                          : MainAxisAlignment.end,
-                      children: [
-                        // TTS button for assistant messages
-                        if (message.role == ChatRole.assistant &&
-                            onSpeak != null)
-                          _buildTtsButton(theme, playbackStatus, message.id),
-                        // Retry button for user messages
-                        if (isUser && onRetry != null)
-                          IconButton.outlined(
-                            icon: const Icon(Icons.refresh, size: 18),
-                            iconSize: 18,
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(
-                              minWidth: 36,
-                              minHeight: 36,
-                            ),
-                            tooltip: 'Retry',
-                            onPressed: () => onRetry!(message.text),
+                    ),
+                  if (onRetry != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: IconButton.outlined(
+                          icon: const Icon(Icons.refresh, size: 18),
+                          iconSize: 18,
+                          padding: const EdgeInsets.all(8),
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
                           ),
-                      ],
+                          tooltip: 'Retry',
+                          onPressed: () => onRetry!(message.text),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            ),
+            ChatRole.assistant => Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SelectableRegion(
+                    selectionControls: MaterialTextSelectionControls(),
+                    child: GptMarkdown(
+                      message.text,
+                      style: theme.textTheme.bodyMedium,
                     ),
                   ),
-              ],
+                  if (onSpeak != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: _buildTtsButton(theme, playbackStatus, message.id),
+                    ),
+                ],
+              ),
             ),
-          ),
+            ChatRole.error => Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: context.errorBg,
+                border: Border(
+                  left: BorderSide(color: context.errorBorder, width: 4),
+                ),
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(10),
+                  bottomRight: Radius.circular(10),
+                ),
+              ),
+              child: ErrorMessageWithDetails(message: message, theme: theme),
+            ),
+          },
         ],
       ),
     );

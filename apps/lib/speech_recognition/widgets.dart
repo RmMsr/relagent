@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/models/settings.dart';
 import '/providers/recording_provider.dart';
 import '/providers/settings_provider.dart';
+import '/theme/app_colors.dart';
 import '/voice/voice_service.dart';
 
 class RecordingStateIndicator extends StatelessWidget {
@@ -64,7 +65,7 @@ class RecordingStateIndicator extends StatelessWidget {
       } else {
         icon = Icon(
           Icons.mic_none,
-          color: theme.colorScheme.onSurface,
+          color: RelagentColors.secondaryText,
           size: 32,
         );
         tooltip = 'Continuous listening disabled';
@@ -73,7 +74,7 @@ class RecordingStateIndicator extends StatelessWidget {
       icon = Icon(Icons.mic, color: theme.colorScheme.primary, size: 32);
       tooltip = 'Recording active';
     } else {
-      icon = Icon(Icons.mic_none, color: theme.colorScheme.onSurface, size: 32);
+      icon = Icon(Icons.mic_none, color: RelagentColors.secondaryText, size: 32);
       tooltip = 'Ready to record';
     }
 

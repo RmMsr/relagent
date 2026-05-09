@@ -13,6 +13,7 @@ import '/providers/voice_service_provider.dart';
 import '/speech_recognition/recording_target.dart';
 import '/speech_recognition/widgets.dart';
 import '/utils/logger.dart';
+import '/theme/app_colors.dart';
 import '/widgets/version_info_widget.dart';
 
 export '/agentic/approval_card.dart';
@@ -156,8 +157,11 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
   Widget build(BuildContext context) {
     final enabled = widget.enabled;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
-      decoration: const BoxDecoration(border: Border(top: BorderSide())),
+      padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -171,6 +175,7 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
                 hintText: enabled
                     ? 'Type a message...'
                     : 'Edit queued message to type a new one',
+                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               minLines: 1,
               maxLines: null,
@@ -179,13 +184,13 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
               onSubmitted: (_) => _submitText(),
             ),
           ),
+          if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable)
+            RecorderButton(),
           IconButton(
-            icon: const Icon(Icons.send),
+            icon: Icon(Icons.send, color: Theme.of(context).colorScheme.primary),
             onPressed: enabled ? _submitText : null,
             tooltip: 'Send message',
           ),
-          if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable)
-            RecorderButton(),
         ],
       ),
     );
@@ -492,20 +497,30 @@ class _AgenticMessageBubble extends StatelessWidget {
             ),
           if (isError)
             _ErrorMessageBubble(message: message)
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: isUser ? theme.colorScheme.primaryContainer : null,
-                borderRadius: BorderRadius.circular(12),
-                border: !isUser
-                    ? Border.all(
-                        color: theme.colorScheme.outlineVariant,
-                        width: 1,
-                      )
-                    : null,
+          else if (isUser)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(color: RelagentColors.indigoBorder, width: 1.5),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(14),
+                    bottomLeft: Radius.circular(14),
+                    topRight: Radius.circular(14),
+                    bottomRight: Radius.circular(4),
+                  ),
+                ),
+                child: Text(
+                  message.text,
+                  style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                ),
               ),
-              child: isUser ? Text(message.text) : GptMarkdown(message.text),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: GptMarkdown(message.text),
             ),
           if (!isUser && !isError)
             Padding(
@@ -560,8 +575,14 @@ class _ErrorMessageBubbleState extends State<_ErrorMessageBubble> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(12),
+        color: context.errorBg,
+        border: Border(
+          left: BorderSide(color: context.errorBorder, width: 4),
+        ),
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(10),
+          bottomRight: Radius.circular(10),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -571,14 +592,14 @@ class _ErrorMessageBubbleState extends State<_ErrorMessageBubble> {
               Icon(
                 Icons.error_outline,
                 size: 18,
-                color: theme.colorScheme.onErrorContainer,
+                color: context.errorText,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   widget.message.text,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onErrorContainer,
+                    color: context.errorText,
                   ),
                 ),
               ),
@@ -586,7 +607,7 @@ class _ErrorMessageBubbleState extends State<_ErrorMessageBubble> {
                 IconButton(
                   icon: Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
-                    color: theme.colorScheme.onErrorContainer,
+                    color: context.errorText,
                     size: 20,
                   ),
                   onPressed: () {
@@ -613,7 +634,7 @@ class _ErrorMessageBubbleState extends State<_ErrorMessageBubble> {
               child: Text(
                 widget.message.technicalDetails!,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onErrorContainer,
+                  color: context.errorText,
                   fontFamily: 'monospace',
                 ),
               ),

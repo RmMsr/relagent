@@ -12,6 +12,7 @@ import '/providers/health_check_provider.dart';
 import '/providers/settings_provider.dart';
 import '/router/app_router.dart';
 import '/utils/logger.dart';
+import '/theme/app_colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,9 +61,9 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: AppInfo.data.toString(),
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent),
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.system,
       routerConfig: appRouter,
       builder: (context, child) => VoiceInitOverlay(child: child!),
     );

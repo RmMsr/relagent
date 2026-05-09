@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '/agentic/models.dart';
+import '/theme/app_colors.dart';
 
 // -- Approval Card --
 
@@ -77,69 +78,86 @@ class _ApprovalCardState extends State<ApprovalCard> {
     final borderSide =
         BorderSide(color: theme.colorScheme.outlineVariant, width: 1);
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      clipBehavior: Clip.antiAlias,
-      elevation: 0,
-      color: isStale
-          ? theme.colorScheme.surfaceContainerHighest.withAlpha(128)
-          : isResolved
-              ? theme.colorScheme.surfaceContainerHighest
-              : Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isStale
-              ? theme.colorScheme.outlineVariant
-              : approval.sensitivity.color.withAlpha(isResolved ? 128 : 255),
-          width: 1.5,
+      decoration: BoxDecoration(
+        border: Border(
+          left: BorderSide(
+            color: isStale
+                ? theme.colorScheme.outlineVariant
+                : isResolved
+                    ? context.approvalBorder.withAlpha(128)
+                    : context.approvalBorder,
+            width: 4,
+          ),
+        ),
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(10),
+          bottomRight: Radius.circular(10),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Section 1 — Header
-          _buildHeader(theme, isResolved, isStale, borderSide),
+      clipBehavior: Clip.antiAlias,
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        elevation: 0,
+        color: isStale
+            ? theme.colorScheme.surfaceContainerHighest.withAlpha(128)
+            : isResolved
+                ? theme.colorScheme.surfaceContainerHighest
+                : context.approvalBg,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            topRight: Radius.circular(10),
+            bottomRight: Radius.circular(10),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Section 1 — Header
+            _buildHeader(theme, isResolved, isStale, borderSide),
 
-          // Detail sections — shown when pending+actionable, or when resolved+expanded
-          if ((!isResolved && !isStale && widget.isActionable) ||
-              (isResolved && _isExpanded)) ...[
-            // Section 2 — Sensitivity row
-            _buildSensitivityRow(theme, borderSide),
+            // Detail sections — shown when pending+actionable, or when resolved+expanded
+            if ((!isResolved && !isStale && widget.isActionable) ||
+                (isResolved && _isExpanded)) ...[
+              // Section 2 — Sensitivity row
+              _buildSensitivityRow(theme, borderSide),
 
-            // Section 3 — Parameters table
-            if (approval.allowedParameters.isNotEmpty)
-              _buildParamsTable(theme, borderSide, readOnly: isResolved),
+              // Section 3 — Parameters table
+              if (approval.allowedParameters.isNotEmpty)
+                _buildParamsTable(theme, borderSide, readOnly: isResolved),
 
-            // Section 4 — Scope selector
-            if (!isResolved)
-              _buildScopeSelector(theme, borderSide)
-            else
-              _buildReadOnlyRow(
-                theme,
-                borderSide,
-                label: 'Scope',
-                value: _isGlobal ? 'Any session' : 'This session',
-              ),
+              // Section 4 — Scope selector
+              if (!isResolved)
+                _buildScopeSelector(theme, borderSide)
+              else
+                _buildReadOnlyRow(
+                  theme,
+                  borderSide,
+                  label: 'Scope',
+                  value: _isGlobal ? 'Any session' : 'This session',
+                ),
 
-            // Section 5 — Expiry selector
-            if (!isResolved)
-              _buildExpirySelector(theme, borderSide)
-            else
-              _buildReadOnlyRow(
-                theme,
-                borderSide,
-                label: 'Expires',
-                value: _formatExpiryAbsolute(approval.expiresAt),
-              ),
+              // Section 5 — Expiry selector
+              if (!isResolved)
+                _buildExpirySelector(theme, borderSide)
+              else
+                _buildReadOnlyRow(
+                  theme,
+                  borderSide,
+                  label: 'Expires',
+                  value: _formatExpiryAbsolute(approval.expiresAt),
+                ),
 
-            // Sensitivity mismatch banner
-            if (!isResolved && hasMismatch) _buildMismatchBanner(theme, borderSide),
+              // Sensitivity mismatch banner
+              if (!isResolved && hasMismatch) _buildMismatchBanner(theme, borderSide),
 
-            // Section 6 — Action buttons
-            if (!isResolved) _buildActionButtons(theme, borderSide),
+              // Section 6 — Action buttons
+              if (!isResolved) _buildActionButtons(theme, borderSide),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -328,11 +346,16 @@ class _ApprovalCardState extends State<ApprovalCard> {
                   : null,
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Row(
+              child: IntrinsicHeight(
+                child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
                     flex: 2,
-                    child: Text(key, style: cellStyle),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(key, style: cellStyle),
+                    ),
                   ),
                   Expanded(
                     flex: 5,
@@ -344,41 +367,45 @@ class _ApprovalCardState extends State<ApprovalCard> {
                           _expandedParams.add(key);
                         }
                       }),
-                      child: Text(
-                        value.toString(),
-                        maxLines: _expandedParams.contains(key) ? null : 2,
-                        overflow: _expandedParams.contains(key)
-                            ? TextOverflow.visible
-                            : TextOverflow.ellipsis,
-                        style: cellStyle?.copyWith(
-                          color: isWildcard
-                              ? theme.colorScheme.onSurfaceVariant.withAlpha(100)
-                              : null,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          value.toString(),
+                          maxLines: _expandedParams.contains(key) ? null : 2,
+                          overflow: _expandedParams.contains(key)
+                              ? TextOverflow.visible
+                              : TextOverflow.ellipsis,
+                          style: cellStyle?.copyWith(
+                            color: theme.colorScheme.onSurface.withAlpha(
+                              isWildcard ? 160 : 230,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                   SizedBox(
                     width: 72,
-                    child: Center(
-                      child: readOnly
-                          ? Icon(
+                    child: readOnly
+                        ? Center(
+                            child: Icon(
                               isWildcard
                                   ? Icons.radio_button_checked
                                   : Icons.radio_button_unchecked,
                               size: 18,
                               color: theme.colorScheme.onSurfaceVariant,
-                            )
-                          : InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () => setState(() {
-                                if (isWildcard) {
-                                  _wildcardParams.remove(key);
-                                } else {
-                                  // Only one wildcard at a time
-                                  _wildcardParams = {key};
-                                }
-                              }),
+                            ),
+                          )
+                        : InkWell(
+                            onTap: () => setState(() {
+                              if (isWildcard) {
+                                _wildcardParams.remove(key);
+                              } else {
+                                // Only one wildcard at a time
+                                _wildcardParams = {key};
+                              }
+                            }),
+                            child: Center(
                               child: Icon(
                                 isWildcard
                                     ? Icons.radio_button_checked
@@ -389,9 +416,10 @@ class _ApprovalCardState extends State<ApprovalCard> {
                                     : theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
-                    ),
+                          ),
                   ),
                 ],
+              ),
               ),
             );
           }),
@@ -445,6 +473,8 @@ class _ApprovalCardState extends State<ApprovalCard> {
         style: SegmentedButton.styleFrom(
           visualDensity: VisualDensity.compact,
           textStyle: theme.textTheme.labelSmall,
+          selectedForegroundColor: theme.colorScheme.onPrimaryContainer,
+          selectedBackgroundColor: theme.colorScheme.primaryContainer,
         ),
       ),
     );
@@ -461,15 +491,28 @@ class _ApprovalCardState extends State<ApprovalCard> {
         children: [
           Text('Expires:', style: theme.textTheme.labelSmall),
           ..._expiryOptions.map((d) {
-          return ChoiceChip(
-            label: Text(_formatExpiryDuration(d)),
-            selected: _selectedExpiry == d,
-            onSelected: (_) => setState(() => _selectedExpiry = d),
-            visualDensity: VisualDensity.compact,
-            labelStyle: theme.textTheme.labelSmall,
-            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-          );
-        }),
+            final isSelected = _selectedExpiry == d;
+            final scheme = theme.colorScheme;
+            return ChoiceChip(
+              label: Text(_formatExpiryDuration(d)),
+              selected: isSelected,
+              onSelected: (_) => setState(() => _selectedExpiry = d),
+              visualDensity: VisualDensity.compact,
+              checkmarkColor: scheme.onPrimaryContainer,
+              labelStyle: theme.textTheme.labelSmall?.copyWith(
+                color: isSelected ? scheme.onPrimaryContainer : scheme.onSurface,
+              ),
+              labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+              backgroundColor: Colors.transparent,
+              selectedColor: scheme.primaryContainer,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(
+                  color: isSelected ? scheme.primary : scheme.outline,
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -530,7 +573,10 @@ class _ApprovalCardState extends State<ApprovalCard> {
               child: TextButton(
                 onPressed: () => widget.onDecline?.call(widget.approval.id),
                 style: TextButton.styleFrom(
-                  shape: const RoundedRectangleBorder(),
+                  shape: RoundedRectangleBorder(
+                    side: BorderSide(color: theme.colorScheme.outline),
+                  ),
+                  foregroundColor: theme.colorScheme.onSurface,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 child: const Text('Continue without'),
@@ -559,9 +605,11 @@ class _ApprovalCardState extends State<ApprovalCard> {
                 },
                 style: FilledButton.styleFrom(
                   shape: const RoundedRectangleBorder(),
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('Approve'),
+                child: const Text('Grant'),
               ),
             ),
           ],
