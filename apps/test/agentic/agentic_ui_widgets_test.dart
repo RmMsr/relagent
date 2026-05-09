@@ -78,7 +78,7 @@ void main() {
 
       expect(find.text('Continue without'), findsOneWidget);
       expect(find.text('Skip'), findsNothing);
-      expect(find.text('Approve'), findsOneWidget);
+      expect(find.text('Grant'), findsOneWidget);
     });
 
     testWidgets('Continue without invokes onDecline with the approval id',
