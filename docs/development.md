@@ -33,14 +33,14 @@ Commits to main should be isolated changes and focus on one aspect.
 
 Commits to feature branches should happen after every small increment. So we get anchor points to compare or go back to.
 
-Conventional commits are a good baseline. Commit messages should start with one short block summarizing the change. Major points can be added as list below. Main answers a commit message should give are:
+Conventional commits are a good baseline. Commit messages should start with 1-2 short sentencesi to summarizing the change. Major points can be added as list below. Main answers a commit message should give are:
 
 - What is new and different form an user perspective
 - What are the major changes if any in architecture, patterns or dependencies
 - Which bugs have been fixed
 - If this is part of a previous or future change, say brief what this build upon and what is next
 
-Leave out insignificant details.
+Keep language short and friendly. Leave out insignificant details.
 
 ### Branches
 

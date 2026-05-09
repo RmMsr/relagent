@@ -12,6 +12,7 @@ import '/providers/tts_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/services/api_health_check.dart';
 import '/theme/app_colors.dart';
+
 import '/widgets/voice_mode_selector.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -220,47 +221,60 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 !healthCheckState.lastResult!.isSuccess)
               _buildHealthCheckBanner(context, healthCheckState.lastResult!),
             Expanded(
-              child: ListView(
-                controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 8),
-                children: [
-                  ChatHistory(
-                    messages: chatState.messages,
-                    showAssistantPending: chatState.showAssistantPending,
-                    retryState: chatState.retryState,
-                    isVoiceAvailable: voiceCapabilities.isAsrAvailable,
-                    onRetry: (text) {
-                      ref.read(chatProvider.notifier).sendMessage(text);
-                    },
-                    onSpeak: !voiceCapabilities.isTtsAvailable
-                        ? null
-                        : (text, messageId) {
-                            final status = ttsState
-                                .getMessageState(messageId)
-                                .status;
-                            final ttsNotifier = ref.read(ttsProvider.notifier);
+              child: ColoredBox(
+                color: Colors.white,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: AppTheme.chatContentMaxWidth,
+                    ),
+                    child: ColoredBox(
+                      color: RelagentColors.backgroundGrey,
+                      child: ListView(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(bottom: 8),
+                        children: [
+                          ChatHistory(
+                            messages: chatState.messages,
+                            showAssistantPending: chatState.showAssistantPending,
+                            retryState: chatState.retryState,
+                            isVoiceAvailable: voiceCapabilities.isAsrAvailable,
+                            onRetry: (text) {
+                              ref.read(chatProvider.notifier).sendMessage(text);
+                            },
+                            onSpeak: !voiceCapabilities.isTtsAvailable
+                                ? null
+                                : (text, messageId) {
+                                    final status = ttsState
+                                        .getMessageState(messageId)
+                                        .status;
+                                    final ttsNotifier = ref.read(ttsProvider.notifier);
 
-                            switch (status) {
-                              case MessagePlaybackStatus.playing:
-                                // Pause if currently playing
-                                ttsNotifier.pause();
-                              case MessagePlaybackStatus.paused:
-                                // Resume if paused
-                                ttsNotifier.resume();
-                              case MessagePlaybackStatus.idle:
-                              case MessagePlaybackStatus.completed:
-                              case MessagePlaybackStatus.error:
-                                // Play from beginning
-                                ttsNotifier.playNow(text, messageId);
-                              case MessagePlaybackStatus.generating:
-                                // Do nothing while generating
-                                break;
-                            }
-                          },
-                    getMessagePlaybackStatus: (messageId) =>
-                        ttsState.getMessageState(messageId).status,
+                                    switch (status) {
+                                      case MessagePlaybackStatus.playing:
+                                        // Pause if currently playing
+                                        ttsNotifier.pause();
+                                      case MessagePlaybackStatus.paused:
+                                        // Resume if paused
+                                        ttsNotifier.resume();
+                                      case MessagePlaybackStatus.idle:
+                                      case MessagePlaybackStatus.completed:
+                                      case MessagePlaybackStatus.error:
+                                        // Play from beginning
+                                        ttsNotifier.playNow(text, messageId);
+                                      case MessagePlaybackStatus.generating:
+                                        // Do nothing while generating
+                                        break;
+                                    }
+                                  },
+                            getMessagePlaybackStatus: (messageId) =>
+                                ttsState.getMessageState(messageId).status,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
             ChatInput(

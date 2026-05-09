@@ -42,6 +42,8 @@ abstract final class RelagentColors {
 }
 
 abstract final class AppTheme {
+  static const double chatContentMaxWidth = 800;
+
   static ThemeData light() => ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(

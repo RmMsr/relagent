@@ -13,6 +13,7 @@ import '/providers/sse_provider.dart';
 import '/providers/tts_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/theme/app_colors.dart';
+
 import '/widgets/voice_mode_selector.dart';
 
 class AgenticChatPage extends ConsumerStatefulWidget {
@@ -158,81 +159,94 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
               _buildHealthCheckBanner(context, healthCheckState.lastResult!),
             if (chatState.isLoadingHistory) const LinearProgressIndicator(),
             Expanded(
-              child: ListView(
-                controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 8, top: 4),
-                children: [
-                  AgenticChatHistory(
-                        messages: chatState.messages,
-                        showAssistantPending: chatState.showAssistantPending,
-                        engineHealthResult: healthCheckState.lastResult,
-                        sensitivityLevel: chatState.sensitivityLevel,
-                        isVoiceAvailable: ref
-                            .watch(voiceCapabilitiesProvider)
-                            .isAsrAvailable,
-                        onRetry: () {
-                          ref
-                              .read(agenticChatProvider.notifier)
-                              .retryFailedMessages();
-                        },
-                        onSpeak:
-                            !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
-                            ? null
-                            : (text, messageId) {
-                                final status = ttsState
-                                    .getMessageState(messageId)
-                                    .status;
-                                final ttsNotifier = ref.read(
-                                  ttsProvider.notifier,
-                                );
+              child: ColoredBox(
+                color: Colors.white,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: AppTheme.chatContentMaxWidth,
+                    ),
+                    child: ColoredBox(
+                      color: RelagentColors.backgroundGrey,
+                      child: ListView(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(bottom: 8, top: 4),
+                        children: [
+                          AgenticChatHistory(
+                            messages: chatState.messages,
+                            showAssistantPending: chatState.showAssistantPending,
+                            engineHealthResult: healthCheckState.lastResult,
+                            sensitivityLevel: chatState.sensitivityLevel,
+                            isVoiceAvailable: ref
+                                .watch(voiceCapabilitiesProvider)
+                                .isAsrAvailable,
+                            onRetry: () {
+                              ref
+                                  .read(agenticChatProvider.notifier)
+                                  .retryFailedMessages();
+                            },
+                            onSpeak:
+                                !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
+                                ? null
+                                : (text, messageId) {
+                                    final status = ttsState
+                                        .getMessageState(messageId)
+                                        .status;
+                                    final ttsNotifier = ref.read(
+                                      ttsProvider.notifier,
+                                    );
 
-                                switch (status) {
-                                  case MessagePlaybackStatus.playing:
-                                    ttsNotifier.pause();
-                                  case MessagePlaybackStatus.paused:
-                                    ttsNotifier.resume();
-                                  case MessagePlaybackStatus.idle:
-                                  case MessagePlaybackStatus.completed:
-                                  case MessagePlaybackStatus.error:
-                                    ttsNotifier.playNow(text, messageId);
-                                  case MessagePlaybackStatus.generating:
-                                    break;
-                                }
-                              },
-                        getMessagePlaybackStatus: (messageId) =>
-                            ttsState.getMessageState(messageId).status,
-                        onChangeSensitivity: (level) {
-                          ref
-                              .read(agenticChatProvider.notifier)
-                              .changeSensitivity(level);
-                        },
-                        onGrantApproval: (approval, grant, isGlobal) {
-                          // ignore: discarded_futures
-                          ref
-                              .read(agenticChatProvider.notifier)
-                              .grantApproval(
-                                approvalId: approval.id,
-                                grant: grant,
-                                isGlobal: isGlobal,
-                              );
-                        },
-                        onDeclineApproval: (approvalId) {
-                          // ignore: discarded_futures
-                          ref
-                              .read(agenticChatProvider.notifier)
-                              .declineApproval(approvalId);
-                        },
-                        onContinue: () {
-                          ref
-                              .read(agenticChatProvider.notifier)
-                              .triggerContinuation();
-                        },
-                        onStop: _onStop,
-                        queuedMessage: chatState.queuedMessage,
-                        onEditQueued: _pullQueuedToInput,
+                                    switch (status) {
+                                      case MessagePlaybackStatus.playing:
+                                        ttsNotifier.pause();
+                                      case MessagePlaybackStatus.paused:
+                                        ttsNotifier.resume();
+                                      case MessagePlaybackStatus.idle:
+                                      case MessagePlaybackStatus.completed:
+                                      case MessagePlaybackStatus.error:
+                                        ttsNotifier.playNow(text, messageId);
+                                      case MessagePlaybackStatus.generating:
+                                        break;
+                                    }
+                                  },
+                            getMessagePlaybackStatus: (messageId) =>
+                                ttsState.getMessageState(messageId).status,
+                            onChangeSensitivity: (level) {
+                              ref
+                                  .read(agenticChatProvider.notifier)
+                                  .changeSensitivity(level);
+                            },
+                            onGrantApproval: (approval, grant, isGlobal) {
+                              // ignore: discarded_futures
+                              ref
+                                  .read(agenticChatProvider.notifier)
+                                  .grantApproval(
+                                    approvalId: approval.id,
+                                    grant: grant,
+                                    isGlobal: isGlobal,
+                                  );
+                            },
+                            onDeclineApproval: (approvalId) {
+                              // ignore: discarded_futures
+                              ref
+                                  .read(agenticChatProvider.notifier)
+                                  .declineApproval(approvalId);
+                            },
+                            onContinue: () {
+                              ref
+                                  .read(agenticChatProvider.notifier)
+                                  .triggerContinuation();
+                            },
+                            onStop: _onStop,
+                            queuedMessage: chatState.queuedMessage,
+                            onEditQueued: _pullQueuedToInput,
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
+                ),
+              ),
             ),
             AgenticChatInput(
               key: _chatInputKey,
