@@ -168,11 +168,20 @@ Future<SessionInfo> getSessionInfo({
   return SessionInfo.fromJson(_parseJsonObject(response.body, uri));
 }
 
+/// Response from message history containing messages + sensitivity.
+class MessageHistoryResponseData {
+  final List<AgenticMessage> messages;
+  final SensitivityLevel? sensitivityLevel;
+
+  MessageHistoryResponseData({required this.messages, this.sensitivityLevel});
+}
+
 /// Fetches message history for a session.
 ///
 /// If [afterMessageId] is provided, only messages after that UUID cursor are
 /// returned. This enables incremental fetching when new messages are appended.
-Future<List<AgenticMessage>> getMessageHistory({
+@visibleForTesting
+Future<MessageHistoryResponseData> getMessageHistory({
   required String baseUrl,
   required String sessionId,
   String? afterMessageId,
@@ -180,6 +189,7 @@ Future<List<AgenticMessage>> getMessageHistory({
   String? username,
   String? password,
   String? apiKey,
+  @visibleForTesting http.Client? client,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uriString = afterMessageId != null
@@ -195,7 +205,9 @@ Future<List<AgenticMessage>> getMessageHistory({
 
   final http.Response response;
   try {
-    response = await http.get(uri, headers: headers);
+    final effectiveClient = client ?? http.Client();
+    response = await effectiveClient.get(uri, headers: headers);
+    if (client == null) effectiveClient.close();
   } catch (e) {
     throw _networkException(e, uri);
   }
@@ -206,17 +218,33 @@ Future<List<AgenticMessage>> getMessageHistory({
 
   final responseJson = _parseJsonObject(response.body, uri);
   final messagesJson = responseJson['messages'] as List<dynamic>? ?? [];
-  return messagesJson
-      .map((json) => AgenticMessage.fromJson(json as Map<String, dynamic>))
-      .toList();
+
+  SensitivityLevel? sensitivityLevel;
+  final sensitivityRaw = responseJson['sensitivity_level'];
+  if (sensitivityRaw is int) {
+    sensitivityLevel = SensitivityLevel.fromValue(sensitivityRaw);
+  } else if (sensitivityRaw is String) {
+    sensitivityLevel = SensitivityLevel.fromName(sensitivityRaw);
+  }
+
+  return MessageHistoryResponseData(
+    messages: messagesJson
+        .map((json) => AgenticMessage.fromJson(json as Map<String, dynamic>))
+        .toList(),
+    sensitivityLevel: sensitivityLevel,
+  );
 }
 
 /// Sends a message to the engine API.
+/// When [sessionId] is null (first message in a new session), an optional
+/// [sensitivityLevel] can be included so the engine applies it before the
+/// first cycle runs, avoiding a post-hoc [setSensitivityLevel] correction.
 Future<ChatResponseData> sendAgenticMessage({
   required String baseUrl,
   String? sessionId, // null for first message, engine creates session
   required String content,
   String? messageId, // stable UUID for idempotent POST on retry
+  SensitivityLevel? sensitivityLevel,
   AuthType authType = AuthType.none,
   String? username,
   String? password,
@@ -240,7 +268,9 @@ Future<ChatResponseData> sendAgenticMessage({
         if (messageId != null) 'message_id': messageId,
       },
     ],
-    'session_id': ?sessionId,
+    if (sessionId != null) 'session_id': sessionId,
+    if (sessionId == null && sensitivityLevel != null)
+      'sensitivity_level': sensitivityLevel.value,
   };
 
   final http.Response response;

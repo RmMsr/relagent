@@ -139,6 +139,49 @@ class TestPerformUserInput:
         assert events[1].event_name == EventNames.SESSION_MESSAGES_APPENDED
         assert events[1].session_id == response.session_id
 
+    async def test_new_session_applies_sensitivity_level_from_request(
+        self,
+        chat_service: ChatService,
+        persistence: Persistence,
+        event_store: EventStore,
+    ):
+        request = ChatRequest(
+            messages=[UserMessage(content="Hello")],
+            sensitivity_level=SensitivityLevel.Confidential,
+        )
+
+        response = await chat_service.perform_user_input(request)
+
+        context = persistence.load_context(response.session_id)
+        assert context.sensitivity_level == SensitivityLevel.Confidential
+
+    async def test_existing_session_ignores_sensitivity_level_from_request(
+        self,
+        chat_service: ChatService,
+        persistence: Persistence,
+    ):
+        session = SessionInfo()
+        persistence.save_session(session)
+        initial_context = ChatContext(
+            messages=[
+                UserMessage(content="Existing", final=True),
+                AssistantMessage(content="Reply"),
+            ],
+            sensitivity_level=SensitivityLevel.Personal,
+        )
+        persistence.save_context(session.session_id, initial_context)
+
+        request = ChatRequest(
+            session_id=session.session_id,
+            messages=[UserMessage(content="New")],
+            sensitivity_level=SensitivityLevel.Confidential,
+        )
+
+        await chat_service.perform_user_input(request)
+
+        context = persistence.load_context(session.session_id)
+        assert context.sensitivity_level == SensitivityLevel.Personal
+
     async def test_perform_user_input_accumulates_messages_per_session(
         self,
         chat_service: ChatService,

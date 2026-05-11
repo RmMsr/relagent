@@ -1,6 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:relagent/agentic/models.dart';
 import 'package:relagent/agentic/services.dart';
 
 void main() {
@@ -85,6 +88,69 @@ void main() {
       final ex = tryParseConflict(body, uri) as NoInFlightCycleException;
 
       expect(ex.sessionId, '');
+    });
+  });
+
+  group('getMessageHistory', () {
+    test('parses sensitivity_level from response', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'session_id': 's-1',
+            'messages': [
+              {
+                'message_id': 'm1',
+                'role': 'assistant',
+                'timestamp': '2025-01-01T00:00:00Z',
+                'content': 'Hello',
+                'final': true,
+              },
+            ],
+            'sensitivity_level': 4,
+          }),
+          200,
+        );
+      });
+
+      final result = await getMessageHistory(
+        baseUrl: 'http://engine.test',
+        sessionId: 's-1',
+        client: mockClient,
+      );
+
+      expect(result.messages.length, 1);
+      expect(result.messages[0].text, 'Hello');
+      expect(result.sensitivityLevel, SensitivityLevel.confidential);
+    });
+
+    test('sensitivity_level is null when absent from response', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'session_id': 's-1',
+            'messages': [
+              {
+                'message_id': 'm1',
+                'role': 'assistant',
+                'timestamp': '2025-01-01T00:00:00Z',
+                'content': 'Hello',
+                'final': true,
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final result = await getMessageHistory(
+        baseUrl: 'http://engine.test',
+        sessionId: 's-1',
+        client: mockClient,
+      );
+
+      expect(result.messages.length, 1);
+      expect(result.messages[0].text, 'Hello');
+      expect(result.sensitivityLevel, isNull);
     });
   });
 }

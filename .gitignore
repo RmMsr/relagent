@@ -19,6 +19,7 @@ worktree.txt
 .aider*
 .vscode
 .windsurfpyright
+.idea
 
 # FVM Version Cache
 .fvm/

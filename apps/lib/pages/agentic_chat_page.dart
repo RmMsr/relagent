@@ -185,6 +185,11 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                                   .read(agenticChatProvider.notifier)
                                   .retryFailedMessages();
                             },
+                            onCancel: () {
+                              ref
+                                  .read(agenticChatProvider.notifier)
+                                  .cancelFailedMessages();
+                            },
                             onSpeak:
                                 !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
                                 ? null

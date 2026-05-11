@@ -101,6 +101,8 @@ class ChatService:
         context: ChatContext = (
             existing_context if existing_context is not None else ChatContext()
         )
+        if new_session and request.sensitivity_level is not None:
+            context.sensitivity_level = request.sensitivity_level
 
         # TODO: Use all request messages
         ai_response = await self.agent_execution.run_basic_query(
@@ -228,7 +230,11 @@ class ChatService:
             )
             if idx is not None:
                 messages = messages[idx + 1 :]
-        return MessagesResponse(session_id=session_id, messages=messages)
+        return MessagesResponse(
+            session_id=session_id,
+            messages=messages,
+            sensitivity_level=context.sensitivity_level,
+        )
 
     def get_session(self, session_id: UUID) -> SessionInfo:
         return self.persistence_repository.load_session(session_id=session_id)

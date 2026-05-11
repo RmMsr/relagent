@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 
 import '/agentic/models.dart';
 import '/agentic/services.dart';
@@ -115,7 +116,11 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     return AgenticChatState.initial();
   }
 
-  Future<void> loadHistory({String? afterMessageId}) async {
+  @visibleForTesting
+  Future<void> loadHistory({
+    String? afterMessageId,
+    @visibleForTesting http.Client? client,
+  }) async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final sessionId = settings.agenticSessionId;
@@ -132,7 +137,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       final password = await settingsNotifier.getEnginePassword();
       final apiKey = await settingsNotifier.getEngineApiKey();
 
-      final messages = await getMessageHistory(
+      final historyData = await getMessageHistory(
         baseUrl: settings.engineBaseUrl,
         sessionId: sessionId,
         afterMessageId: afterMessageId,
@@ -140,11 +145,18 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         username: settings.engineUsername,
         password: password,
         apiKey: apiKey,
+        client: client,
       );
+
+      final sensitivityLevel = historyData.sensitivityLevel;
+      final messages = historyData.messages;
 
       if (afterMessageId != null) {
         _ingestMessages(messages);
-        state = state.copyWith(isLoadingHistory: false);
+        state = state.copyWith(
+          isLoadingHistory: false,
+          sensitivityLevel: sensitivityLevel,
+        );
         // If the fetch settled the in-flight cycle, clear the pending indicator
         // before auto-dispatching so the UI doesn't flash real-message + bubble.
         _clearPendingIfSettled();
@@ -155,7 +167,11 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         _dispatchQueuedIfAny();
       } else {
         // Full load replaces state entirely — do not auto-dispatch.
-        state = state.copyWith(messages: messages, isLoadingHistory: false);
+        state = state.copyWith(
+          messages: messages,
+          isLoadingHistory: false,
+          sensitivityLevel: sensitivityLevel,
+        );
         // Same pending-clear for the full-load path (e.g. SSE fires before
         // POST response for a new session, cursor is null → full load arrives
         // with settled messages while showAssistantPending is still true).
@@ -205,6 +221,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         sessionId: sessionId,
         content: userMessage.text,
         messageId: userMessage.messageId,
+        sensitivityLevel: state.sensitivityLevel,
         authType: settings.engineAuthType,
         username: settings.engineUsername,
         password: password,
@@ -806,5 +823,22 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         break;
       }
     }
+  }
+
+  /// Strip trailing error messages and clear the queued message.
+  /// Leaves all prior messages intact so the user can see what was said.
+  void cancelFailedMessages() {
+    final messages = state.messages;
+    int lastNonError = messages.length - 1;
+    while (lastNonError >= 0 &&
+        messages[lastNonError].role == AgenticRole.error) {
+      lastNonError--;
+    }
+    final cleaned = messages.sublist(0, lastNonError + 1);
+    state = state.copyWith(
+      messages: cleaned,
+      clearQueuedMessage: true,
+    );
+    Logger.debug('AgenticChat: Cancelled failed messages');
   }
 }

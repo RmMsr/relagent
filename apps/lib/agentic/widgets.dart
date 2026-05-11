@@ -174,7 +174,7 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
                 border: InputBorder.none,
                 hintText: enabled
                     ? 'Type a message...'
-                    : 'Edit queued message to type a new one',
+                    : 'Wait for response or edit queued message',
                 hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               minLines: 1,
@@ -248,6 +248,7 @@ class AgenticChatHistory extends StatelessWidget {
   final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
   final EngineHealthResult? engineHealthResult;
   final VoidCallback? onRetry;
+  final VoidCallback? onCancel;
   final bool isVoiceAvailable;
   final SensitivityLevel sensitivityLevel;
   final ValueChanged<SensitivityLevel>? onChangeSensitivity;
@@ -267,6 +268,7 @@ class AgenticChatHistory extends StatelessWidget {
     this.getMessagePlaybackStatus,
     this.engineHealthResult,
     this.onRetry,
+    this.onCancel,
     this.isVoiceAvailable = false,
     this.sensitivityLevel = SensitivityLevel.personal,
     this.onChangeSensitivity,
@@ -415,6 +417,7 @@ class AgenticChatHistory extends StatelessWidget {
               onSpeak: onSpeak,
               getMessagePlaybackStatus: getMessagePlaybackStatus,
               onRetry: onRetry,
+              onCancel: onCancel,
             ),
           );
         }
@@ -454,6 +457,7 @@ class _AgenticMessageBubble extends StatelessWidget {
   final void Function(String, String)? onSpeak;
   final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
   final VoidCallback? onRetry;
+  final VoidCallback? onCancel;
 
   const _AgenticMessageBubble({
     required this.message,
@@ -462,6 +466,7 @@ class _AgenticMessageBubble extends StatelessWidget {
     this.onSpeak,
     this.getMessagePlaybackStatus,
     this.onRetry,
+    this.onCancel,
   });
 
   @override
@@ -533,20 +538,39 @@ class _AgenticMessageBubble extends StatelessWidget {
                 getMessagePlaybackStatus: getMessagePlaybackStatus,
               ),
             ),
-          if (isError && onRetry != null)
+          if (isError && (onRetry != null || onCancel != null))
             Padding(
               padding: const EdgeInsets.only(top: 8, left: 4),
-              child: TextButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Retry'),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  visualDensity: VisualDensity.compact,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onRetry != null)
+                    TextButton.icon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Retry'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  if (onCancel != null)
+                    TextButton.icon(
+                      onPressed: onCancel,
+                      icon: const Icon(Icons.cancel_outlined, size: 18),
+                      label: const Text('Cancel'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                ],
               ),
             ),
         ],

@@ -211,7 +211,6 @@ class SystemAction(BaseModel):
         description="True once the surrounding cycle has settled",
     )
 
-
 ChatMessage = UserMessage | AssistantMessage | SystemAction
 
 
@@ -245,6 +244,10 @@ class ChatRequest(BaseModel):
             [UserMessage(content="Hi, how long until peaceful coexistence day?")]
         ],
     )
+    sensitivity_level: SensitivityLevel | None = Field(
+        default=None,
+        description="The desired sensitivity level for a new session. Ignored when session_id is provided.",
+    )
 
 
 class ChatResponse(BaseModel):
@@ -266,4 +269,8 @@ class MessagesResponse(BaseModel):
     messages: Sequence[ChatMessage] = Field(
         description="All messages in the session",
         default_factory=list,
+    )
+    sensitivity_level: SensitivityLevel | None = Field(
+        default=None,
+        description="The sensitivity level of the session context",
     )

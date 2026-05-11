@@ -1,5 +1,10 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:relagent/agentic/models.dart';
 import 'package:relagent/models/settings.dart';
 import 'package:relagent/providers/agentic_chat_provider.dart';
@@ -491,6 +496,80 @@ void main() {
 
     test('AgenticMessage.user defaults to non-final (in-flight)', () {
       expect(AgenticMessage.user('hi').isFinal, isFalse);
+    });
+  });
+
+  group('AgenticChatNotifier — loadHistory sensitivity', () {
+    test('sets sensitivityLevel from response on full load', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'session_id': 'test-session',
+            'messages': [],
+            'sensitivity_level': 4,
+          }),
+          200,
+        );
+      });
+
+      final container = _makeContainer(sessionId: 'test-session');
+      addTearDown(container.dispose);
+      final notifier = container.read(agenticChatProvider.notifier);
+
+      await notifier.loadHistory(client: mockClient);
+
+      final state = container.read(agenticChatProvider);
+      expect(state.sensitivityLevel, SensitivityLevel.confidential);
+    });
+
+    test('sets sensitivityLevel from response on incremental load', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'session_id': 'test-session',
+            'messages': [],
+            'sensitivity_level': 4,
+          }),
+          200,
+        );
+      });
+
+      final container = _makeContainer(sessionId: 'test-session');
+      addTearDown(container.dispose);
+      final notifier = container.read(agenticChatProvider.notifier);
+
+      await notifier.loadHistory(afterMessageId: 'cursor', client: mockClient);
+
+      final state = container.read(agenticChatProvider);
+      expect(state.sensitivityLevel, SensitivityLevel.confidential);
+    });
+
+    test('does not reset sensitivityLevel when field is absent', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'session_id': 'test-session',
+            'messages': [],
+          }),
+          200,
+        );
+      });
+
+      final container = _makeContainer(sessionId: 'test-session');
+      addTearDown(container.dispose);
+      final notifier = container.read(agenticChatProvider.notifier);
+
+      notifier.setStateForTest(
+        AgenticChatState(
+          messages: [],
+          sensitivityLevel: SensitivityLevel.confidential,
+        ),
+      );
+
+      await notifier.loadHistory(client: mockClient);
+
+      final state = container.read(agenticChatProvider);
+      expect(state.sensitivityLevel, SensitivityLevel.confidential);
     });
   });
 }

@@ -208,6 +208,53 @@ class TestPostMessages:
         data = response.json()
         assert "session_id" in data
 
+    def test_chat_request_with_sensitivity_level(
+        self, client_with_service_mock: TestClient, mock_chat_service: MagicMock
+    ):
+        session_id = uuid.uuid4()
+        mock_chat_service.perform_user_input = AsyncMock(
+            return_value=ChatResponse(
+                session_id=session_id,
+                message=AssistantMessage(content="Handled"),
+                sensitivity_level=SensitivityLevel.Confidential,
+            )
+        )
+
+        response = client_with_service_mock.post(
+            "/api/v1/messages",
+            json={
+                "messages": [{"role": "user", "content": "Hello"}],
+                "sensitivity_level": 4,
+            },
+        )
+
+        assert response.status_code == 200
+        _, kwargs = mock_chat_service.perform_user_input.call_args
+        request = kwargs["request"]
+        assert request.sensitivity_level == SensitivityLevel.Confidential
+
+    def test_chat_request_without_sensitivity_level(
+        self, client_with_service_mock: TestClient, mock_chat_service: MagicMock
+    ):
+        session_id = uuid.uuid4()
+        mock_chat_service.perform_user_input = AsyncMock(
+            return_value=ChatResponse(
+                session_id=session_id,
+                message=AssistantMessage(content="Handled"),
+                sensitivity_level=SensitivityLevel.Personal,
+            )
+        )
+
+        response = client_with_service_mock.post(
+            "/api/v1/messages",
+            json={"messages": [{"role": "user", "content": "Hello"}]},
+        )
+
+        assert response.status_code == 200
+        _, kwargs = mock_chat_service.perform_user_input.call_args
+        request = kwargs["request"]
+        assert request.sensitivity_level is None
+
     def test_invalid_body_missing_content(self, client_with_service_mock: TestClient):
         response = client_with_service_mock.post(
             "/api/v1/messages",
@@ -338,6 +385,35 @@ class TestGetMessages:
         assert len(messages) == 1
         assert messages[0]["content"] == "After cursor"
         assert "message_id" in messages[0]
+
+    def test_includes_sensitivity_level(
+        self, client_with_service_mock: TestClient, mock_chat_service: MagicMock
+    ):
+        session_id = uuid.uuid4()
+        mock_chat_service.get_messages.return_value = MessagesResponse(
+            session_id=session_id,
+            messages=[UserMessage(content="Hello")],
+            sensitivity_level=SensitivityLevel.Confidential,
+        )
+
+        response = client_with_service_mock.get(f"/api/v1/messages/{session_id}")
+        data = response.json()
+
+        assert data["sensitivity_level"] == 4
+
+    def test_sensitivity_level_null_when_not_set(
+        self, client_with_service_mock: TestClient, mock_chat_service: MagicMock
+    ):
+        session_id = uuid.uuid4()
+        mock_chat_service.get_messages.return_value = MessagesResponse(
+            session_id=session_id,
+            messages=[UserMessage(content="Hello")],
+        )
+
+        response = client_with_service_mock.get(f"/api/v1/messages/{session_id}")
+        data = response.json()
+
+        assert data["sensitivity_level"] is None
 
 
 class TestGetStatus:
