@@ -436,7 +436,7 @@ void main() {
       expect(textField.enabled, isFalse);
       expect(
         textField.decoration?.hintText,
-        'Wait for response or edit queued message to type a new one',
+        'Wait for response or edit queued message',
       );
 
       final sendBtn = tester.widget<IconButton>(

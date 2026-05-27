@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:relagent/models/settings.dart';
 import 'package:relagent/providers/agentic_chat_provider.dart';
 import 'package:relagent/providers/settings_provider.dart';
@@ -34,7 +35,7 @@ class _TrackingChatNotifier extends AgenticChatNotifier {
   }
 
   @override
-  Future<void> loadHistory({String? afterMessageId}) async {
+  Future<void> loadHistory({String? afterMessageId, http.Client? client}) async {
     loadHistoryCount++;
     final c = _pauseCompleter;
     if (c != null) await c.future;
