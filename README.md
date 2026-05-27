@@ -9,7 +9,7 @@
 **\#PrivacyFirst - \#SelfHosting - \#DataSovereignty - \#DigitalIndependence**
 
 <a href="https://play.google.com/store/apps/details?id=org.venkado.relagent">
-  <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Relagent on Google Play" width="180">
+  <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Relagent on Google Play" width="120">
 </a>
 
 </div>
@@ -121,15 +121,15 @@ To ensure everything is working as expected, try out the **Self-Test** on the
 
 Those are some very relevant topics that we would love to spend time on:
 
-- **Getting started bundle with llama.cpp**: Removes the need to find and install an inference engine for demos and first time use.
+- **"Getting started" bundle with CPU inference**: Removes the need to find and install an inference engine for demos and first time use.
 - **Onboarding wizard**: Explain core concepts and give the user the chance to specify some preferences like spoken languages or a default location.
 - **Explicit cross-session memory**: Creating and accessing topic specific long-term memory.
 - **Sandbox for untrusted steps**: Increase security by restricting access to necessary resources.
-- **Response actions**: Items the user can interact with like links or phone call actions
-- **External triggers**: Allowing external events like calendar entries or scheduled reminders to initiate agent actions.
+- **Response actions**: Items the user can interact with like links or phone calls
+- **External triggers**: Allowing events like calendar entries or scheduled reminders to initiate agent actions.
 - **Security gates**: Map execution steps (data access or tool calling) to risks and apply rules and permissions.
 - **Evolving context seed**: Allows the agent to step into interactions with distilled knowledge from previous sessions.
-- **Desktop installer**: Rollout as an all-in-one packe to simplify setup.
+- **Desktop installer**: Rollout as an all-in-one package to simplify setup.
 
 ## Design decisions and limitations
 
