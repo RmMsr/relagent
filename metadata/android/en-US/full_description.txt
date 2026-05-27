@@ -1,4 +1,4 @@
-Run a modern AI agent yourself without external services. You need just this app and a computer to run the Relagent Engine and a Large Language Model (LLM).
+Run a modern private AI agent yourself without external services. You need just this app and a computer to run the Relagent Engine and a Large Language Model (LLM).
 
 The goal of the Relagent project is an accessible solution for agentic AI services with full control over your data. Setting up your own installation should be within reach without considerable technical knowledge or financial investment. The software is designed to be resource-efficient without any hidden costs.
 
@@ -8,21 +8,21 @@ What Relagent brings you:
 
 * 🗨️ <b>Chat interface</b>: Chat with your AI assistant and manage sessions.
 * 🌐 <b>Persistent sessions</b>: Open new sessions and continue them on any device. Data stays on your systems only.
-* 🎤 <b>Speech Integration</b>: Input and Output on device with about 40 languages.
-* ⚖️ <b>Use any open-weights model</b>: By using the OpenAI-compatible chat completions protocol, you can choose the inference service that works best for you. No external service needed - but you can use one.
-* 🔒️ <b>API Key Authentication</b>: Restrict access to your data. Combine with a HTTPS proxy or a VPN to protect your data while accessing it from anywhere.
-* 🧰 <b>Agentic tools</b>: For example web search. You can decide in which cases you want to be asked for permission based on your selected privacy level.
+* 🎤 <b>Speech Integration</b>: Input and Output on-device with about 40 languages.
+* ⚖️ <b>Use any open-weights model</b>: By using the OpenAI-compatible chat completions protocol, you can choose the inference service that works best for you. No external service is needed - but you can use one.
+* 🔒️ <b>API Key Authentication</b>: Restrict access to your data. Combine with an HTTPS proxy or a VPN to protect your data while accessing it from anywhere.
+* 🧰 <b>Agentic tools</b>: For example, web search. You can decide in which cases you want to be asked for permission based on your selected privacy level.
 
 What you do <b>NOT need</b>:
 
-* Register for a 3rd party service (unless you want to use a commercial LLM provider)
+* Register for a third-party service (unless you want to use a commercial LLM provider)
 * Pay for any usage or access (but I appreciate donations)
 * Fear that your data ends up in big data silos or model training
 
 What you <b>CAN do</b>:
 
 * Host the Relagent engine yourself (start on your computer, switch to permanent installation when you are ready)
-* Run a Large Language Model yourself (needs one additional app, there are several free options with or without graphical interface to choose from)
+* Run a Large Language Model yourself (needs one additional app, there are several free options with or without a graphical interface to choose from)
 * Protect the API with HTTPS, Basic Auth or using a VPN.
 
 For more information:
