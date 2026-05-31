@@ -237,6 +237,12 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                                   .read(agenticChatProvider.notifier)
                                   .declineApproval(approvalId);
                             },
+                            onDeclineAllApprovals: (approvalIds) {
+                              // ignore: discarded_futures
+                              ref
+                                  .read(agenticChatProvider.notifier)
+                                  .declineAllAndContinue(approvalIds);
+                            },
                             onContinue: () {
                               ref
                                   .read(agenticChatProvider.notifier)

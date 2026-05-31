@@ -324,7 +324,11 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         indexById[msg.messageId] = out.length;
         out.add(msg);
       } else if (!out[idx].isFinal) {
-        out[idx] = msg;
+        final existing = out[idx];
+        // Guard: preserve approvals if the incoming update lost them.
+        out[idx] = (existing.approvals != null && msg.approvals == null)
+            ? msg.copyWith(approvals: existing.approvals)
+            : msg;
       }
     }
     state = state.copyWith(messages: out);
@@ -554,6 +558,46 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     }
   }
 
+  /// Decline all listed approvals server-side before triggering continuation,
+  /// so /continue never races ahead of the decline API calls.
+  Future<void> declineAllAndContinue(List<String> approvalIds) async {
+    for (final id in approvalIds) {
+      _updateApprovalResolution(id, ApprovalResolution.declined,
+          skipAutoTrigger: true);
+    }
+
+    final settings = ref.read(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+    final sessionId = settings.agenticSessionId;
+
+    if (sessionId == null) return;
+
+    try {
+      final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
+
+      await Future.wait([
+        for (final id in approvalIds)
+          declineSessionApproval(
+            baseUrl: settings.engineBaseUrl,
+            sessionId: sessionId,
+            approvalId: id,
+            authType: settings.engineAuthType,
+            username: settings.engineUsername,
+            password: password,
+            apiKey: apiKey,
+          ),
+      ]);
+
+      Logger.debug('AgenticChat: Declined ${approvalIds.length} approval(s), continuing');
+    } catch (e) {
+      Logger.debug('AgenticChat: Failed to decline approvals: $e');
+      rethrow;
+    }
+
+    await triggerContinuation();
+  }
+
   /// Decline a specific approval — records granted=false on the in-flight
   /// SystemAction. Replaces the prior "skip" affordance.
   Future<void> declineApproval(String approvalId) async {
@@ -690,6 +734,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     String approvalId,
     ApprovalResolution resolution, {
     DateTime? expiresAt,
+    bool skipAutoTrigger = false,
   }) {
     final updatedMessages = state.messages.map((msg) {
       if (msg.role == AgenticRole.system && msg.approvals != null) {
@@ -707,7 +752,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     }).toList();
 
     state = state.copyWith(messages: updatedMessages);
-    _triggerContinuationIfAllResolved();
+    if (!skipAutoTrigger) _triggerContinuationIfAllResolved();
   }
 
   @visibleForTesting

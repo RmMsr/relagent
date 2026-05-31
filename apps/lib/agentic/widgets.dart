@@ -255,6 +255,7 @@ class AgenticChatHistory extends StatelessWidget {
   final void Function(ApprovalData, GrantRequest, bool isGlobal)?
       onGrantApproval;
   final ValueChanged<String>? onDeclineApproval;
+  final void Function(List<String> approvalIds)? onDeclineAllApprovals;
   final VoidCallback? onContinue;
   final VoidCallback? onStop;
   final String? queuedMessage;
@@ -274,6 +275,7 @@ class AgenticChatHistory extends StatelessWidget {
     this.onChangeSensitivity,
     this.onGrantApproval,
     this.onDeclineApproval,
+    this.onDeclineAllApprovals,
     this.onContinue,
     this.onStop,
     this.queuedMessage,
@@ -388,6 +390,7 @@ class AgenticChatHistory extends StatelessWidget {
                     onChangeSensitivity: onChangeSensitivity,
                     onGrant: onGrantApproval,
                     onDecline: onDeclineApproval,
+                    onDeclineAll: isLastMessage ? onDeclineAllApprovals : null,
                     onContinue: isLastMessage ? onContinue : null,
                     onStop: isLastMessage ? onStop : null,
                   ),
