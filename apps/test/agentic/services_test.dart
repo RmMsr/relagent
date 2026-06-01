@@ -89,6 +89,75 @@ void main() {
 
       expect(ex.sessionId, '');
     });
+
+    test('maps provider_unavailable to ProviderUnavailableException', () {
+      final body = jsonEncode({
+        'detail': {
+          'error': 'provider_unavailable',
+          'reason': 'Inference provider returned HTTP 503',
+        },
+      });
+
+      final result = tryParseConflict(body, uri);
+
+      expect(result, isA<ProviderUnavailableException>());
+      final ex = result as ProviderUnavailableException;
+      expect(ex.technicalDetails, 'Inference provider returned HTTP 503');
+      expect(ex.userMessage.toLowerCase(), contains('retry'));
+      expect(ex.url, uri.toString());
+    });
+
+    test('provider_unavailable without reason keeps a non-empty detail', () {
+      final body = jsonEncode({
+        'detail': {'error': 'provider_unavailable'},
+      });
+
+      final ex = tryParseConflict(body, uri) as ProviderUnavailableException;
+
+      expect(ex.technicalDetails, isNotEmpty);
+    });
+  });
+
+  group('sendAgenticMessage provider availability', () {
+    test('maps 503 provider_unavailable body to ProviderUnavailableException',
+        () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'detail': {
+              'error': 'provider_unavailable',
+              'reason': 'Inference provider returned HTTP 503',
+            },
+          }),
+          503,
+        );
+      });
+
+      expect(
+        () => sendAgenticMessage(
+          baseUrl: 'http://engine.test',
+          content: 'hi',
+          client: mockClient,
+        ),
+        throwsA(isA<ProviderUnavailableException>()),
+      );
+    });
+
+    test('maps bare 503 (no structured body) to ProviderUnavailableException',
+        () async {
+      final mockClient = MockClient((request) async {
+        return http.Response('Service Unavailable', 503);
+      });
+
+      expect(
+        () => sendAgenticMessage(
+          baseUrl: 'http://engine.test',
+          content: 'hi',
+          client: mockClient,
+        ),
+        throwsA(isA<ProviderUnavailableException>()),
+      );
+    });
   });
 
   group('getMessageHistory', () {

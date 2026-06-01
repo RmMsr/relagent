@@ -854,13 +854,11 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
     Logger.debug('AgenticChat: Retrying ${retryMessages.length} message(s)');
 
-    // Strip from the first retry message to the end (includes trailing errors).
-    int stripFrom = messages.indexOf(retryMessages.first);
-    while (stripFrom > 0 && messages[stripFrom - 1].role == AgenticRole.error) {
-      stripFrom--;
-    }
-    state = state.copyWith(messages: messages.sublist(0, stripFrom));
-
+    // Keep the trailing error(s) in place so the user can follow the sequence
+    // of events. The re-POSTed user messages already live in history and are
+    // settled, so _dispatchUserMessage's optimistic add is deduped by
+    // _ingestMessages — the user message is not duplicated, and the fresh
+    // response (or a new error) is appended after the preserved error.
     for (final userMsg in retryMessages) {
       await _dispatchUserMessage(userMsg);
       if (state.messages.isNotEmpty &&

@@ -19,9 +19,13 @@ def get_version() -> str:
     return VERSION_FILE.read_text().strip()
 
 
-def build_with_framework(framework: str, allow_cache: bool = False) -> str:
+def build_with_framework(framework: str, target: str = "", allow_cache: bool = False) -> str:
     """Build container image with version tag. Returns the version."""
     version = get_version()
+
+    if target:
+        version += f"-{target}"
+
     image = f"{IMAGE_BASE}:{version}"
 
     # Build with version tags
@@ -33,6 +37,8 @@ def build_with_framework(framework: str, allow_cache: bool = False) -> str:
         "-f",
         "Containerfile",
     ]
+    if target:
+        command.extend(["--target", target])
     if not allow_cache:
         command.append("--no-cache")
     command.append(".")
@@ -56,6 +62,10 @@ def build_with_framework(framework: str, allow_cache: bool = False) -> str:
 
 if __name__ == "__main__":
     framework = find_container_framework()
-    version = build_with_framework(framework)
+    versions = [
+        build_with_framework(framework, allow_cache=True),
+        build_with_framework(framework, target="bundled", allow_cache=True),
+    ]
     print("\nBuilt images:")
-    print(f"  {IMAGE_BASE}:{version}")
+    for ver in versions:
+        print(f"  {IMAGE_BASE}:{ver}")

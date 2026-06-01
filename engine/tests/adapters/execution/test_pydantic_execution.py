@@ -12,6 +12,7 @@ from pydantic_ai import (
     UserPromptPart,
     models,
 )
+from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 
@@ -20,6 +21,7 @@ from engine.adapters.pydantic_ai_execution.agent_definitions import (
     title_summarizer_agent,
 )
 from engine.adapters.pydantic_ai_execution.queries import PydanticAgentAdapter
+from engine.domain.exceptions import ProviderUnavailable
 from engine.domain.models import (
     Approval,
     AssistantMessage,
@@ -948,3 +950,70 @@ class TestExecutionLoop:
 
         assert isinstance(result, SystemAction)
         assert len(result.approvals) == 1
+
+
+class TestProviderUnavailableHandling:
+    """The adapter maps provider transport failures to ProviderUnavailable so
+    higher layers don't depend on pydantic_ai/openai exception types."""
+
+    def _raising_model(self, exc: Exception) -> FunctionModel:
+        def model_function(
+            messages: list[ModelMessage], info: AgentInfo
+        ) -> ModelResponse:
+            raise exc
+
+        return FunctionModel(model_function)
+
+    async def test_run_basic_query_raises_on_connection_error(
+        self, adapter: PydanticAgentAdapter
+    ):
+        model = self._raising_model(
+            ModelAPIError(model_name="olmo-3", message="Connection error.")
+        )
+        with discussion_agent.override(model=model):
+            with pytest.raises(ProviderUnavailable) as exc_info:
+                await adapter.run_basic_query(context=ChatContext(), query="hi")
+
+        # The reason names the configured endpoint and the underlying cause so
+        # the user can tell a misconfigured/offline provider from a real bug.
+        reason = exc_info.value.reason
+        assert "11434" in reason  # default PROVIDER_API_BASE host:port
+        assert "Connection error" in reason
+        # The provider message is embedded in parentheses; a trailing period
+        # from the provider must not leave a stray ".)" inside the brackets.
+        assert ".)" not in reason
+
+    async def test_run_basic_query_raises_on_http_5xx(
+        self, adapter: PydanticAgentAdapter
+    ):
+        model = self._raising_model(
+            ModelHTTPError(status_code=503, model_name="olmo-3", body="loading model")
+        )
+        with discussion_agent.override(model=model):
+            with pytest.raises(ProviderUnavailable) as exc_info:
+                await adapter.run_basic_query(context=ChatContext(), query="hi")
+
+        reason = exc_info.value.reason
+        assert "503" in reason
+        assert "loading model" in reason  # provider's own body is surfaced
+
+    async def test_run_basic_query_passes_through_http_4xx(
+        self, adapter: PydanticAgentAdapter
+    ):
+        """A 4xx is a client/config error, not provider unavailability."""
+        model = self._raising_model(
+            ModelHTTPError(status_code=404, model_name="olmo-3", body="no such model")
+        )
+        with discussion_agent.override(model=model):
+            with pytest.raises(ModelHTTPError):
+                await adapter.run_basic_query(context=ChatContext(), query="hi")
+
+    async def test_generate_title_raises_on_connection_error(
+        self, adapter: PydanticAgentAdapter
+    ):
+        model = self._raising_model(
+            ModelAPIError(model_name="olmo-3", message="Connection error.")
+        )
+        with title_summarizer_agent.override(model=model):
+            with pytest.raises(ProviderUnavailable):
+                await adapter.generate_title(query="some question")

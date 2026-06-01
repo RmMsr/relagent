@@ -42,10 +42,16 @@ build-engine:
     - buildah push $CI_REGISTRY_IMAGE:$PACKAGE_VERSION
     - buildah tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION $CI_REGISTRY_IMAGE:any
     - buildah push $CI_REGISTRY_IMAGE:any
+    - buildah build --layers --platform=linux/amd64 --target bundled --tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION-bundled .
+    - buildah push $CI_REGISTRY_IMAGE:$PACKAGE_VERSION-bundled
+    - buildah tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION-bundled $CI_REGISTRY_IMAGE:any-bundled
+    - buildah push $CI_REGISTRY_IMAGE:any-bundled
     - |
       if echo "$PACKAGE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
         buildah tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION $CI_REGISTRY_IMAGE:latest
         buildah push $CI_REGISTRY_IMAGE:latest
+        buildah tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION-bundled $CI_REGISTRY_IMAGE:latest-bundled
+        buildah push $CI_REGISTRY_IMAGE:latest-bundled
       fi
 
 build-android:

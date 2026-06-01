@@ -116,6 +116,20 @@ class NoInFlightCycleException extends EngineApiException {
   }) : super(userMessage: 'No active request to stop');
 }
 
+/// Raised when the engine returns 503 because the inference provider is
+/// unreachable or not ready yet (e.g. a bundled llama.cpp still loading its
+/// model). The condition is transient — the user-facing message is retryable.
+class ProviderUnavailableException extends EngineApiException {
+  ProviderUnavailableException({
+    required super.technicalDetails,
+    super.url,
+  }) : super(
+          userMessage:
+              'The inference engine is unreachable or still starting up — '
+              'please retry.',
+        );
+}
+
 Map<String, String> _buildHeaders({
   required AuthType authType,
   String? username,
@@ -249,6 +263,7 @@ Future<ChatResponseData> sendAgenticMessage({
   String? username,
   String? password,
   String? apiKey,
+  @visibleForTesting http.Client? client,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse('$normalizedUrl/api/v1/messages');
@@ -275,7 +290,13 @@ Future<ChatResponseData> sendAgenticMessage({
 
   final http.Response response;
   try {
-    response = await http.post(uri, headers: headers, body: jsonEncode(bodyMap));
+    final effectiveClient = client ?? http.Client();
+    response = await effectiveClient.post(
+      uri,
+      headers: headers,
+      body: jsonEncode(bodyMap),
+    );
+    if (client == null) effectiveClient.close();
   } catch (e) {
     throw _networkException(e, uri);
   }
@@ -622,7 +643,7 @@ EngineApiException _httpException(
   String? notFoundMessage,
   String? invalidDataMessage,
 }) {
-  if (response.statusCode == 409) {
+  if (response.statusCode == 409 || response.statusCode == 503) {
     final conflict = tryParseConflict(response.body, uri);
     if (conflict != null) return conflict;
   }
@@ -634,6 +655,12 @@ EngineApiException _httpException(
     userMessage = notFoundMessage ?? 'Endpoint not found (check engine URL and version)';
   } else if (response.statusCode == 422) {
     userMessage = invalidDataMessage ?? 'Invalid request data';
+  } else if (response.statusCode == 503) {
+    // Reached only when the 503 had no structured provider_unavailable body.
+    return ProviderUnavailableException(
+      technicalDetails: _extractErrorDetails(response.statusCode, response.body),
+      url: uri.toString(),
+    );
   } else if (response.statusCode >= 500) {
     userMessage = 'Engine error occurred';
   } else {
@@ -668,6 +695,13 @@ EngineApiException? tryParseConflict(String body, Uri uri) {
       return NoInFlightCycleException(
         sessionId: sessionId,
         technicalDetails: body,
+        url: uri.toString(),
+      );
+    }
+    if (error == 'provider_unavailable') {
+      final reason = detail['reason'] as String?;
+      return ProviderUnavailableException(
+        technicalDetails: (reason != null && reason.isNotEmpty) ? reason : body,
         url: uri.toString(),
       );
     }

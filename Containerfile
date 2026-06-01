@@ -27,7 +27,7 @@ ADD apps/assets/silero_vad.onnx apps/assets/voice-models.json ./assets/
 
 RUN flutter build web --release --wasm --base-href=/app/
 
-FROM ghcr.io/astral-sh/uv:debian-slim
+FROM ghcr.io/astral-sh/uv:debian-slim AS app
 
 RUN useradd --home-dir=/app --no-create-home --shell=/usr/bin/sh app
 
@@ -52,6 +52,8 @@ RUN apt-get update && \
 ADD run/settings-template.ini \
     /app/.local/share/org.venkado.relagent-engine/settings.ini
 
+ADD run/entrypoint.sh /app/entrypoint.sh
+
 ADD pyproject.toml uv.lock VERSION ./
 
 USER app
@@ -62,4 +64,24 @@ ADD engine ./engine
 
 COPY --chown=root:root --from=flutter-builder /app/build/web ./web
 
-CMD [ "python", "-m", "engine.api.run" ]
+CMD [ "/app/entrypoint.sh" ]
+
+FROM ghcr.io/ggml-org/llama.cpp:server AS llama
+
+FROM app AS bundled
+
+USER root
+
+COPY --from=llama /app/ /opt/llama/
+
+ENV LD_LIBRARY_PATH=/opt/llama PROVIDER_BUNDLED=true
+
+RUN apt-get update && \
+    apt-get install libssl3 libgomp1 -y && \
+    apt-get clean
+
+USER app
+
+RUN mkdir -p /app/.cache/llama.cpp/
+
+FROM app AS slim

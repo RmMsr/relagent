@@ -13,7 +13,11 @@ from engine.api.v1 import (
     dependency_approval_service,
     dependency_chat_service,
 )
-from engine.domain.exceptions import ChatContextNotFound, SessionNotFound
+from engine.domain.exceptions import (
+    ChatContextNotFound,
+    ProviderUnavailable,
+    SessionNotFound,
+)
 from engine.domain.models import (
     AgentStats,
     AssistantMessage,
@@ -144,6 +148,24 @@ class TestPostMessages:
         assert data["session_id"] == str(session_id)
         assert data["message"]["role"] == "assistant"
         assert data["message"]["content"] == "Hello, it is 9:55"
+
+    def test_provider_unavailable_returns_503(
+        self, client_with_service_mock: TestClient, mock_chat_service: MagicMock
+    ):
+        mock_chat_service.perform_user_input = AsyncMock(
+            side_effect=ProviderUnavailable("Inference provider returned HTTP 503")
+        )
+
+        response = client_with_service_mock.post(
+            "/api/v1/messages",
+            json={"messages": [{"role": "user", "content": "Hello"}]},
+        )
+
+        assert response.status_code == 503
+        assert response.headers.get("Retry-After") is not None
+        detail = response.json()["detail"]
+        assert detail["error"] == "provider_unavailable"
+        assert detail["reason"] == "Inference provider returned HTTP 503"
 
     def test_response_includes_agent_stats(
         self, client_with_service_mock: TestClient, mock_chat_service: MagicMock
@@ -814,6 +836,24 @@ class TestContinueSession:
 
         assert response.status_code == 404
         assert response.json()["detail"] == "Session not found"
+
+    def test_provider_unavailable_returns_503(
+        self, client_with_service_mock: TestClient, mock_chat_service: MagicMock
+    ):
+        session_id = uuid.uuid4()
+        mock_chat_service.continue_session = AsyncMock(
+            side_effect=ProviderUnavailable("Inference provider is unreachable")
+        )
+
+        response = client_with_service_mock.post(
+            f"/api/v1/sessions/{session_id}/continue"
+        )
+
+        assert response.status_code == 503
+        assert response.headers.get("Retry-After") is not None
+        detail = response.json()["detail"]
+        assert detail["error"] == "provider_unavailable"
+        assert detail["reason"] == "Inference provider is unreachable"
 
     def test_invalid_uuid_format(self, client_with_service_mock: TestClient):
         response = client_with_service_mock.post(

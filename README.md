@@ -33,35 +33,20 @@ The goal of the Relagent project is an accessible solution for agentic AI servic
 
 ## Quick start
 
-The easiest way to get your private instance of Relagent (the relatable agentic minion) is to use the containerized setup. More installation options are explained in the [Installation documentation](docs/installation.md).
+The easiest way to get your private instance of Relagent (the relatable agentic minion) is to use the `bundled` container image. It comes with a CPU-optimized LLM provider (inference server). More installation options are explained in the [Installation documentation](docs/installation.md).
 
 What you need:
 
-1. **Container runtime**: [Podman](https://podman.io/getting-started/installation) or [Docker](https://docs.docker.com/get-docker/) to run the containerized application.
-2. **LLM service**: Access to an OpenAI compatible inference service (API URL and optional API Key). For example:
-   - Running locally. For example using [LM Studio](https://lmstudio.ai/), [Ollama](https://ollama.com/download) or [Lemonade-Server](https://lemonade-server.ai/).
-   - Using a third party provider who will run the LLM for you. Any provider that supports the OpenAI v1 API should work.
-3. **LLM Model**: Please choose a text-generating large language model (LLM) available at your inference service. The model needs to support so-called tool or function calling. For example `gemma-4` , `gpt-oss`, `nemotron-3` or `olmo3` should give you a solid start.
-4. **Secret Access Key**: A secret only you know to protect access to your service.
+1. **Container runtime**: [Podman](https://podman.io/getting-started/installation) or [Docker](https://docs.docker.com/get-docker/)
+2. **Secret Access Key**: A secret only you know to protect access to your service
 
-> **LM Studio** is a good choice to get going with local LLM inference. It comes with a graphical user interface and runs on Linux, macOS and Windows. The application helps you choose fitting models and runs them on CPU or GPU (nVidia=CUDA, AMD=ROCm and Intel=Vulkan). This example assumes you have the lm studio server running with default settings.
+> The bundled version of Relagent comes with [llama.cpp](https://llama-cpp.com/) for model inference. The container will download the Google "Gemma 4 E2B" LLM with a 4-bit Quantization (`Q4_K_M`) on the first start. With a size of about 3,5 GB, this is a comparable small but versatile open-weight model. Please expect several seconds of response time.
 >
-> As a starting point locate the Google open-weights model "Gemma 4 E4B" in "My Models" and download it (~ 6.5 GiB, id=`google/gemma-4-e4b`). If you need a smaller model, look for the 2-billion-parameter model "Gemma 4 E2B" (~ 4.5 GiB, id=`google/gemma-4-e2b`).
+> For faster responses or more capable models, please run a dedicated inference server with a AI-capable graphics card. You can override the default huggingface model via `PROVIDER_DEFAULT_MODEL` and pass extra llama.cpp flags via `PROVIDER_ADDITIONAL_ARGS`.
 
-First, we set configuration via environment variables. Please refer to the [settings.ini template](run/settings-template.ini) for more options and details.
-
-Run those commands in a project directory with a terminal:
+Run these commands inside a directory for your relagent setup:
 
 ```shell
-# The URL of the Inference provider (leave out the /chat/completions part)
-export PROVIDER_API_BASE=http://host.containers.internal:1234/v1
-
-# The API key for the Inference provider (not needed for local inference)
-export PROVIDER_API_KEY=
-
-# The identifier of the default model to use
-export PROVIDER_DEFAULT_MODEL=openai/gpt-oss-20b
-
 # The secret access key should be random and long enough so that it cannot be
 # guessed. One way to generate it is to use python:
 export SERVER_SECRET_ACCESS_KEY=$(
@@ -69,28 +54,29 @@ export SERVER_SECRET_ACCESS_KEY=$(
 )
 echo Secret access key: $SERVER_SECRET_ACCESS_KEY
 
-# Create the data directory inside a suitable folder
+# Create a directory to persist your data
 mkdir -p ./data
+
+# Create a directory to keep downloaded models
+mkdir -p $HOME/.cache/huggingface/hub
 ```
 
-Now you can start the container using podman:
+Start the container using Podman:
 
 ```shell
-# Securely save the secret for use inside the container
+# Save the secret so the container can access it securely
 podman secret create --env=true relagent-secret-access-key SERVER_SECRET_ACCESS_KEY
 
 # Start the container. Stop it again by pressing [Ctrl] + [C]
 podman run \
   --name relagent-engine \
   --rm \
-  --env=PROVIDER_API_BASE \
-  --env=PROVIDER_API_KEY \
-  --env=PROVIDER_DEFAULT_MODEL \
   --secret=relagent-secret-access-key,type=env,target=SERVER_SECRET_ACCESS_KEY \
   --volume=./data:/app/.local/share/org.venkado.relagent-engine/data:rw \
+  --volume=$HOME/.cache/huggingface/hub:/app/.cache/huggingface/hub:rw \
   --publish=8000:8000 \
   --userns=keep-id:uid=1000,gid=1000 \
-  registry.gitlab.com/rmmsr/relagent:latest
+  registry.gitlab.com/rmmsr/relagent:latest-bundled
 ```
 
 Alternatively using Docker:
@@ -99,21 +85,18 @@ Alternatively using Docker:
 docker run \
   --name relagent-engine \
   --rm \
-  --env=PROVIDER_API_BASE \
-  --env=PROVIDER_API_KEY \
-  --env=PROVIDER_DEFAULT_MODEL \
   --env=SERVER_SECRET_ACCESS_KEY \
   --volume=./data:/app/.local/share/org.venkado.relagent-engine/data:rw \
+  --volume=$HOME/.cache/huggingface/hub:/app/.cache/huggingface/hub:rw \
   --publish=8000:8000 \
   --user=1000:1000 \
   --add-host=host.containers.internal:host-gateway \
-  registry.gitlab.com/rmmsr/relagent:latest
+  registry.gitlab.com/rmmsr/relagent:latest-bundled
 ```
 
-Now you can access the Relagent web app at [http://localhost:8000/](http://localhost:8000/) in your browser. To authorize the connection, you need to set the *secret access key* as the Engine API key in the Settings.
+Now you can access the Relagent web app at [http://localhost:8000/](http://localhost:8000/) in your browser. Set the *secret access key* as the Engine API key in the Settings to authorize the connection.
 
-To ensure everything is working as expected, try out the **Self-Test** on the
-"About" page.
+To ensure everything is working as expected, try out the **Self-Test** on the "About" page.
 
 ## Roadmap
 
@@ -121,7 +104,6 @@ To ensure everything is working as expected, try out the **Self-Test** on the
 
 Those are some very relevant topics that we would love to spend time on:
 
-- **"Getting started" bundle with CPU inference**: Removes the need to find and install an inference engine for demos and first time use.
 - **Onboarding wizard**: Explain core concepts and give the user the chance to specify some preferences like spoken languages or a default location.
 - **Explicit cross-session memory**: Creating and accessing topic specific long-term memory.
 - **Sandbox for untrusted steps**: Increase security by restricting access to necessary resources.
@@ -137,7 +119,8 @@ Several aspects are on purpose out of scope at the moment:
 
 - The mobile and desktop **apps are not yet published in all appstores**. Follow the instructions to build them yourself.
 - Only **English has full language support**. Other languages can be used, but LLMs will often fall back to English.
-- **Dependency on OpenAI compatible endpoint**. Performing LLM inference directly within Relagent is not needed for the current featureset. You can choose from many self-hosting options to run your own inference server.
+- **Dependency on OpenAI compatible endpoint** when not using the bundled image. You can choose from many self-hosting options to run your own inference server.
+- **Choosing an objectively good LLM** is hard and arguable impossible. Instead of promoting a specific one, we try to be compatible with the open and less biased ethical models, but ultimately leave the choice to the user.
 - **Just one user per installation**. No multi-user support. You can run multiple instances of the Relagent Engine with the same APP and LLM provider.
 - **No arbitrary service extension** using MCP (Model Context Protocol). There is currently no reliable way to control which data would be sent to third party services.
 - Use of a **shared secret** among devices. No per-device authentication and access revocation yet.

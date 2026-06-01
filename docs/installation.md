@@ -4,48 +4,42 @@ Relagent can be installed in different ways depending on your needs and abilitie
 
 ## Overview
 
-For apps:
+You have several choices to get and install the building blocks. The Engine is the only required component. In most cases you want to also install the Relagent apps and a dedicated inference server.
 
-- Use the web app that comes with the Relagent engine.
-- Build and install mobile and desktop apps from source.
+Your most common options are listed below.
 
-Relagent engine:
+### Relagent engine
 
-- Run the pre-built container youself
-  - On Linux using Systemd and Podman (least effort)
-  - Using your individual setup
+- Run the pre-built container yourself
+  - On Linux using Systemd and Podman (the least effort)
+  - Any other container engine
 - Use a hosting provider for containerized applications
 
-LLM inference:
+### Relagent apps
 
-- Local running Open AI compatible inference
-- Use a 3rd party API
+This is the user interface for interaction with the agent.
+
+- Use the web app that comes with the Relagent engine
+- Install a mobile app from an app store. Currently, only [Google play store](https://play.google.com/store/apps/details?id=org.venkado.relagent) is available
+- Build and install mobile and desktop apps from source (windows, linux, macOS)
+
+### LLM inference
+
+- Use the bundled relagent engine, for example the `latest-bundled` container tag.
+- Local running OpenAI chat completion compatible inference server.
+- Use a third-party API.
+
+**Please Note**: Using the bundled inference server (based on llama.cpp) gives only limited performance and should not be considered for a permanent installation.
 
 ## Starting from source code
 
-To get started you need to build and run all parts yourself.
+To get started, you need to build and run some parts yourself.
 
 First: Get a copy of the source code:
 
 ```shell
 git clone https://gitlab.com/RmMsr/relagent.git
 ```
-
-## Relagent App
-
-The user facing interface is be built using the [Flutter SDK](https://docs.flutter.dev/install).
-
-Make sure your mobile device is connected and configured for debugging via ADB. Then build and install the Android app:
-
-```shell
-cd apps
-flutter build apk
-flutter install
-```
-
-iOS and desktop versions should work, but are currently untested.
-
-Relagent requires a running OpenAI compatible inference server. Like [LM Studio](https://lmstudio.ai/), [Lemonade-Server](https://lemonade-server.ai/), [vLLM](https://github.com/vllm-project/vllm) or [Ollama](https://github.com/ollama/ollama).
 
 ## Relagent Engine
 
@@ -91,13 +85,13 @@ systemctl --user status podman-auto-update.service
 
 ### Running at a hosting provider
 
-You can use a professional cloud or hosting provider to run the engine. They will run the engine container for you an allow you to access it via HTTPS. The engine can for example run as a serverless on demand service or continuously as a managed container.
+You can use a professional cloud or hosting provider to run the engine. They will run the engine container for you and allow you to access it via HTTPS. The engine can for example run as a serverless on demand service or continuously as a managed container.
 
-The URL for the most recent stable container image is: `registry.gitlab.com/venkado/relagent/relagent-engine:latest`
+The URL for the most recent stable container image is: `registry.gitlab.com/rmmsr/relagent:latest`
 
 To avoid surprising updates, use a specific version tag like `:0.1.2` instead of `:latest`.
 
-The configuration for the container can be set via a mounted settings file. or as environmental variables. See [`settings-template.ini`](run/settings-template.ini) for some examples.
+The configuration for the container can be set via a mounted settings file or as environment variables. See [`settings-template.ini`](run/settings-template.ini) for some examples.
 
 ### Standalone or development setup
 
@@ -126,9 +120,46 @@ Or standalone:
 uv run --module engine.run
 ```
 
+## Relagent App
+
+The user-facing interface is built using the [Flutter SDK](https://docs.flutter.dev/install).
+
+Make sure your mobile device is connected and configured for debugging via ADB. Then build and install the Android app:
+
+```shell
+cd apps
+flutter build apk
+flutter install
+```
+
+iOS and desktop versions should work but are currently untested.
+
+## LLM inference
+
+Relagent requires a running OpenAI compatible inference service, like [LM Studio](https://lmstudio.ai/), [Lemonade-Server](https://lemonade-server.ai/), [Ollama](https://github.com/ollama/ollama) or [llama.cpp server](https://llama-cpp.com/).
+
+**LM Studio** is a good choice to get going with local LLM inference. It comes with a graphical user interface and runs on Linux, macOS and Windows. The application helps you choose fitting models and runs them on CPU or GPU (nVidia=CUDA, AMD=ROCm and Intel=Vulkan). This example assumes you have the lm studio server running with default settings.
+
+There are many ways to get good inference performance. As a base, look for a computer with a good amount of RAM. Up to 24 GB if you can.
+
+Then focus on a graphics card that has a compatible chip with tensor cores or matrix cores and again as much onboard RAM as possible. 16 to 24 GB is very good. Popular choices are:
+
+- Nvidia GeForce RTX 3xxx, 4xxx and 5xxx series
+- AMD Radeon RX 6xxx or 7xxx series
+
+### Picking a generative AI model
+
+There exist many models capable of performing the relevant agentic tasks. What you need is a text-generating Large Language model with so-called tool (or function) calling capabilities. In typical local execution scenarios, the model must be in the [GGUF format](https://en.wikipedia.org/wiki/GGUF).
+
+A good source is the model catalog inside LM Studio, or once you have an idea what you need the [Hugging Face Hub](https://huggingface.co/models) to find a suitable variant. Both tools help you to assess which models probably fit your hardware.
+
+Assuming you have a working LM Studio server, look for the Google open-weights model "Gemma 4 E4B" in "My Models" and download it (~ 6.5 GiB, id=`google/gemma-4-e4b`). If you need a smaller model, look for the 2-billion-parameter model "Gemma 4 E2B" (~ 4.5 GiB, id=`google/gemma-4-e2b`).
+
+Some alternatives that should work well are: `gpt-oss`, `nemotron-3`, and `olmo3`.
+
 ## Monitoring
 
-For traces run an gen_ai compatible open telemetry destination like Phoenix:
+For traces run a gen_ai compatible OpenTelemetry destination like Phoenix:
 
 ```shell
 podman run --publish=6006:6006 -i docker.io/arizephoenix/phoenix:latest

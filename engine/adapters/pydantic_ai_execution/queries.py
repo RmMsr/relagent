@@ -15,7 +15,10 @@ from pydantic_ai import (
     ToolCallPart,
     UserPromptPart,
 )
+from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
 
+from engine.constants import PROVIDER_API_BASE
+from engine.domain.exceptions import ProviderUnavailable
 from engine.domain.models import (
     AgentStats,
     Approval,
@@ -36,6 +39,44 @@ from .agent_definitions import (
 )
 
 logger = get_logger(__name__)
+
+
+def _provider_body_snippet(body: object) -> str:
+    """Short, single-line view of a provider error body for the reason text."""
+    text = str(body).strip()
+    if not text:
+        return ""
+    text = " ".join(text.split())
+    return text[:200] + "…" if len(text) > 200 else text
+
+
+def _map_provider_error(exc: ModelAPIError) -> None:
+    """Translate a pydantic_ai transport error into ProviderUnavailable.
+
+    A connection failure (provider not running / unreachable) and a 5xx (e.g.
+    bundled llama.cpp still loading the model) both mean "not available, retry".
+    A 4xx is a client/config error and is left to propagate unchanged.
+
+    The reason names the configured endpoint and surfaces the provider's own
+    message so the user gets a descriptive, actionable detail instead of a bare
+    status code.
+    """
+    if isinstance(exc, ModelHTTPError):
+        if exc.status_code >= 500:
+            reason = (
+                f"Inference provider at {PROVIDER_API_BASE} returned "
+                f"HTTP {exc.status_code} — it may still be loading the model"
+            )
+            body = _provider_body_snippet(exc.body)
+            if body:
+                reason += f": {body}"
+            raise ProviderUnavailable(reason) from exc
+        return
+    message = (exc.message or "connection failed").strip().rstrip(".")
+    raise ProviderUnavailable(
+        f"Cannot reach the inference provider at {PROVIDER_API_BASE} — "
+        f"it may be offline or still starting up ({message})"
+    ) from exc
 
 
 class PydanticAgentAdapter(AgentExecution):
@@ -100,11 +141,15 @@ class PydanticAgentAdapter(AgentExecution):
             remaining_iterations -= 1
 
             start_time = time.monotonic()
-            result = await agent.run(
-                message_history=history,
-                user_prompt=query,
-                deferred_tool_results=deferred_tool_results,
-            )
+            try:
+                result = await agent.run(
+                    message_history=history,
+                    user_prompt=query,
+                    deferred_tool_results=deferred_tool_results,
+                )
+            except ModelAPIError as exc:
+                _map_provider_error(exc)
+                raise
             agent_duration_seconds += time.monotonic() - start_time
             query = deferred_query if deferred_query else None
             deferred_query = None
@@ -200,7 +245,11 @@ class PydanticAgentAdapter(AgentExecution):
         return deferred_tool_results, open_approvals
 
     async def generate_title(self, query: str) -> str:
-        ai_response = await title_summarizer_agent.run(query)
+        try:
+            ai_response = await title_summarizer_agent.run(query)
+        except ModelAPIError as exc:
+            _map_provider_error(exc)
+            raise
         if self.debug_dumps:
             self._dump_raw_messages(ai_response, "title_summarizer")
         return ai_response.output

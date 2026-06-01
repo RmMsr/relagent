@@ -325,6 +325,44 @@ void main() {
       expect(userMessages.first.messageId, 'msg-user-0');
     });
 
+    test('retryFailedMessages keeps the trailing error in history', () async {
+      // A failed send leaves [user(final), error]. Retrying re-POSTs the
+      // unsent user message but MUST keep the original error so the user
+      // can follow the sequence of events, and MUST NOT duplicate the
+      // user message.
+      final user = AgenticMessage(
+        messageId: 'msg-user-0',
+        localId: 'u',
+        text: 'go',
+        role: AgenticRole.user,
+        isFinal: true,
+      );
+      final error = AgenticMessage.error('inference engine unreachable');
+
+      notifier.setStateForTest(
+        AgenticChatState(messages: [user, error]),
+      );
+
+      // The re-POST hits the network in the test env and fails; that's fine —
+      // we only assert the original error survived and the user wasn't dupbed.
+      await notifier.retryFailedMessages().catchError((_) {});
+
+      final messages = container.read(agenticChatProvider).messages;
+
+      expect(
+        messages.any(
+          (m) =>
+              m.messageId == error.messageId && m.role == AgenticRole.error,
+        ),
+        isTrue,
+        reason: 'original error must be preserved across retry',
+      );
+      final userMessages =
+          messages.where((m) => m.role == AgenticRole.user).toList();
+      expect(userMessages.length, 1);
+      expect(userMessages.first.messageId, 'msg-user-0');
+    });
+
     test('preserves queued message when active session id is unchanged', () {
       notifier.setStateForTest(
         const AgenticChatState(messages: [], queuedMessage: 'still here'),

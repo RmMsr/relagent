@@ -1,6 +1,18 @@
 from uuid import UUID
 
 
+class ProviderUnavailable(Exception):
+    """The inference provider could not be reached or is not ready yet.
+
+    Covers both a provider that is not running/unreachable and one that is up
+    but still warming up (e.g. bundled llama.cpp loading model weights).
+    """
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
 class PersistenceError(Exception):
     def __init__(self, message: str):
         super().__init__(message)

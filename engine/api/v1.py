@@ -20,6 +20,7 @@ from engine.constants import SERVICE_NAME, VERSION
 from engine.domain.exceptions import (
     ChatContextNotFound,
     NoInFlightCycleToStop,
+    ProviderUnavailable,
     SessionInFlightTimeout,
     SessionNotFound,
 )
@@ -55,6 +56,18 @@ ApprovalServiceDepends = Annotated[
 ]
 EventStoreDepends = Annotated[EventStore, Depends(dependency_event_store)]
 AgentExecutionDepends = Annotated[AgentExecution, Depends(dependency_agent_execution)]
+
+
+def _provider_unavailable_error(exc: ProviderUnavailable) -> HTTPException:
+    """503 with a structured, retryable body — mirrors the 409 in-flight contract.
+
+    Clients SHOULD surface a retryable message; the inference provider is either
+    unreachable or still warming up (e.g. bundled llama.cpp loading weights)."""
+    return HTTPException(
+        status_code=503,
+        detail={"error": "provider_unavailable", "reason": exc.reason},
+        headers={"Retry-After": "5"},
+    )
 
 
 @api_router.get("/status")
@@ -95,6 +108,8 @@ async def messages(
                 "trailing_message_id": str(exc.trailing_message_id),
             },
         )
+    except ProviderUnavailable as exc:
+        raise _provider_unavailable_error(exc)
 
     if plain_body:
         if isinstance(response.message, AssistantMessage):
@@ -168,6 +183,8 @@ async def continue_session(
         return await service.continue_session(session_id=session_id)
     except SessionNotFound:
         raise HTTPException(status_code=404, detail="Session not found")
+    except ProviderUnavailable as exc:
+        raise _provider_unavailable_error(exc)
 
 
 @api_router.get("/sessions/{session_id}/grants")
