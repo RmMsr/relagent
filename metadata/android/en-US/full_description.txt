@@ -1,8 +1,8 @@
-Run a modern private AI agent yourself without external services. You need just this app and a computer to run the Relagent Engine and a Large Language Model (LLM).
-
-The goal of the Relagent project is an accessible solution for agentic AI services with full control over your data. Setting up your own installation should be within reach without considerable technical knowledge or financial investment. The software is designed to be resource-efficient without any hidden costs.
+Relagent is a private and selfhosted AI assistant that runs on your hardware. In addition to this app, you need to run the Relagent engine.
 
 To get started, please have a look at the project's readme at https://gitlab.com/RmMsr/relagent.
+
+The goal of the Relagent project is an accessible solution for agentic AI services with full control over your data. Setting up your own installation should be within reach without considerable technical knowledge or financial investment. The software is designed to be resource-efficient without any hidden costs.
 
 What Relagent brings you:
 
@@ -24,6 +24,11 @@ What you <b>CAN do</b>:
 * Host the Relagent engine yourself (start on your computer, switch to permanent installation when you are ready)
 * Run a Large Language Model yourself (needs one additional app, there are several free options with or without a graphical interface to choose from)
 * Protect the API with HTTPS, Basic Auth or using a VPN.
+
+Permissions on your device:
+
+* In order to send data between the app and the engine and to download speech models, internet access is needed
+* For the voice input (ASR) and output (TTS) features several permissions includiing bluetooth and background processing are required. Relagent won't continuously listen on the microphone unless you explicitly activate it
 
 For more information:
 
