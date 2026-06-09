@@ -77,9 +77,13 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             buildConfigField("boolean", "DEBUG", "true")
+            resValue("string", "app_name", "Relagent Debug")
+            resValue("string", "process_text_label", "Ask Relagent Debug")
         }
         release {
             buildConfigField("boolean", "DEBUG", "false")
+            resValue("string", "app_name", "Relagent")
+            resValue("string", "process_text_label", "Ask Relagent")
             if (hasSigningConfig) {
                 signingConfig = signingConfigs.getByName("release")
             }

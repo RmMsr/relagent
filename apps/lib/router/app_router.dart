@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '/pages/chat_router_page.dart';
 import '/pages/info_page.dart';
+import '/pages/invocation_page.dart';
 import '/models/model_catalog.dart';
 import '/widgets/model_management_section.dart';
 import '/pages/sessions_page.dart';
@@ -51,6 +52,14 @@ final appRouter = GoRouter(
       name: 'sessions',
       pageBuilder: (context, state) =>
           const MaterialPage(child: SessionsPage()),
+    ),
+    GoRoute(
+      path: '/invoke',
+      name: 'invoke',
+      pageBuilder: (context, state) => MaterialPage(
+        key: ValueKey(state.uri.queryParameters['t']),
+        child: const InvocationPage(),
+      ),
     ),
   ],
 );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '/models/app_info.dart';
+import '/providers/invocation_provider.dart';
 
 /// Splash screen displayed during app startup.
 /// Shows app icon, name, and version while background initialization completes.
@@ -23,9 +24,11 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   Future<void> _navigateAfterDelay() async {
     // Minimum display time for splash screen
     await Future<void>.delayed(const Duration(milliseconds: 1500));
-    if (mounted) {
-      context.go('/chat');
-    }
+    if (!mounted) return;
+    final hasPendingInvocation = ref.read(invocationProvider) != null;
+    context.go(hasPendingInvocation
+        ? '/invoke?t=${DateTime.now().millisecondsSinceEpoch}'
+        : '/chat');
   }
 
   @override

@@ -14,12 +14,15 @@ class MainActivity : FlutterActivity() {
 
     private val METHOD_CHANNEL = "com.relagent.background_service"
     private val NOTIFICATION_ACTION_CHANNEL = "com.relagent.notification_actions"
+    private val PROCESS_TEXT_CHANNEL = "com.relagent.process_text"
     private val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
     private val BLUETOOTH_PERMISSION_REQUEST_CODE = 1002
     private val COMBINED_PERMISSIONS_REQUEST_CODE = 1003
 
     // Store pending service start request while waiting for permission
     private var pendingServiceStart: PendingServiceStart? = null
+
+    private var processTextChannel: MethodChannel? = null
 
     private data class PendingServiceStart(
         val mode: String,
@@ -28,6 +31,15 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        processTextChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            PROCESS_TEXT_CHANNEL,
+        )
+        // Send any text that arrived before the engine was ready
+        intent?.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.let { text ->
+            processTextChannel?.invokeMethod("onProcessText", text)
+        }
 
         // Setup reverse MethodChannel for notification actions (Native -> Flutter)
         val notificationActionChannel = MethodChannel(
@@ -68,6 +80,13 @@ class MainActivity : FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.let { text ->
+            processTextChannel?.invokeMethod("onProcessText", text)
         }
     }
 
