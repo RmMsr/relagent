@@ -615,7 +615,7 @@ class VoiceCatalogEvaluator {
     if (languages.isEmpty) return true;
     final entryLangs =
         (entry['languages'] as List<dynamic>? ?? []).cast<String>().toSet();
-    if (entryLangs.isEmpty) return true; // unknown language: include
+    if (entryLangs.isEmpty) return false;
     return entryLangs.intersection(languages).isNotEmpty;
   }
 

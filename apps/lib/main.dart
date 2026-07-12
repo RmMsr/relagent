@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '/models/app_info.dart';
 import '/models/model_catalog.dart';
+import '/voice/imported_model_registry.dart';
 import '/providers/background_service_provider.dart';
 import '/providers/health_check_provider.dart';
 import '/providers/invocation_listener_provider.dart';
@@ -26,6 +27,7 @@ void main() async {
 
   // Load voice model catalog from bundled JSON asset
   await ModelCatalog.init();
+  await ImportedModelRegistry.init();
 
   // Get runtime app info
   await AppInfo.initialize();

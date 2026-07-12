@@ -1,11 +1,19 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '/models/imported_model.dart';
 import '/models/model_catalog.dart';
+import '/providers/imported_models_provider.dart';
 import '/providers/model_download_provider.dart';
 import '/providers/settings_provider.dart';
+import '/voice/imported_model_registry.dart';
+import '/voice/imported_model_service.dart';
 import '/voice/model_download_service.dart';
+import 'import_model_sheet.dart';
 
 /// Full-screen catalog browser for downloading and selecting models.
 class ModelCatalogBrowser extends ConsumerStatefulWidget {
@@ -72,6 +80,9 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Voice Models'),
+          actions: [
+            _ImportModelAction(tabController: _tabController),
+          ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -197,11 +208,35 @@ class _ModelListState extends ConsumerState<_ModelList> {
         .toList();
   }
 
+  List<ImportedModelEntry> _applyImportedFilter(
+    List<ImportedModelEntry> all,
+  ) {
+    // Imported models are always locally available; include them when downloadedOnly.
+    if (widget.filterQuery.isEmpty) return all;
+    final q = widget.filterQuery.toLowerCase();
+    return all
+        .where(
+          (e) =>
+              e.displayName.toLowerCase().contains(q) ||
+              e.languages.any((l) => l.toLowerCase().contains(q)) ||
+              e.id.toLowerCase().contains(q),
+        )
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final downloadState = ref.watch(modelDownloadProvider);
+    final importedState = ref.watch(importedModelsProvider);
     final settings = ref.watch(settingsProvider);
-    final entries = _applyFilter(ModelCatalog.byType(widget.type), downloadState);
+
+    final catalogEntries = _applyFilter(
+      ModelCatalog.byType(widget.type),
+      downloadState,
+    );
+    final importedEntries = _applyImportedFilter(
+      ImportedModelRegistry.byType(widget.type),
+    );
 
     final selectedId = widget.type == ModelType.asr
         ? settings.selectedAsrModelId
@@ -211,24 +246,32 @@ class _ModelListState extends ConsumerState<_ModelList> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // Imported models first, then catalog entries.
+    final totalCount = importedEntries.length + catalogEntries.length;
+
     return Column(
       children: [
+        if (importedState.isImporting)
+          const LinearProgressIndicator(),
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: entries.length,
+            itemCount: totalCount,
             itemBuilder: (context, index) {
-              final entry = entries[index];
-              final isDownloaded = downloadState.isDownloaded(entry.id);
-              final isSelected = selectedId == entry.id;
-              final isDownloading = downloadState.isDownloadingModel(entry.id);
-
+              if (index < importedEntries.length) {
+                final entry = importedEntries[index];
+                return _ImportedModelCard(
+                  entry: entry,
+                  isSelected: selectedId == entry.id,
+                );
+              }
+              final entry = catalogEntries[index - importedEntries.length];
               return _ModelEntryCard(
                 entry: entry,
-                isDownloaded: isDownloaded,
-                isSelected: isSelected,
-                isDownloading: isDownloading,
+                isDownloaded: downloadState.isDownloaded(entry.id),
+                isSelected: selectedId == entry.id,
+                isDownloading: downloadState.isDownloadingModel(entry.id),
                 progress: downloadState.progressFor(entry.id),
               );
             },
@@ -330,7 +373,12 @@ class _ModelEntryCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 2),
-              Text(entry.id, style: muted),
+              Row(
+                children: [
+                  Expanded(child: Text(entry.id, style: muted)),
+                  Text(architectureLabel(entry.architecture), style: muted),
+                ],
+              ),
               const SizedBox(height: 4),
               Text(
                 entry.languages.join(', '),
@@ -457,6 +505,267 @@ class _ModelEntryCard extends ConsumerWidget {
       // Clear selection if this was the active model
       await ref.read(settingsProvider.notifier).clearModelSelection(entry.id);
       await ref.read(modelDownloadProvider.notifier).deleteModel(entry.id);
+    }
+  }
+}
+
+// ─── Imported model card ──────────────────────────────────────────────────────
+
+class _ImportedModelCard extends ConsumerWidget {
+  final ImportedModelEntry entry;
+  final bool isSelected;
+
+  const _ImportedModelCard({required this.entry, required this.isSelected});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: InkWell(
+        onTap: () => _selectModel(ref),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      entry.displayName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Chip(
+                    label: const Text('Imported'),
+                    labelStyle: theme.textTheme.labelSmall,
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  if (isSelected) ...[
+                    const SizedBox(width: 8),
+                    Icon(Icons.check_circle, color: theme.colorScheme.primary),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Expanded(child: Text(entry.id, style: muted)),
+                  Text(architectureLabel(entry.architecture), style: muted),
+                ],
+              ),
+              if (entry.languages.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(entry.languages.join(', '),
+                    style: theme.textTheme.bodySmall),
+              ],
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isSelected)
+                      TextButton(
+                        onPressed: () => _selectModel(ref),
+                        child: const Text('Select'),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 20),
+                      onPressed: () => _editMetadata(context, ref),
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Edit',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      onPressed: () => _deleteModel(context, ref),
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Delete',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _selectModel(WidgetRef ref) {
+    final notifier = ref.read(settingsProvider.notifier);
+    if (entry.type == ModelType.asr) {
+      notifier.updateSelectedAsrModelId(entry.id);
+    } else {
+      notifier.updateSelectedTtsModelId(entry.id);
+    }
+  }
+
+  Future<void> _editMetadata(BuildContext context, WidgetRef ref) async {
+    final updated = await showImportModelSheet(
+      context,
+      suggestedName: entry.displayName,
+      detectedArchitecture: entry.architecture,
+      initialType: entry.type,
+      initialLanguages: entry.languages,
+    );
+    if (updated == null || !context.mounted) return;
+
+    await ref.read(importedModelsProvider.notifier).updateModel(
+          ImportedModelEntry(
+            id: entry.id,
+            displayName: updated.displayName,
+            type: updated.type,
+            architecture: updated.architecture,
+            languages: updated.languages,
+            importedAt: entry.importedAt,
+          ),
+        );
+  }
+
+  Future<void> _deleteModel(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Imported Model'),
+        content: Text('Delete "${entry.displayName}"? '
+            'This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await ref.read(settingsProvider.notifier).clearModelSelection(entry.id);
+      await ref.read(importedModelsProvider.notifier).deleteModel(entry.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${entry.displayName}" deleted'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+}
+
+// ─── Import action ─────────────────────────────────────────────────────────────
+
+class _ImportModelAction extends ConsumerStatefulWidget {
+  final TabController tabController;
+
+  const _ImportModelAction({required this.tabController});
+
+  @override
+  ConsumerState<_ImportModelAction> createState() => _ImportModelActionState();
+}
+
+class _ImportModelActionState extends ConsumerState<_ImportModelAction> {
+  bool _isPeeking = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final importedState = ref.watch(importedModelsProvider);
+    final busy = _isPeeking || importedState.isImporting;
+    return IconButton(
+      icon: busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.upload_file),
+      tooltip: 'Import from storage',
+      onPressed: busy ? null : _startImport,
+    );
+  }
+
+  Future<void> _startImport() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['bz2', 'gz', 'tgz', 'zip', 'tar'],
+      withData: false,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final path = result.files.first.path;
+    if (path == null) return;
+
+    if (!mounted) return;
+
+    final archive = File(path);
+    final service = ref.read(importedModelServiceProvider);
+
+    setState(() => _isPeeking = true);
+    ArchivePeekResult peek;
+    try {
+      peek = await service.peekArchive(archive);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isPeeking = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read archive: $e')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _isPeeking = false);
+
+    if (!context.mounted) return;
+
+    final suggestedName = result.files.first.name
+        .replaceAll(RegExp(r'\.(tar\.bz2|tbz2|tar\.gz|tgz|tar|zip|bz2|gz)$'), '');
+
+    final initialType = widget.tabController.index == 0
+        ? ModelType.asr
+        : ModelType.tts;
+    final template = await showImportModelSheet(
+      context,
+      suggestedName: suggestedName,
+      detectedArchitecture: peek.detectedArchitecture,
+      initialType: initialType,
+    );
+
+    if (template == null || !mounted) return;
+
+    await ref
+        .read(importedModelsProvider.notifier)
+        .importFromFile(archive, template);
+
+    if (!mounted) return;
+
+    final error = ref.read(importedModelsProvider).operationError;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      ref.read(importedModelsProvider.notifier).clearError();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${template.displayName}" imported'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 }

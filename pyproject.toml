@@ -1,6 +1,6 @@
 [project]
 name = "relagent-engine"
-version = "0.1.25-pre"
+version = "0.1.26-pre"
 description = "Backend for Relagent apps"
 readme = "README.md"
 requires-python = ">=3.12"

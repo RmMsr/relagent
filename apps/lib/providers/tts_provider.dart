@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '/models/settings.dart';
 import '/providers/model_download_provider.dart';
@@ -41,12 +42,21 @@ class MessageTtsState {
 class TtsState {
   final Map<String, MessageTtsState> messageStates;
 
-  const TtsState({this.messageStates = const {}});
+  /// Non-null when TTS model initialization failed. Cleared on next successful init.
+  final String? initError;
+
+  const TtsState({this.messageStates = const {}, this.initError});
 
   factory TtsState.initial() => const TtsState();
 
-  TtsState copyWith({Map<String, MessageTtsState>? messageStates}) {
-    return TtsState(messageStates: messageStates ?? this.messageStates);
+  TtsState copyWith({
+    Map<String, MessageTtsState>? messageStates,
+    String? Function()? initError,
+  }) {
+    return TtsState(
+      messageStates: messageStates ?? this.messageStates,
+      initError: initError != null ? initError() : this.initError,
+    );
   }
 
   MessageTtsState getMessageState(String messageId) {
@@ -57,6 +67,10 @@ class TtsState {
 final ttsProvider = NotifierProvider<TtsNotifier, TtsState>(() {
   return TtsNotifier();
 });
+
+/// SharedPreferences key written before TTS init, cleared on success.
+/// If present on startup the previous init caused a native crash (SIGABRT).
+const _ttsCrashGuardKey = 'tts_crash_guard_model_id';
 
 class TtsNotifier extends Notifier<TtsState> {
   TtsService? _service;
@@ -73,6 +87,9 @@ class TtsNotifier extends Notifier<TtsState> {
       _service?.dispose();
     });
 
+    // Detect if a previous TTS init crashed (SIGABRT leaves the guard set).
+    Future.microtask(_checkCrashGuard);
+
     // Listen to settings changes
     ref.listen<Settings>(settingsProvider, (previous, next) {
       if (previous?.ttsSpeakerId != next.ttsSpeakerId ||
@@ -81,6 +98,7 @@ class TtsNotifier extends Notifier<TtsState> {
       }
       // Reinitialize TTS when model selection changes
       if (previous?.selectedTtsModelId != next.selectedTtsModelId) {
+        _clearInitError();
         _handleTtsModelChanged();
       }
     });
@@ -98,6 +116,7 @@ class TtsNotifier extends Notifier<TtsState> {
           !(previous?.isDownloaded(selectedId) ?? false) &&
           next.isDownloaded(selectedId)) {
         if (_pendingTasks.isEmpty) {
+          _clearInitError();
           _handleTtsModelChanged();
         } else {
           _pendingReinit = true;
@@ -108,9 +127,49 @@ class TtsNotifier extends Notifier<TtsState> {
     return TtsState.initial();
   }
 
+  /// On startup: if the crash-guard key is still set, the previous TTS init
+  /// triggered a native abort. Deselect the offending model so the app stays usable.
+  Future<void> _checkCrashGuard() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final crashedId = prefs.getString(_ttsCrashGuardKey);
+    if (crashedId == null) return;
+
+    await prefs.remove(_ttsCrashGuardKey);
+
+    final currentId = ref.read(settingsProvider).selectedTtsModelId;
+    if (currentId == crashedId) {
+      Logger.error('TtsProvider: model "$crashedId" crashed on last init, deselecting');
+      await ref.read(settingsProvider.notifier).clearModelSelection(crashedId);
+      state = state.copyWith(
+        initError: () =>
+            'Voice model crashed and was deselected. Please choose a different model.',
+      );
+    }
+  }
+
+  Future<void> _setCrashGuard(SharedPreferences prefs, String? modelId) async {
+    if (modelId != null) {
+      await prefs.setString(_ttsCrashGuardKey, modelId);
+    }
+  }
+
+  Future<void> _clearCrashGuard(SharedPreferences prefs) async {
+    await prefs.remove(_ttsCrashGuardKey);
+  }
+
   Future<void> initialize() async {
-    final service = await _getService();
-    await service.initialize();
+    final prefs = ref.read(sharedPreferencesProvider);
+    final modelId = ref.read(settingsProvider).selectedTtsModelId;
+    await _setCrashGuard(prefs, modelId);
+    try {
+      final service = await _getService();
+      await service.initialize();
+      await _clearCrashGuard(prefs);
+    } catch (e) {
+      await _clearCrashGuard(prefs);
+      Logger.error('TtsProvider: TTS initialization failed: $e');
+      state = state.copyWith(initError: () => e.toString());
+    }
   }
 
   Future<TtsService> _getService() async {
@@ -137,13 +196,29 @@ class TtsNotifier extends Notifier<TtsState> {
     }
   }
 
+  void _clearInitError() {
+    if (state.initError != null) {
+      state = state.copyWith(initError: () => null);
+    }
+  }
+
   Future<void> _handleTtsModelChanged() async {
     if (_service == null) return;
+    _clearInitError();
     final settings = ref.read(settingsProvider);
     final downloadState = ref.read(modelDownloadProvider);
+    final prefs = ref.read(sharedPreferencesProvider);
+    await _setCrashGuard(prefs, settings.selectedTtsModelId);
     final resolved = await resolveTtsModel(settings, downloadState);
     Logger.debug('TtsProvider: TTS model changed, reinitializing...');
-    await _service!.reinitializeWithModel(resolved);
+    try {
+      await _service!.reinitializeWithModel(resolved);
+      await _clearCrashGuard(prefs);
+    } catch (e) {
+      await _clearCrashGuard(prefs);
+      Logger.error('TtsProvider: TTS initialization failed: $e');
+      state = state.copyWith(initError: () => e.toString());
+    }
   }
 
   void onChatCleared() {

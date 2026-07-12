@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '/agentic/health_check.dart';
 import '/models/model_catalog.dart';
+import '/voice/imported_model_registry.dart';
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
 import '/providers/voice_service_provider.dart';
@@ -604,14 +605,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       return const Text('None');
     }
     final entry = ModelCatalog.findById(id);
-    if (entry == null) return Text(id);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('${entry.displayName} · ${entry.downloadSizeMb.round()} MB'),
-        Text(id, style: muted),
-      ],
-    );
+    if (entry != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${entry.displayName} · ${entry.downloadSizeMb.round()} MB'),
+          Text(id, style: muted),
+        ],
+      );
+    }
+    final imported = ImportedModelRegistry.findById(id);
+    if (imported != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${imported.displayName} · Imported'),
+          Text(id, style: muted),
+        ],
+      );
+    }
+    return Text(id);
   }
 
   Future<void> _confirmReset() async {
