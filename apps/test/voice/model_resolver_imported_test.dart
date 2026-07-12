@@ -70,6 +70,17 @@ void main() {
     await File(p.join(dir.path, '.complete')).writeAsString('done');
   }
 
+  Future<void> _createVitsPiperLayout(String id) async {
+    final dir = Directory(
+      p.join(tmpDir.path, 'imported_models', 'tts', id),
+    );
+    await dir.create(recursive: true);
+    await File(p.join(dir.path, 'model.onnx')).writeAsBytes([]);
+    await File(p.join(dir.path, 'tokens.txt')).writeAsString('');
+    await Directory(p.join(dir.path, 'espeak-ng-data')).create(recursive: true);
+    await File(p.join(dir.path, '.complete')).writeAsString('done');
+  }
+
   test('resolveAsrMetadata falls back to imported model when catalog miss', () async {
     const id = 'imported-resolver01';
     await ImportedModelRegistry.add(ImportedModelEntry(
@@ -117,7 +128,7 @@ void main() {
       languages: ['de'],
       importedAt: DateTime(2026),
     ));
-    await _createCompleteMarker(id, ModelType.tts);
+    await _createVitsPiperLayout(id);
 
     final settings = Settings.defaults().copyWith(selectedTtsModelId: id);
     final result = await resolveTtsModel(settings, const ModelDownloadState());
