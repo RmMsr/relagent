@@ -10,6 +10,8 @@ variables:
   PACKAGE_VERSION: "${CI_COMMIT_REF_NAME}"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/app-releases"
   FLUTTER_IMAGE: ghcr.io/cirruslabs/flutter:3.41.9
+  PUB_CACHE: "$CI_PROJECT_DIR/.pub-cache"
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle-cache"
 
 default:
   tags:
@@ -54,26 +56,68 @@ build-engine:
         buildah push $CI_REGISTRY_IMAGE:latest-bundled
       fi
 
-build-android:
+build-android-apk:
   stage: build
   tags:
     - dedicated-build
   rules:
     - if: $CI_COMMIT_TAG
   image: $FLUTTER_IMAGE
+  timeout: 2h
+  retry:
+    max: 1
+    when: runner_system_failure
+  cache:
+    - key:
+        files:
+          - apps/pubspec.lock
+      paths:
+        - .pub-cache/
+    - key: gradle-android
+      paths:
+        - .gradle-cache/
   script:
     - bin/reproducible-build-prepare.sh
     - |
       pushd /tmp/build/org.venkado.relagent/apps
-      flutter pub get --enforce-lockfile
       flutter build apk --release --split-per-abi
-      flutter build appbundle --release
       popd
     - bin/reproducible-build-collect.sh
   artifacts:
     name: 'android-app'
     paths:
       - apps/build/app/outputs/flutter-apk/*.apk
+
+build-android-bundle:
+  stage: build
+  tags:
+    - dedicated-build
+  rules:
+    - if: $CI_COMMIT_TAG
+  image: $FLUTTER_IMAGE
+  timeout: 2h
+  retry:
+    max: 1
+    when: runner_system_failure
+  cache:
+    - key:
+        files:
+          - apps/pubspec.lock
+      paths:
+        - .pub-cache/
+    - key: gradle-android
+      paths:
+        - .gradle-cache/
+  script:
+    - bin/reproducible-build-prepare.sh
+    - |
+      pushd /tmp/build/org.venkado.relagent/apps
+      flutter build appbundle --release
+      popd
+    - bin/reproducible-build-collect.sh
+  artifacts:
+    name: 'android-app'
+    paths:
       - apps/build/app/outputs/bundle/release/*.aab
 
 upload-app-artifacts:
@@ -81,7 +125,8 @@ upload-app-artifacts:
   rules:
     - if: $CI_COMMIT_TAG
   dependencies:
-    - build-android
+    - build-android-apk
+    - build-android-bundle
   image: curlimages/curl:latest
   script:
     - |
