@@ -32,7 +32,10 @@ dependencies:
   connectivity_plus: ^7.0.0
   flutter_secure_storage: ^10.0.0
   url_launcher: ^6.3.2
-  receive_sharing_intent: ^1.8.1
+  # 1.9.0 relies on Flutter's Gradle tooling auto-applying kotlin-android to
+  # plugin subprojects, which isn't present until Flutter 3.44. Lift this
+  # upper bound once the project's Flutter version reaches 3.44+.
+  receive_sharing_intent: ">=1.8.1 <1.9.0"
   file_picker: ^11.0.2
   archive: ^4.0.9
 
