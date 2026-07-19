@@ -699,9 +699,10 @@ class _ImportModelActionState extends ConsumerState<_ImportModelAction> {
   }
 
   Future<void> _startImport() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['bz2', 'gz', 'tgz', 'zip', 'tar'],
+      allowMultiple: false,
       withData: false,
     );
 
