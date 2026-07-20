@@ -39,6 +39,12 @@ abstract final class RelagentColors {
   static const Color noteBgDark         = Color(0xFF1B3A1F);
   static const Color noteBorderDark     = Color(0xFF81C784);
   static const Color noteTextDark       = Color(0xFFA5D6A7);
+
+  // Dark surfaces
+  static const Color backgroundDark     = Color(0xFF121212);
+  static const Color surfaceDark        = Color(0xFF1E1E1E);
+  static const Color surfaceDarkLow     = Color(0xFF252525);
+  static const Color dividerDark        = Color(0xFF333333);
 }
 
 abstract final class AppTheme {
@@ -57,6 +63,7 @@ abstract final class AppTheme {
     colorScheme: ColorScheme.fromSeed(
       seedColor: RelagentColors.primaryIndigo,
       brightness: Brightness.dark,
+      surface: RelagentColors.backgroundDark,
     ),
   );
 }

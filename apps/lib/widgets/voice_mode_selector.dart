@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
-import '/theme/app_colors.dart';
 
 class VoiceModeSelector extends ConsumerWidget {
   const VoiceModeSelector({super.key});
@@ -73,14 +72,15 @@ class _VoiceToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return IconButton(
       icon: Icon(
         isOn ? iconOn : iconOff,
-        color: isOn ? RelagentColors.primaryIndigo : RelagentColors.toggleOffMuted,
+        color: isOn ? colorScheme.primary : colorScheme.onSurfaceVariant,
       ),
       style: isOn
           ? IconButton.styleFrom(
-              backgroundColor: RelagentColors.indigoTint,
+              backgroundColor: colorScheme.primaryContainer,
               shape: const StadiumBorder(),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               minimumSize: Size.zero,

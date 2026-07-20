@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 import '/chat/models.dart';
-import '/theme/app_colors.dart';
 
 import '/models/app_info.dart';
 import '/providers/chat_provider.dart';
@@ -13,6 +12,7 @@ import '/providers/voice_service_provider.dart';
 import '/speech_recognition/recording_target.dart';
 import '/speech_recognition/widgets.dart';
 import '/utils/logger.dart';
+import '/theme/app_colors.dart';
 import '/widgets/version_info_widget.dart';
 
 class ChatInput extends ConsumerStatefulWidget {
@@ -467,7 +467,7 @@ class ChatMessageBubble extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(10, 10, 16, 10),
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: RelagentColors.indigoBorder,
+                    color: Theme.of(context).colorScheme.outline,
                     width: 1.5,
                   ),
                   borderRadius: const BorderRadius.only(

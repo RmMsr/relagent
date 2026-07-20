@@ -160,14 +160,14 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
             if (chatState.isLoadingHistory) const LinearProgressIndicator(),
             Expanded(
               child: ColoredBox(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       maxWidth: AppTheme.chatContentMaxWidth,
                     ),
                     child: ColoredBox(
-                      color: RelagentColors.backgroundGrey,
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
                       child: ListView(
                         controller: _scrollController,
                         padding: const EdgeInsets.only(bottom: 8, top: 4),

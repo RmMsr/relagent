@@ -511,7 +511,7 @@ class _AgenticMessageBubble extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  border: Border.all(color: RelagentColors.indigoBorder, width: 1.5),
+                  border: Border.all(color: Theme.of(context).colorScheme.outline, width: 1.5),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(14),
                     bottomLeft: Radius.circular(14),

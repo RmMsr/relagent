@@ -10,7 +10,6 @@ import '/voice/imported_model_registry.dart';
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
 import '/providers/voice_service_provider.dart';
-import '/theme/app_colors.dart';
 import '/services/api_health_check.dart';
 import '/voice/model_resolver.dart';
 
@@ -1152,14 +1151,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: RelagentColors.indigoTint,
+                      color: Theme.of(context).colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Experimental',
                       style: TextStyle(
                         fontSize: 11,
-                        color: RelagentColors.primaryIndigo,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
                       ),
                     ),
                   ),
