@@ -163,20 +163,23 @@ class ChatInputState extends ConsumerState<ChatInput>
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              autofocus: true,
-              controller: _controller,
-              focusNode: _focusNode,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: 'Type a message...',
-                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.5),
+              child: TextField(
+                autofocus: true,
+                controller: _controller,
+                focusNode: _focusNode,
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: 'Type a message...',
+                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+                minLines: 1,
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _submitText(),
               ),
-              minLines: 1,
-              maxLines: null,
-              keyboardType: TextInputType.multiline,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _submitText(),
             ),
           ),
           if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable)
