@@ -21,6 +21,9 @@ worktree.txt
 .windsurfpyright
 .idea
 
+# Log files
+*.log
+
 # FVM Version Cache
 .fvm/
 

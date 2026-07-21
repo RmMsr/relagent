@@ -34,10 +34,12 @@ async def web_search(ctx: RunContext, query: str) -> list[dict[str, str]]:
         raise ApprovalRequired({"tool": "web_search", "query": query})
 
     # TODO: Expose backend to approval
+    # Ordered by privacy: mojeek and duckduckgo have no ad-tracking business
+    # model, startpage proxies google anonymously, brave has its own index.
     backend = (
         ctx.tool_call_metadata.get("search-backend")
         if ctx.tool_call_metadata
-        else "duckduckgo"
+        else "mojeek,duckduckgo,startpage,brave"
     )
     logger.info(f"Using search backend: {backend}")
 
