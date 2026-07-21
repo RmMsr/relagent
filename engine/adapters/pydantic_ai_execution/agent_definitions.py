@@ -21,7 +21,7 @@ default_model = OpenAIChatModel(
 
 Agent.instrument_all(
     InstrumentationSettings(
-        include_content=True, include_binary_content=True, version=3
+        include_content=True, include_binary_content=True, version=5
     )
 )
 

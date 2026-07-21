@@ -15,7 +15,7 @@ PROVIDER_API_BASE: str = get_setting(
     "provider", "api_base", default="http://localhost:11434"
 )
 PROVIDER_API_KEY: str = get_setting(
-    "provider", "api_key", default="", obscure_value=True
+    "provider", "api_key", default="no-key", obscure_value=True
 )
 
 DEFAULT_MODEL: str = get_setting("provider", "default_model", default="olmo-3")

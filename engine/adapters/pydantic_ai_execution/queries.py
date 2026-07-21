@@ -407,21 +407,21 @@ class PydanticAgentAdapter(AgentExecution):
             stats.duration_seconds += duration_seconds
 
         if stats.input_tokens is None:
-            stats.input_tokens = result.usage().input_tokens
+            stats.input_tokens = result.usage.input_tokens
         else:
-            stats.input_tokens += result.usage().input_tokens
+            stats.input_tokens += result.usage.input_tokens
 
         if stats.output_tokens is None:
-            stats.output_tokens = result.usage().output_tokens
+            stats.output_tokens = result.usage.output_tokens
         else:
-            stats.output_tokens += result.usage().output_tokens
+            stats.output_tokens += result.usage.output_tokens
 
         if stats.requests_count is None:
-            stats.requests_count = result.usage().requests
+            stats.requests_count = result.usage.requests
         else:
-            stats.requests_count += result.usage().requests
+            stats.requests_count += result.usage.requests
 
         if stats.tool_calls_count is None:
-            stats.tool_calls_count = result.usage().tool_calls
+            stats.tool_calls_count = result.usage.tool_calls
         else:
-            stats.tool_calls_count += result.usage().tool_calls
+            stats.tool_calls_count += result.usage.tool_calls
