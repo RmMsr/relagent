@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -43,6 +44,17 @@ class ModelDownloadService {
   Future<Directory> _modelsBaseDir() async {
     final cacheDir = await getApplicationCacheDirectory();
     return Directory(p.join(cacheDir.path, _modelsSubdir));
+  }
+
+  /// Same as [_modelsBaseDir], but null when local storage is unavailable
+  /// (web). Scans run at startup and must not throw.
+  Future<Directory?> _scannableBaseDir() async {
+    if (kIsWeb) return null;
+    try {
+      return await _modelsBaseDir();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Get the storage directory for a specific model.
@@ -167,8 +179,8 @@ class ModelDownloadService {
 
   /// List all fully downloaded model IDs.
   Future<Set<String>> listDownloadedModels() async {
-    final base = await _modelsBaseDir();
-    if (!await base.exists()) return {};
+    final base = await _scannableBaseDir();
+    if (base == null || !await base.exists()) return {};
 
     final downloaded = <String>{};
 
@@ -219,8 +231,8 @@ class ModelDownloadService {
 
   /// Calculate total disk space used by all downloaded models in bytes.
   Future<int> totalStorageUsed() async {
-    final base = await _modelsBaseDir();
-    if (!await base.exists()) return 0;
+    final base = await _scannableBaseDir();
+    if (base == null || !await base.exists()) return 0;
 
     var total = 0;
     await for (final entity in base.list(recursive: true)) {

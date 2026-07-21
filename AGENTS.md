@@ -19,7 +19,7 @@ IMPORTANT: Check also the subproject: @engine/AGENTS.md for the python backend a
 
 ## Project guide and rules
 
-**MCP Tool Preference**: ALWAYS prefer MCP tools especially for flutter (dart-flutter_*) over shell commands when available.
+**MCP Tool Preference**: ALWAYS prefer MCP tools especially for flutter (dart-flutter_*) over shell commands when available. Caveat: the `dart-flutter_*` inspection tools (`get_app_logs`, `get_runtime_errors`, DTD) only attach to an app that `dart-flutter_launch_app` started. They cannot inspect an already-running or pre-compiled artifact (e.g. the web bundle the engine serves at `/app/`) — to debug one, reproduce it in dev mode via `launch_app` first, or fall back to shell tools if that is not possible.
 
 ### CRITICAL RULES
 

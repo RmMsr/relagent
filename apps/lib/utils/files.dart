@@ -1,13 +1,21 @@
 // Contains code from sherpa-onnx. Copyright (c) 2024  Xiaomi Corporation
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'logger.dart';
 
+/// Copies a bundled asset into the cache directory and returns its path.
+///
+/// Native only — callers reach this through the sherpa voice services, which
+/// web replaces with no-ops.
 Future<String> copyAssetFileToCache(String src, [String? dst]) async {
+  if (kIsWeb) {
+    throw UnsupportedError('Caching asset $src requires local storage');
+  }
   final Directory directory = await getApplicationCacheDirectory();
   final target = join(directory.path, src);
   final targetFile = File(target);

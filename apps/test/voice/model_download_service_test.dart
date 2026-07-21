@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -13,6 +14,16 @@ class _FakeCachePathProvider extends PathProviderPlatform {
 
   @override
   Future<String?> getApplicationCachePath() async => cachePath;
+}
+
+/// Simulates a platform that ships no path_provider implementation, as on web.
+class _UnavailablePathProvider extends PathProviderPlatform {
+  @override
+  Future<String?> getApplicationCachePath() async =>
+      throw MissingPluginException(
+        'No implementation found for method getApplicationCacheDirectory '
+        'on channel plugins.flutter.io/path_provider',
+      );
 }
 
 void main() {
@@ -41,6 +52,15 @@ void main() {
     test('listDownloadedModels returns empty when no models exist', () async {
       final models = await service.listDownloadedModels();
       expect(models, isEmpty);
+    });
+
+    // The startup scan is unawaited, so throwing here leaves the model UI
+    // stuck on "scanning" and raises an uncaught async error.
+    test('scanning degrades to empty without local storage', () async {
+      PathProviderPlatform.instance = _UnavailablePathProvider();
+
+      expect(await service.listDownloadedModels(), isEmpty);
+      expect(await service.totalStorageUsed(), 0);
     });
 
     test('isModelDownloaded returns false for unknown model', () async {

@@ -92,3 +92,28 @@ class MyWidget extends ConsumerWidget {
 ## Debugging
 
 Use `dart-flutter_get_runtime_errors` or `adb logcat` for system logs.
+
+### Web app
+
+Reproduce web bugs with `dart-flutter_launch_app` on the `chrome` device
+first. The `dart-flutter_*` tools only attach to apps they launched, so they
+cannot inspect a pre-built bundle served by the engine at `/app/` — for that
+the app must be running in dev mode.
+
+- **Dart-level bug** (exception, wrong behaviour): dev mode reproduces it in
+  seconds and hot-restarts. `getApplicationSupportDirectory` and other
+  `path_provider` / `dart:io` calls throw `MissingPluginException` on web —
+  guard startup code with `kIsWeb` *and* a fail-safe (see the platform guards
+  in `lib/voice/`). Confirm the fix in a `--wasm` build before closing.
+- **Suspected build or serving problem** (blank page, 404, wrong MIME type):
+  inspect the served artifact directly. `chromium --dump-dom` and
+  `--virtual-time-budget` are unreliable for wasm — virtual time stalls on the
+  wasm fetch and returns identical output whether the app works or crashes.
+  Drive Chrome DevTools Protocol with real wall-clock waits and trust the
+  screenshot, not the DOM (skwasm renders into a shadow-DOM canvas, so
+  `querySelectorAll('canvas')` finds nothing in a healthy app).
+- `flutter run -d chrome` compiles **dart2js**. Use `--wasm` to reproduce
+  renderer (skwasm) or JS-interop issues, since the release build is wasm.
+
+CI runs `flutter test` only (VM platform, `kIsWeb == false`), so web-only
+startup crashes are not caught before release — verify web changes manually.

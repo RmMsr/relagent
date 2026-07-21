@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -44,6 +45,18 @@ class _FakePathProvider
   Future<String?> getDownloadsPath() async => null;
 }
 
+/// Simulates a platform that ships no path_provider implementation, as on web.
+class _UnavailablePathProvider extends _FakePathProvider {
+  _UnavailablePathProvider() : super('');
+
+  @override
+  Future<String?> getApplicationSupportPath() async =>
+      throw MissingPluginException(
+        'No implementation found for method getApplicationSupportDirectory '
+        'on channel plugins.flutter.io/path_provider',
+      );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 ImportedModelEntry makeEntry({
@@ -80,6 +93,18 @@ void main() {
 
   test('init with no manifest yields empty list', () async {
     await ImportedModelRegistry.init();
+    expect(ImportedModelRegistry.entries, isEmpty);
+  });
+
+  // init() runs before runApp(); throwing here leaves the app on a blank screen.
+  test('init without path_provider yields empty list instead of throwing',
+      () async {
+    await ImportedModelRegistry.init();
+    await ImportedModelRegistry.add(makeEntry());
+
+    PathProviderPlatform.instance = _UnavailablePathProvider();
+
+    await expectLater(ImportedModelRegistry.init(), completes);
     expect(ImportedModelRegistry.entries, isEmpty);
   });
 

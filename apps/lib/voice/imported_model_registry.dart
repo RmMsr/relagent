@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -13,13 +14,19 @@ class ImportedModelRegistry {
 
   static List<ImportedModelEntry> get entries => List.unmodifiable(_entries);
 
+  /// Runs before runApp(), so it must never throw. Without local storage
+  /// (web) the app just has no imported models.
   static Future<void> init() async {
-    final file = await _manifestFile();
-    if (!await file.exists()) {
+    if (kIsWeb) {
       _entries = [];
       return;
     }
     try {
+      final file = await _manifestFile();
+      if (!await file.exists()) {
+        _entries = [];
+        return;
+      }
       final raw = jsonDecode(await file.readAsString()) as List<dynamic>;
       _entries = raw
           .cast<Map<String, dynamic>>()
