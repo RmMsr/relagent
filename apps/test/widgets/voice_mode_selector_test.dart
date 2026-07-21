@@ -49,7 +49,7 @@ void main() {
     expect(find.byIcon(Icons.mic), findsNothing);
   });
 
-  testWidgets('ON toggle button has indigoTint background', (tester) async {
+  testWidgets('ON toggle button has primaryContainer background', (tester) async {
     SharedPreferences.setMockInitialValues({
       'user_settings': _settingsJson(voiceMode: 'listening', continuousVoiceEnabled: true),
     });
@@ -61,7 +61,8 @@ void main() {
     final micButton = tester.widget<IconButton>(
       find.ancestor(of: find.byIcon(Icons.mic), matching: find.byType(IconButton)),
     );
+    final colorScheme = Theme.of(tester.element(find.byIcon(Icons.mic))).colorScheme;
     final bg = micButton.style?.backgroundColor?.resolve({});
-    expect(bg, RelagentColors.indigoTint);
+    expect(bg, colorScheme.primaryContainer);
   });
 }

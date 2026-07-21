@@ -17,18 +17,19 @@ ChatMessage _msg(ChatRole role, String text) => ChatMessage(
 );
 
 void main() {
-  testWidgets('user message bubble has indigoBorder outline and no fill', (tester) async {
+  testWidgets('user message bubble has outline border and no fill', (tester) async {
     await tester.pumpWidget(_wrap(ChatMessageBubble(message: _msg(ChatRole.user, 'hello'))));
     await tester.pump();
 
+    final outlineColor = Theme.of(tester.element(find.byType(ChatMessageBubble))).colorScheme.outline;
     final containers = tester.widgetList<Container>(find.byType(Container)).toList();
     final bubble = containers.firstWhere(
       (c) {
         final deco = c.decoration as BoxDecoration?;
         final border = deco?.border as Border?;
-        return border?.top.color == RelagentColors.indigoBorder;
+        return border?.top.color == outlineColor;
       },
-      orElse: () => throw TestFailure('No container with indigoBorder found'),
+      orElse: () => throw TestFailure('No container with outline border found'),
     );
     final deco = bubble.decoration as BoxDecoration;
     expect(deco.color, isNull, reason: 'User bubble must have no fill');
@@ -38,12 +39,13 @@ void main() {
     await tester.pumpWidget(_wrap(ChatMessageBubble(message: _msg(ChatRole.assistant, 'hi'))));
     await tester.pump();
 
+    final colorScheme = Theme.of(tester.element(find.byType(ChatMessageBubble))).colorScheme;
     final containers = tester.widgetList<Container>(find.byType(Container)).toList();
     final hasBubble = containers.any((c) {
       final deco = c.decoration as BoxDecoration?;
       final border = deco?.border as Border?;
-      return border?.top.color == RelagentColors.indigoBorder ||
-          deco?.color == RelagentColors.indigoTint;
+      return border?.top.color == colorScheme.outline ||
+          deco?.color == colorScheme.primaryContainer;
     });
     expect(hasBubble, isFalse, reason: 'Assistant has no bubble decoration');
   });
