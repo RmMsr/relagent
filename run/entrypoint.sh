@@ -16,6 +16,7 @@ if [ "${PROVIDER_BUNDLED}" = "true" ]; then
         --flash-attn on \
         --cache-type-k q8_0 \
         --cache-type-v q8_0 \
+        --cors-origins localhost \
         -hf "${PROVIDER_DEFAULT_MODEL}" \
         $PROVIDER_ADDITIONAL_ARGS \
         &

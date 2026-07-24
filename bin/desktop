@@ -1,0 +1,5 @@
+!#/usr/bin/env
+
+pushd apps
+fvm flutter run --device-id linux --print-dtd 2>&1 |tee flutter-linux.log
+popd
