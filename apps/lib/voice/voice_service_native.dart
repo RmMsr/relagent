@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_session/audio_session.dart' as native_audio;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '/models/model_catalog.dart';
 import '/speech_recognition/services.dart' as asr;
@@ -8,15 +9,25 @@ import '/speech_recognition/asr_metadata.dart';
 import '/speech_recognition/sherpa_vad_asr.dart';
 import '/tts/tts_isolate_worker.dart';
 import '/utils/logger.dart';
+import '/voice/mic_router.dart';
 import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 import 'package:record/record.dart' as record_pkg;
 
 /// Native voice service wrapping sherpa_onnx, record, and audio_session.
+/// Android microphone routing is owned by the native MicRouter; this class
+/// only sequences it (ensureReady before the recorder opens, release after).
 class NativeVoiceService extends VoiceService {
   asr.AsrService? _asr;
   TtsIsolateWorker? _ttsWorker;
   bool _ttsInitialized = false;
+
+  final MicRouter _micRouter;
+  MicPreference _micPreference = const MicPreference.auto();
+  StreamSubscription<void>? _micEventsSub;
+
+  NativeVoiceService({MicRouter? micRouter})
+    : _micRouter = micRouter ?? MicRouter();
 
   static const _backgroundServiceChannel = MethodChannel(
     'com.relagent.background_service',
@@ -41,6 +52,9 @@ class NativeVoiceService extends VoiceService {
 
   @override
   bool get isBackgroundListeningAvailable => true;
+
+  @override
+  bool get isInputSelectionAvailable => _micRouter.isSupported;
 
   // --- ASR ---
 
@@ -103,6 +117,8 @@ class NativeVoiceService extends VoiceService {
   @override
   Future<void> stopRecording() async {
     await _asr?.stop();
+    // Keep the route for 5s so a follow-up utterance skips SCO reconnect.
+    await _micRouter.releaseAfterIdle();
   }
 
   @override
@@ -178,7 +194,88 @@ class NativeVoiceService extends VoiceService {
     _ttsInitialized = false;
   }
 
+  // --- Input device selection ---
+
+  @override
+  Future<List<MicDevice>> listInputDevices() => _micRouter.listInputs();
+
+  @override
+  void setInputDevicePreference(MicPreference preference) {
+    _micPreference = preference;
+  }
+
+  @override
+  Future<MicSelectionResult> queryInputSelection() =>
+      _micRouter.querySelection(_micPreference);
+
   // --- Audio Session ---
+
+  @override
+  Future<void> configureAudioSessionForRecording() async {
+    try {
+      final session = await native_audio.AudioSession.instance;
+      await session.configure(
+        native_audio.AudioSessionConfiguration(
+          // iOS: playAndRecord + voiceChat enables Bluetooth HFP mic
+          avAudioSessionCategory:
+              native_audio.AVAudioSessionCategory.playAndRecord,
+          avAudioSessionCategoryOptions:
+              native_audio.AVAudioSessionCategoryOptions.allowBluetooth |
+              native_audio.AVAudioSessionCategoryOptions.defaultToSpeaker,
+          avAudioSessionMode: native_audio.AVAudioSessionMode.voiceChat,
+          // Android: voiceCommunication activates Bluetooth SCO for mic input
+          androidAudioAttributes: const native_audio.AndroidAudioAttributes(
+            contentType: native_audio.AndroidAudioContentType.speech,
+            usage: native_audio.AndroidAudioUsage.voiceCommunication,
+          ),
+          androidAudioFocusGainType:
+              native_audio.AndroidAudioFocusGainType.gain,
+          androidWillPauseWhenDucked: false,
+        ),
+      );
+      await session.setActive(true);
+      // Establish the mic route and wait until Android reports it active, so
+      // the recorder opens on the intended device (MicRouter bounds the wait).
+      // Best effort: whatever Android reports is what we record on.
+      await _micRouter.ensureReady(_micPreference);
+    } catch (e) {
+      Logger.debug(
+        'NativeVoiceService: Failed to configure audio session for recording: $e',
+      );
+    }
+  }
+
+  @override
+  Future<void> configureAudioSessionForPlayback() async {
+    try {
+      final session = await native_audio.AudioSession.instance;
+      await session.configure(
+        native_audio.AudioSessionConfiguration(
+          // iOS: playback + allowBluetoothA2dp routes to high-quality BT output
+          avAudioSessionCategory: native_audio.AVAudioSessionCategory.playback,
+          avAudioSessionCategoryOptions:
+              native_audio.AVAudioSessionCategoryOptions.allowBluetooth |
+              native_audio.AVAudioSessionCategoryOptions.allowBluetoothA2dp,
+          avAudioSessionMode: native_audio.AVAudioSessionMode.spokenAudio,
+          // Android: assistant routes speech output through Bluetooth A2DP
+          androidAudioAttributes: const native_audio.AndroidAudioAttributes(
+            contentType: native_audio.AndroidAudioContentType.speech,
+            usage: native_audio.AndroidAudioUsage.assistant,
+          ),
+          androidAudioFocusGainType:
+              native_audio.AndroidAudioFocusGainType.gain,
+          androidWillPauseWhenDucked: false,
+        ),
+      );
+      await session.setActive(true);
+      // Playback needs A2DP; drop any held mic route immediately.
+      await _micRouter.releaseNow();
+    } catch (e) {
+      Logger.debug(
+        'NativeVoiceService: Failed to configure audio session for playback: $e',
+      );
+    }
+  }
 
   @override
   Future<void> configureAudioSession() async {
@@ -209,6 +306,14 @@ class NativeVoiceService extends VoiceService {
         Logger.debug('NativeVoiceService: Audio devices changed');
         Logger.debug('  Devices added: ${event.devicesAdded}');
         Logger.debug('  Devices removed: ${event.devicesRemoved}');
+        _deviceChangedController.add(null);
+      });
+
+      // MicRouter reports device-topology changes so the UI can refresh the
+      // input-device symbol. The actual capture route is logged natively for
+      // diagnostics only; it never drives behavior here.
+      _micEventsSub ??= _micRouter.deviceChanges.listen((_) {
+        Logger.debug('NativeVoiceService: MicRouter reported devicesChanged');
         _deviceChangedController.add(null);
       });
     } catch (e) {
@@ -317,6 +422,7 @@ class NativeVoiceService extends VoiceService {
     disposeTts();
     _interruptionSub?.cancel();
     _deviceChangedSub?.cancel();
+    _micEventsSub?.cancel();
     _interruptionController.close();
     _deviceChangedController.close();
   }

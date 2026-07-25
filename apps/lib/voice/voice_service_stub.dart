@@ -18,6 +18,9 @@ class NoOpVoiceService extends VoiceService {
   @override
   bool get isBackgroundListeningAvailable => false;
 
+  @override
+  bool get isInputSelectionAvailable => false;
+
   // ASR — no-ops
 
   @override
@@ -66,6 +69,12 @@ class NoOpVoiceService extends VoiceService {
   Future<void> configureAudioSession() async {}
 
   @override
+  Future<void> configureAudioSessionForRecording() async {}
+
+  @override
+  Future<void> configureAudioSessionForPlayback() async {}
+
+  @override
   Future<void> activateAudioSession() async {}
 
   @override
@@ -76,6 +85,16 @@ class NoOpVoiceService extends VoiceService {
 
   @override
   Stream<void> get deviceChangedEvents => const Stream.empty();
+
+  @override
+  Future<List<MicDevice>> listInputDevices() async => const [];
+
+  @override
+  void setInputDevicePreference(MicPreference preference) {}
+
+  @override
+  Future<MicSelectionResult> queryInputSelection() async =>
+      const MicSelectionResult(MicSelectionStatus.unsupported, null);
 
   // Background service — no-ops
 

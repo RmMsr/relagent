@@ -13,6 +13,9 @@ class _FakeVoiceCapabilities implements VoiceCapabilities {
   bool get isTtsAvailable => false;
   @override
   bool get isBackgroundListeningAvailable => false;
+
+  @override
+  bool get isInputSelectionAvailable => false;
 }
 
 AgenticMessage _settledUserMsg() => AgenticMessage(

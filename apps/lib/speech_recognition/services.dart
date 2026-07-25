@@ -129,11 +129,11 @@ class ASR implements AsrService {
         Logger.debug(devs.toString());
 
         final config = RecordConfig(
-          androidConfig: AndroidRecordConfig(
-            // Use communication mode to enable Bluetooth SCO for voice communication
-            // This allows Bluetooth headset microphones to work properly
-            audioManagerMode: AudioManagerMode.modeInCommunication,
-          ),
+          // MicRouter (native) is the single owner of Android audio mode and
+          // Bluetooth SCO; leave audioManagerMode at its modeNormal default
+          // and disable record's own Bluetooth management so it doesn't race
+          // MicRouter's route with its own legacy startBluetoothSco() calls.
+          androidConfig: const AndroidRecordConfig(manageBluetooth: false),
           encoder: encoder,
           sampleRate: 16000,
           numChannels: 1,
@@ -142,7 +142,7 @@ class ASR implements AsrService {
           audioInterruption: AudioInterruptionMode.pauseResume,
         );
 
-        Logger.debug('ASR: Starting recording with Bluetooth SCO mode');
+        Logger.debug('ASR: Starting recording');
         final stream = await _audioRecorder!.startStream(config);
         String? lastText;
 

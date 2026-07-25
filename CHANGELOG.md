@@ -5,7 +5,8 @@ All notable changes to Relagent are recorded here. The format follows
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The engine and the apps ship with identical version. Keep both at the same
-release for best compatibility.
+release for best compatibility. When only one part changes, the other receives
+a no-change version bump to stay in sync.
 
 ## 0.1.23 — Strict-ordering chat
 

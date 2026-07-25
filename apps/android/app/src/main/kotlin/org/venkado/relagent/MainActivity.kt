@@ -23,6 +23,7 @@ class MainActivity : FlutterActivity() {
     private var pendingServiceStart: PendingServiceStart? = null
 
     private var processTextChannel: MethodChannel? = null
+    private var micRouter: MicRouter? = null
 
     private data class PendingServiceStart(
         val mode: String,
@@ -31,6 +32,8 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        micRouter = MicRouter(this, flutterEngine.dartExecutor.binaryMessenger)
 
         processTextChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -81,6 +84,12 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun onDestroy() {
+        micRouter?.dispose()
+        micRouter = null
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {

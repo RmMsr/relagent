@@ -43,11 +43,13 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
   VoiceService get _voiceService => ref.read(voiceServiceProvider);
 
   StreamSubscription<AudioInterruptionEvent>? _interruptionSub;
+  StreamSubscription<void>? _deviceChangedSub;
 
   @override
   BackgroundServiceState build() {
     ref.onDispose(() {
       _interruptionSub?.cancel();
+      _deviceChangedSub?.cancel();
     });
     _init();
     return BackgroundServiceState.initial();
@@ -161,6 +163,23 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
           ref
               .read(audioCoordinatorProvider.notifier)
               .handleAudioFocusChange('gain');
+        }
+      });
+
+      // Reconfigure audio session routing when Bluetooth devices connect/disconnect
+      _deviceChangedSub = _voiceService.deviceChangedEvents.listen((_) {
+        Logger.debug('BackgroundServiceProvider: Audio device changed');
+        final mode = ref.read(audioCoordinatorProvider).mode;
+        if (mode == AudioMode.recording) {
+          Logger.debug(
+            'BackgroundServiceProvider: Reconfiguring audio session for recording after device change',
+          );
+          _voiceService.configureAudioSessionForRecording();
+        } else if (mode == AudioMode.playing) {
+          Logger.debug(
+            'BackgroundServiceProvider: Reconfiguring audio session for playback after device change',
+          );
+          _voiceService.configureAudioSessionForPlayback();
         }
       });
 

@@ -109,9 +109,9 @@ class VadAsr implements AsrService {
     }
 
     final config = RecordConfig(
-      androidConfig: const AndroidRecordConfig(
-        audioManagerMode: AudioManagerMode.modeInCommunication,
-      ),
+      // See services.dart: MicRouter owns Android routing; keep record's
+      // own audio-mode/Bluetooth management out of the way.
+      androidConfig: const AndroidRecordConfig(manageBluetooth: false),
       encoder: encoder,
       sampleRate: _sampleRate,
       numChannels: 1,

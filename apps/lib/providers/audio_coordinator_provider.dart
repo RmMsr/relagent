@@ -93,7 +93,7 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
   }
 
   /// Handle audio focus change events from native platform
-  void handleAudioFocusChange(String eventType) {
+  Future<void> handleAudioFocusChange(String eventType) async {
     Logger.debug('AudioCoordinator: handleAudioFocusChange($eventType)');
 
     switch (eventType) {
@@ -102,7 +102,7 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
       case 'permanent_loss':
         _handlePermanentLoss();
       case 'gain':
-        _handleGain();
+        await _handleGain();
       default:
         Logger.debug('AudioCoordinator: Unknown audio focus event: $eventType');
     }
@@ -143,7 +143,7 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
     }
   }
 
-  void _handleGain() {
+  Future<void> _handleGain() async {
     Logger.debug('AudioCoordinator: Audio focus regained');
 
     if (state.audioFocusState.status == AudioFocusStatus.temporaryLoss) {
@@ -155,9 +155,9 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
       );
 
       if (previousMode == AudioMode.recording) {
-        requestRecording();
+        await requestRecording();
       } else if (previousMode == AudioMode.playing) {
-        requestPlayback();
+        await requestPlayback();
       }
     } else {
       state = state.copyWith(
@@ -184,6 +184,10 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
       return false;
     }
 
+    await _voiceService.configureAudioSessionForRecording();
+
+    if (!ref.mounted) return false;
+
     Logger.debug('AudioCoordinator: Transitioning to recording mode');
     state = const AudioCoordinatorState(mode: AudioMode.recording);
 
@@ -209,7 +213,9 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
       return false;
     }
 
-    await _configureSpeechMode();
+    await _voiceService.configureAudioSessionForPlayback();
+
+    if (!ref.mounted) return false;
 
     Logger.debug('AudioCoordinator: Transitioning to playing mode');
     state = const AudioCoordinatorState(mode: AudioMode.playing);
@@ -239,22 +245,14 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
 
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
+    if (!ref.mounted) return;
+
     if (state.mode == AudioMode.idle) {
       final settings = ref.read(settingsProvider);
       if (settings.continuousVoiceEnabled && settings.isContinuousRecording) {
         Logger.debug('AudioCoordinator: Auto-resuming continuous recording');
         await requestRecording();
       }
-    }
-  }
-
-  Future<void> _configureSpeechMode() async {
-    try {
-      Logger.debug('AudioCoordinator: Configuring audio session for speech mode');
-      await _voiceService.activateAudioSession();
-      Logger.debug('AudioCoordinator: Audio session activated for speech');
-    } catch (e) {
-      Logger.debug('AudioCoordinator: Failed to configure speech mode: $e');
     }
   }
 

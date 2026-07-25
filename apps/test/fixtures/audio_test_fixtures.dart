@@ -343,7 +343,7 @@ class AudioTestScenarios {
 
     // Phone call ends
     fixture.simulatePhoneCall(begin: false);
-    coordinator.handleAudioFocusChange('gain');
+    await coordinator.handleAudioFocusChange('gain');
 
     // Should restore recording
     assert(

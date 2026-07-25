@@ -212,8 +212,8 @@ void main() {
       coordinator.handleAudioFocusChange('temporary_loss');
       expect(container.read(audioCoordinatorProvider).mode, AudioMode.idle);
 
-      // Regain focus
-      coordinator.handleAudioFocusChange('gain');
+      // Regain focus (await so audio session config completes before asserting)
+      await coordinator.handleAudioFocusChange('gain');
 
       // Should restore recording (implementation-dependent)
       // Note: This tests the current auto-resume behavior

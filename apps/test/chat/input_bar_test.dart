@@ -14,6 +14,9 @@ class _NoVoice with VoiceCapabilities {
   bool get isTtsAvailable => false;
   @override
   bool get isBackgroundListeningAvailable => false;
+
+  @override
+  bool get isInputSelectionAvailable => false;
 }
 
 Widget _wrap(Widget child) => ProviderScope(

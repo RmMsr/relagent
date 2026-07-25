@@ -39,6 +39,11 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
   final FocusNode _focusNode = FocusNode();
   String _textBeforeRecording = '';
   bool _isUpdatingFromASR = false;
+  // The field text last written by ASR. Controller notifications carrying this
+  // value are ASR echoes (incl. async IME echoes) and must NOT move the
+  // baseline; only genuine user edits do. Timing guards alone are not enough
+  // because a focused field re-notifies after the synchronous write.
+  String _lastAsrText = '';
   RecordingNotifier? _recordingNotifier;
 
   void requestFocus() {
@@ -70,6 +75,7 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
     setState(() {
       _controller.clear();
       _textBeforeRecording = '';
+      _lastAsrText = '';
     });
     _focusNode.requestFocus();
   }
@@ -88,9 +94,8 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
   }
 
   void _onControllerChanged() {
-    if (!_isUpdatingFromASR) {
-      _textBeforeRecording = _controller.text;
-    }
+    if (_isUpdatingFromASR || _controller.text == _lastAsrText) return;
+    _textBeforeRecording = _controller.text;
   }
 
   @override
@@ -113,6 +118,7 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
     _isUpdatingFromASR = true;
     setState(() {
       _controller.text = _textBeforeRecording + text;
+      _lastAsrText = _controller.text;
       _controller.selection = TextSelection.fromPosition(
         TextPosition(offset: _controller.text.length),
       );

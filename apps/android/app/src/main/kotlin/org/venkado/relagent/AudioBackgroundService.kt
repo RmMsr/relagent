@@ -175,7 +175,7 @@ class AudioBackgroundService : Service() {
                     Log.d(TAG, "Mode idle - keeping service alive during transition")
                     releaseWakeLock()
                     stopNotificationUpdates()
-                    resetAudioMode()
+                    // Audio mode is owned by MicRouter; do not touch it here.
                     // Update notification for idle mode instead of removing
                     val idleNotification = createNotification("Ready")
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -228,8 +228,6 @@ class AudioBackgroundService : Service() {
                     Log.d(TAG, "Starting foreground service for playback")
                     releaseWakeLock() // No wake lock needed for playback
                     stopNotificationUpdates()
-
-                    resetAudioMode()
 
                     val notification = createNotification("Speaking...")
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -495,36 +493,6 @@ class AudioBackgroundService : Service() {
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(ERROR_NOTIFICATION_ID, notification)
-    }
-
-    // Audio Mode Management
-
-    private fun resetAudioMode() {
-        try {
-            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            val currentMode = audioManager.mode
-
-            // Reset to normal mode when idle
-            if (currentMode != AudioManager.MODE_NORMAL) {
-                Log.d(TAG, "Resetting audio mode to NORMAL (was: ${getAudioModeString(currentMode)})")
-                audioManager.mode = AudioManager.MODE_NORMAL
-                Log.d(TAG, "Audio mode reset successfully")
-            } else {
-                Log.d(TAG, "Audio mode already NORMAL")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to reset audio mode: ${e.message}", e)
-        }
-    }
-
-    private fun getAudioModeString(mode: Int): String {
-        return when (mode) {
-            AudioManager.MODE_NORMAL -> "NORMAL"
-            AudioManager.MODE_RINGTONE -> "RINGTONE"
-            AudioManager.MODE_IN_CALL -> "IN_CALL"
-            AudioManager.MODE_IN_COMMUNICATION -> "IN_COMMUNICATION"
-            else -> "UNKNOWN($mode)"
-        }
     }
 
     // Audio Routing Debugging

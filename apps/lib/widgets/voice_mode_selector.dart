@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
+import '/providers/mic_preference_provider.dart';
 import '/providers/settings_provider.dart';
+import '/providers/voice_service_provider.dart';
+import '/speech_recognition/mic_selection_widgets.dart';
+import '/voice/voice_service.dart';
 
 class VoiceModeSelector extends ConsumerWidget {
   const VoiceModeSelector({super.key});
@@ -10,6 +14,12 @@ class VoiceModeSelector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    final inputSelectionAvailable = ref
+        .watch(voiceCapabilitiesProvider)
+        .isInputSelectionAvailable;
+    final MicDeviceCategory? micCategory = inputSelectionAvailable
+        ? ref.watch(micSelectionProvider).value?.device?.category
+        : null;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -35,6 +45,7 @@ class VoiceModeSelector extends ConsumerWidget {
           isOn: settings.isContinuousRecording,
           iconOn: Icons.mic,
           iconOff: Icons.mic_off,
+          micCategory: micCategory,
           tooltipOn: 'Continuous recording on',
           tooltipOff: 'Continuous recording off',
           onToggle: () {
@@ -61,6 +72,10 @@ class _VoiceToggleButton extends StatelessWidget {
   final String tooltipOff;
   final VoidCallback onToggle;
 
+  /// Badges the "on" icon with the active input device. Null (the default,
+  /// and always for non-microphone toggles) renders the icon unchanged.
+  final MicDeviceCategory? micCategory;
+
   const _VoiceToggleButton({
     required this.isOn,
     required this.iconOn,
@@ -68,15 +83,19 @@ class _VoiceToggleButton extends StatelessWidget {
     required this.tooltipOn,
     required this.tooltipOff,
     required this.onToggle,
+    this.micCategory,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final color = isOn ? colorScheme.primary : colorScheme.onSurfaceVariant;
     return IconButton(
-      icon: Icon(
-        isOn ? iconOn : iconOff,
-        color: isOn ? colorScheme.primary : colorScheme.onSurfaceVariant,
+      icon: MicDeviceBadge(
+        category: isOn ? micCategory : null,
+        color: color,
+        size: 24,
+        child: Icon(isOn ? iconOn : iconOff, color: color),
       ),
       style: isOn
           ? IconButton.styleFrom(

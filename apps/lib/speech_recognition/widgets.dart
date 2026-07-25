@@ -2,18 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
+import '/providers/mic_preference_provider.dart';
 import '/providers/recording_provider.dart';
 import '/providers/settings_provider.dart';
+import '/providers/voice_service_provider.dart';
+import '/speech_recognition/mic_selection_widgets.dart';
 import '/voice/voice_service.dart';
 
 class RecordingStateIndicator extends StatelessWidget {
   final RecordingState recordingState;
   final VoiceMode voiceMode;
 
+  /// Category of the active input device, shown as a badge on the mic icon.
+  final MicDeviceCategory? micCategory;
+
   const RecordingStateIndicator({
     super.key,
     required this.recordingState,
     required this.voiceMode,
+    this.micCategory,
   });
 
   @override
@@ -55,30 +62,46 @@ class RecordingStateIndicator extends StatelessWidget {
     } else if (voiceMode == VoiceMode.listening ||
         voiceMode == VoiceMode.conversation) {
       if (recordingState.isRecording) {
-        icon = Icon(
-          Icons.radio_button_checked,
+        // Keep the distinct "live" indicator, but still show which device is
+        // being listened on — continuous mode is exactly when that matters.
+        icon = MicDeviceBadge(
+          category: micCategory,
           color: theme.colorScheme.primary,
           size: 32,
+          child: Icon(
+            Icons.radio_button_checked,
+            color: theme.colorScheme.primary,
+            size: 32,
+          ),
         );
         tooltip = 'Listening continuously';
       } else {
-        icon = Icon(
-          Icons.mic_none,
+        icon = MicSymbol(
+          category: micCategory,
           color: theme.colorScheme.onSurfaceVariant,
-          size: 32,
         );
         tooltip = 'Continuous listening disabled';
       }
     } else if (recordingState.isRecording) {
-      icon = Icon(Icons.mic, color: theme.colorScheme.primary, size: 32);
+      icon = MicSymbol(
+        category: micCategory,
+        filled: true,
+        color: theme.colorScheme.primary,
+      );
       tooltip = 'Recording active';
     } else {
-      icon = Icon(Icons.mic_none, color: theme.colorScheme.onSurfaceVariant, size: 32);
+      icon = MicSymbol(
+        category: micCategory,
+        color: theme.colorScheme.onSurfaceVariant,
+      );
       tooltip = 'Ready to record';
     }
 
     return Tooltip(
       message: tooltip,
+      // Hover-only: a long-press trigger here would win the gesture arena
+      // against the enclosing IconButton's onLongPress (the mic picker).
+      triggerMode: TooltipTriggerMode.manual,
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         transitionBuilder: (child, animation) {
@@ -252,6 +275,12 @@ class RecorderButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final voiceMode = ref.watch(settingsProvider).voiceMode;
     final recordingState = ref.watch(recordingProvider);
+    final inputSelectionAvailable = ref
+        .watch(voiceCapabilitiesProvider)
+        .isInputSelectionAvailable;
+    final micCategory = inputSelectionAvailable
+        ? ref.watch(micSelectionProvider).value?.device?.category
+        : null;
 
     String tooltip;
     if (voiceMode == VoiceMode.listening ||
@@ -264,6 +293,11 @@ class RecorderButton extends ConsumerWidget {
     }
 
     return IconButton(
+      // Long-press opens the mic picker; must be on the button itself, not a
+      // wrapping GestureDetector, or the tooltip's long-press wins the arena.
+      onLongPress: inputSelectionAvailable
+          ? () => showMicPickerSheet(context)
+          : null,
       onPressed: () {
         final voiceMode = ref.read(settingsProvider).voiceMode;
         final recordingState = ref.read(recordingProvider);
@@ -301,6 +335,7 @@ class RecorderButton extends ConsumerWidget {
               child: RecordingStateIndicator(
                 recordingState: recordingState,
                 voiceMode: voiceMode,
+                micCategory: micCategory,
               ),
             ),
           ],
