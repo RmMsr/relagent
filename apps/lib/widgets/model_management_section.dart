@@ -5,15 +5,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '/models/imported_model.dart';
 import '/models/model_catalog.dart';
+import '/providers/credentials_pass_provider.dart';
 import '/providers/imported_models_provider.dart';
 import '/providers/model_download_provider.dart';
 import '/providers/settings_provider.dart';
+import '/providers/settings_tab_request_provider.dart';
+import '/utils/settings_navigation.dart';
 import '/voice/imported_model_registry.dart';
 import '/voice/imported_model_service.dart';
 import '/voice/model_download_service.dart';
 import 'import_model_sheet.dart';
+import 'settings_apply_bar.dart';
 
 /// Full-screen catalog browser for downloading and selecting models.
 class ModelCatalogBrowser extends ConsumerStatefulWidget {
@@ -51,6 +57,26 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
     super.dispose();
   }
 
+  Future<void> _apply() async {
+    if (ref.read(credentialsPassProvider)) {
+      await commitPendingSettings(ref);
+      if (mounted) context.go('/chat');
+      return;
+    }
+    final closeAnyway = await showUnverifiedCredentialsDialog(context);
+    if (!mounted) return;
+    if (closeAnyway) {
+      await commitPendingSettings(ref);
+      if (mounted) context.go('/chat');
+    } else {
+      // Land back on the Connection tab regardless of whichever tab
+      // Settings was last showing — that's where the credential/URL
+      // fields the user needs to review actually live.
+      ref.read(settingsTabRequestProvider.notifier).requestTab(0);
+      context.pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<ModelDownloadState>(modelDownloadProvider, (prev, next) {
@@ -72,7 +98,7 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
             event.logicalKey == LogicalKeyboardKey.escape) {
-          Navigator.of(context).pop();
+          context.pop();
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
@@ -80,6 +106,10 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Voice Models'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
           actions: [
             _ImportModelAction(tabController: _tabController),
           ],
@@ -138,6 +168,7 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
           ),
         ],
       ),
+      bottomNavigationBar: SettingsApplyBar(onApply: _apply),
     ),
     );
   }
@@ -692,7 +723,7 @@ class _ImportModelActionState extends ConsumerState<_ImportModelAction> {
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Icon(Icons.upload_file),
+          : const Icon(Icons.file_open),
       tooltip: 'Import from storage',
       onPressed: busy ? null : _startImport,
     );

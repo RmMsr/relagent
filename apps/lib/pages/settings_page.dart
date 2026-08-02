@@ -8,10 +8,15 @@ import '/agentic/health_check.dart';
 import '/models/model_catalog.dart';
 import '/voice/imported_model_registry.dart';
 import '/models/settings.dart';
+import '/providers/credentials_pass_provider.dart';
+import '/providers/pending_settings_provider.dart';
 import '/providers/settings_provider.dart';
+import '/providers/settings_tab_request_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/services/api_health_check.dart';
+import '/utils/settings_navigation.dart';
 import '/voice/model_resolver.dart';
+import '/widgets/settings_apply_bar.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -20,15 +25,29 @@ class SettingsPage extends ConsumerStatefulWidget {
   ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends ConsumerState<SettingsPage> {
-  late TextEditingController _baseUrlController;
-  late TextEditingController _modelController;
-  late TextEditingController _primeMessageController;
-  late int _ttsSpeakerId;
+class _SettingsPageState extends ConsumerState<SettingsPage>
+    with TickerProviderStateMixin {
+  TabController? _tabController;
+  int _tabControllerLength = 0;
+
+  // Track each Autocomplete field's underlying controller instance so its
+  // change-listener is attached exactly once, not re-added on every
+  // rebuild — RawAutocomplete keeps this controller alive across rebuilds
+  // of this State, so re-registering in fieldViewBuilder (which runs every
+  // rebuild) would otherwise leak a duplicate listener each time. The
+  // paired "_isSyncing*" flag distinguishes a programmatic resync (this
+  // field being brought back in line with the shared draft, e.g. on first
+  // build) from a genuine user edit, so only real edits invalidate
+  // credentialsPass — a resync isn't a credential/URL change.
+  TextEditingController? _chatUrlFieldController;
+  bool _isSyncingChatUrlField = false;
+  TextEditingController? _chatModelFieldController;
+  bool _isSyncingChatModelField = false;
+  TextEditingController? _engineUrlFieldController;
+  bool _isSyncingEngineUrlField = false;
+
   late TextEditingController _usernameController;
   late TextEditingController _passwordController;
-  late double _ttsSpeed;
-  late BackgroundListeningDuration _backgroundListeningDuration;
   final _formKey = GlobalKey<FormState>();
   HealthCheckResult? _healthCheckResult;
   bool _isHealthCheckRunning = false;
@@ -36,7 +55,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _chatBasicAuthEnabled = false;
 
   // Engine settings controllers
-  late TextEditingController _engineUrlController;
   late TextEditingController _engineUsernameController;
   late TextEditingController _enginePasswordController;
   late TextEditingController _engineApiKeyController;
@@ -48,26 +66,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   // Chat API key controller
   late TextEditingController _chatApiKeyController;
 
+  // Prime message controller — a plain TextEditingController (rather than
+  // relying on TextFormField.initialValue) so it can be resynced when the
+  // draft is discarded out from under it (the smart-nav "Discard" dialog
+  // choice); see the ref.listen in build().
+  late TextEditingController _primeMessageController;
+
   @override
   void initState() {
     super.initState();
     final settings = ref.read(settingsProvider);
-    _baseUrlController = TextEditingController(
-      text: settings.simpleChatBaseUrl,
-    );
-    _modelController = TextEditingController(text: settings.simpleChatModel);
-    _primeMessageController = TextEditingController(
-      text: settings.primeMessage,
-    );
-    _ttsSpeakerId = settings.ttsSpeakerId;
     _usernameController = TextEditingController(text: settings.username ?? '');
     _passwordController = TextEditingController();
     _chatBasicAuthEnabled = settings.username?.isNotEmpty ?? false;
-    _ttsSpeed = settings.ttsSpeed;
-    _backgroundListeningDuration = settings.backgroundListeningDuration;
 
     // Engine settings
-    _engineUrlController = TextEditingController(text: settings.engineBaseUrl);
     _engineUsernameController = TextEditingController(
       text: settings.engineUsername ?? '',
     );
@@ -77,6 +90,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Chat API key
     _chatApiKeyController = TextEditingController();
+
+    // Prime message — seeded once from the draft; kept in sync afterwards
+    // via ref.listen in build().
+    _primeMessageController = TextEditingController(
+      text: ref.read(pendingSettingsProvider).primeMessage,
+    );
+
+    _usernameController.addListener(_invalidateCredentialsPass);
+    _passwordController.addListener(_invalidateCredentialsPass);
+    _chatApiKeyController.addListener(_invalidateCredentialsPass);
+    _engineUsernameController.addListener(_invalidateCredentialsPass);
+    _enginePasswordController.addListener(_invalidateCredentialsPass);
+    _engineApiKeyController.addListener(_invalidateCredentialsPass);
 
     // Check whether passwords are saved (without loading the value)
     _checkSavedCredentials();
@@ -94,18 +120,56 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  void _invalidateCredentialsPass() {
+    ref.read(credentialsPassProvider.notifier).invalidate();
+  }
+
+  /// Returns the current [TabController], creating (or recreating, if
+  /// `length` changed — e.g. voice capabilities became available while
+  /// Settings was open) a fresh one as needed. `TabController.length` is
+  /// fixed at construction, so a length change requires a new controller;
+  /// this replaces the length-handling `DefaultTabController` used to do
+  /// implicitly, now that the controller is explicit (needed so it can be
+  /// driven externally via [settingsTabRequestProvider]).
+  TabController _ensureTabController(int length) {
+    if (_tabController == null || _tabControllerLength != length) {
+      _tabController?.dispose();
+      _tabController = TabController(length: length, vsync: this);
+      _tabControllerLength = length;
+    }
+    return _tabController!;
+  }
+
+  bool _hasUnsavedCredentialChanges() {
+    final settings = ref.read(settingsProvider);
+    return _usernameController.text.trim() != (settings.username ?? '') ||
+        _passwordController.text.isNotEmpty ||
+        _chatApiKeyController.text.trim().isNotEmpty ||
+        _chatBasicAuthEnabled != (settings.username?.isNotEmpty ?? false) ||
+        _engineUsernameController.text.trim() !=
+            (settings.engineUsername ?? '') ||
+        _enginePasswordController.text.isNotEmpty ||
+        _engineApiKeyController.text.trim().isNotEmpty ||
+        _engineBasicAuthEnabled !=
+            (settings.engineUsername?.isNotEmpty ?? false);
+  }
+
   @override
   void dispose() {
-    _baseUrlController.dispose();
-    _modelController.dispose();
-    _primeMessageController.dispose();
+    _tabController?.dispose();
+    _usernameController.removeListener(_invalidateCredentialsPass);
     _usernameController.dispose();
+    _passwordController.removeListener(_invalidateCredentialsPass);
     _passwordController.dispose();
-    _engineUrlController.dispose();
+    _engineUsernameController.removeListener(_invalidateCredentialsPass);
     _engineUsernameController.dispose();
+    _enginePasswordController.removeListener(_invalidateCredentialsPass);
     _enginePasswordController.dispose();
+    _engineApiKeyController.removeListener(_invalidateCredentialsPass);
     _engineApiKeyController.dispose();
+    _chatApiKeyController.removeListener(_invalidateCredentialsPass);
     _chatApiKeyController.dispose();
+    _primeMessageController.dispose();
     super.dispose();
   }
 
@@ -117,8 +181,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _healthCheckResult = null;
     });
 
-    final baseUrl = _baseUrlController.text.trim();
-    final model = _modelController.text.trim();
+    final pending = ref.read(pendingSettingsProvider);
+    final baseUrl = pending.simpleChatBaseUrl;
+    final model = pending.simpleChatModel;
     final notifier = ref.read(settingsProvider.notifier);
     final authType = _chatBasicAuthEnabled ? AuthType.basic : AuthType.none;
 
@@ -138,11 +203,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             : await notifier.getChatApiKey(),
       );
 
+      ref.read(credentialsPassProvider.notifier).markVerified(result.isSuccess);
       setState(() {
         _healthCheckResult = result;
         _isHealthCheckRunning = false;
       });
     } catch (e) {
+      ref.read(credentialsPassProvider.notifier).markVerified(false);
       setState(() {
         _healthCheckResult = HealthCheckResult.connectionFailed(e.toString());
         _isHealthCheckRunning = false;
@@ -158,7 +225,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _engineHealthCheckResult = null;
     });
 
-    final baseUrl = _engineUrlController.text.trim();
+    final baseUrl = ref.read(pendingSettingsProvider).engineBaseUrl;
     final authType = _engineBasicAuthEnabled ? AuthType.basic : AuthType.none;
     final notifier = ref.read(settingsProvider.notifier);
 
@@ -177,11 +244,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             : await notifier.getEngineApiKey(url: baseUrl),
       );
 
+      ref.read(credentialsPassProvider.notifier).markVerified(result.isSuccess);
       setState(() {
         _engineHealthCheckResult = result;
         _isEngineHealthCheckRunning = false;
       });
     } catch (e) {
+      ref.read(credentialsPassProvider.notifier).markVerified(false);
       setState(() {
         _engineHealthCheckResult = EngineHealthResult.connectionFailed(
           e.toString(),
@@ -233,6 +302,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     });
 
     _showClearedBanner();
+    _invalidateCredentialsPass();
   }
 
   Future<void> _clearEngineCredentials() async {
@@ -252,6 +322,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     });
 
     _showClearedBanner();
+    _invalidateCredentialsPass();
   }
 
   Widget _buildDebugInfo(String label, String value) {
@@ -284,6 +355,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildChatHealthPanel() {
     final result = _healthCheckResult!;
+    final pending = ref.read(pendingSettingsProvider);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -327,12 +399,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _buildDebugInfo('Method', 'POST'),
           _buildDebugInfo(
             'URL',
-            '${_baseUrlController.text.trim()}/chat/completions',
+            '${pending.simpleChatBaseUrl}/chat/completions',
           ),
           _buildDebugInfo(
             'Body',
             '{"messages": [{"role": "user", "content": "test"}], '
-                '"model": "${_modelController.text.trim()}", '
+                '"model": "${pending.simpleChatModel}", '
                 '"max_completion_tokens": 100}',
           ),
           if (result.httpStatusCode != null)
@@ -361,6 +433,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildEngineHealthPanel() {
     final result = _engineHealthCheckResult!;
+    final pending = ref.read(pendingSettingsProvider);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -404,7 +477,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _buildDebugInfo('Method', 'GET'),
           _buildDebugInfo(
             'URL',
-            '${_engineUrlController.text.trim()}/api/v1/status',
+            '${pending.engineBaseUrl}/api/v1/status',
           ),
           if (result.httpStatusCode != null)
             _buildDebugInfo('Status', 'HTTP ${result.httpStatusCode}'),
@@ -426,11 +499,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Future<void> _saveSettings() async {
+  Future<void> _apply() async {
     if (_formKey.currentState != null && !_formKey.currentState!.validate()) return;
 
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final settings = ref.read(settingsProvider);
+    final pending = ref.read(pendingSettingsProvider);
 
     // Save simple chat authentication credentials if changed
     if (_usernameController.text.trim() != (settings.username ?? '')) {
@@ -442,10 +516,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       setState(() => _hasPassword = true);
     }
 
-    // Save engine settings
-    await settingsNotifier.updateEngineBaseUrl(
-      _engineUrlController.text.trim(),
-    );
+    // Commit the engine base URL before any engine credential writes below
+    // (matching the original save order): updateEngineBaseUrl resets
+    // engineAuthType/engineUsername/engineHasApiKey when the URL changes
+    // (settings_provider.dart), and setEnginePassword/setEngineApiKey store
+    // secrets keyed by the *current* engineBaseUrl. Committing it here first
+    // means those writes land under the new URL and don't get clobbered by
+    // commitPendingSettings' own engineBaseUrl commit — which becomes a
+    // no-op below since settings.engineBaseUrl already matches
+    // pending.engineBaseUrl by the time commitPendingSettings reads it.
+    if (pending.engineBaseUrl != settings.engineBaseUrl) {
+      await settingsNotifier.updateEngineBaseUrl(pending.engineBaseUrl);
+    }
+
+    // Save engine credential fields (not part of the shared draft — see
+    // Global Constraints)
     final engineAuthType = _engineBasicAuthEnabled
         ? AuthType.basic
         : AuthType.none;
@@ -473,14 +558,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       await settingsNotifier.setChatApiKey(_chatApiKeyController.text.trim());
     }
 
-    final success = await settingsNotifier.updateSettings(
-      simpleChatBaseUrl: _baseUrlController.text.trim(),
-      simpleChatModel: _modelController.text.trim(),
-      primeMessage: _primeMessageController.text.trim(),
-      ttsSpeakerId: _ttsSpeakerId,
-      ttsSpeed: _ttsSpeed,
-      backgroundListeningDuration: _backgroundListeningDuration,
-    );
+    // Everything else still staged — engine URL (above), chat base
+    // URL/model/prime message — is the shared draft, committed the same
+    // way regardless of which screen's Apply button was pressed.
+    final success = await commitPendingSettings(ref);
 
     if (!success) {
       if (mounted) {
@@ -510,7 +591,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       return;
     }
 
-    // Settings saved successfully - run health check for selected backend
+    // If the currently-active connection settings are already trusted (no
+    // relevant field changed since the last time they passed), skip the
+    // live check entirely and just leave — this is what keeps Apply a true
+    // single tap on the common "nothing credential-relevant changed" path.
+    if (ref.read(credentialsPassProvider)) {
+      if (mounted) context.go('/chat');
+      return;
+    }
+
+    // Not yet verified since the last relevant change — run a live health
+    // check for the active backend before leaving.
     final updatedSettings = ref.read(settingsProvider);
 
     try {
@@ -520,7 +611,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (updatedSettings.selectedBackend == ChatBackendType.relagentEngine) {
         final service = EngineHealthCheckService();
         final result = await service.checkStatus(
-          baseUrl: _engineUrlController.text.trim(),
+          baseUrl: updatedSettings.engineBaseUrl,
           authType: _engineBasicAuthEnabled ? AuthType.basic : AuthType.none,
           username: _engineUsernameController.text.trim(),
           password: _enginePasswordController.text.trim().isNotEmpty
@@ -535,8 +626,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       } else {
         final service = ApiHealthCheckService();
         final result = await service.performHealthCheck(
-          baseUrl: _baseUrlController.text.trim(),
-          model: _modelController.text.trim(),
+          baseUrl: updatedSettings.simpleChatBaseUrl,
+          model: updatedSettings.simpleChatModel,
           authType: _chatBasicAuthEnabled ? AuthType.basic : AuthType.none,
           username: _usernameController.text.trim(),
           password: _passwordController.text.trim().isNotEmpty
@@ -550,9 +641,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         failureMessage = result.message;
       }
 
+      ref.read(credentialsPassProvider.notifier).markVerified(isSuccess);
+
       if (mounted) {
         if (isSuccess) {
-          context.pop('Settings saved and connection verified successfully');
+          context.go('/chat');
         } else {
           await _showHealthCheckFailureDialog(
             'Connection test failed: $failureMessage',
@@ -560,6 +653,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         }
       }
     } catch (e) {
+      ref.read(credentialsPassProvider.notifier).markVerified(false);
       if (mounted) {
         await _showHealthCheckFailureDialog(
           'Connection test encountered an error: $e',
@@ -592,7 +686,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
 
     if (result == true && mounted) {
-      context.pop('Settings saved, but connection test failed');
+      context.go('/chat');
     }
   }
 
@@ -626,106 +720,42 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return Text(id);
   }
 
-  Future<void> _confirmReset() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset All Settings'),
-        content: const Text(
-          'Reset all settings to defaults? All changes will be lost.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Reset'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await _resetToDefaults();
-  }
-
-  Future<void> _resetToDefaults() async {
-    final success = await ref.read(settingsProvider.notifier).resetToDefaults();
-    final settings = ref.read(settingsProvider);
-    _baseUrlController.text = settings.simpleChatBaseUrl;
-    _modelController.text = settings.simpleChatModel;
-    _primeMessageController.text = settings.primeMessage;
-    _engineUrlController.text = settings.engineBaseUrl;
-    _engineUsernameController.text = settings.engineUsername ?? '';
-    _enginePasswordController.clear();
-    _engineApiKeyController.clear();
-    _chatApiKeyController.clear();
-    setState(() {
-      _ttsSpeakerId = settings.ttsSpeakerId;
-      _ttsSpeed = settings.ttsSpeed;
-      _backgroundListeningDuration = settings.backgroundListeningDuration;
-      _hasPassword = false;
-      _hasEnginePassword = false;
-      _chatBasicAuthEnabled = false;
-      _engineBasicAuthEnabled = false;
-    });
-
-    if (mounted) {
-      final ThemeData theme = Theme.of(context);
-      if (success) {
-        ScaffoldMessenger.of(context).showMaterialBanner(
-          MaterialBanner(
-            content: const Text('Reset to defaults successfully'),
-            backgroundColor: theme.colorScheme.secondaryContainer,
-            actions: [
-              TextButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-                },
-                child: Text(
-                  'OK',
-                  style: TextStyle(
-                    color: theme.colorScheme.onSecondaryContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-          }
-        });
-      } else {
-        ScaffoldMessenger.of(context).showMaterialBanner(
-          MaterialBanner(
-            content: const Text(
-              'Failed to save default settings. Check console for details.',
-            ),
-            backgroundColor: theme.colorScheme.errorContainer,
-            actions: [
-              TextButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-                },
-                child: Text(
-                  'DISMISS',
-                  style: TextStyle(
-                    color: theme.colorScheme.onSecondaryContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    // Prime Message has no fieldViewBuilder to hook a post-frame resync
+    // into (unlike the Autocomplete-backed fields), so keep its controller
+    // in sync with the draft here instead — covers the smart-nav "Discard"
+    // dialog choice, which reverts pending.primeMessage out from under the
+    // field. The equality guard avoids fighting the user's own typing,
+    // which already wrote this same value into the draft via onChanged.
+    ref.listen<Settings>(pendingSettingsProvider, (previous, next) {
+      if (_primeMessageController.text != next.primeMessage) {
+        _primeMessageController.text = next.primeMessage;
+      }
+    });
+
     final settings = ref.watch(settingsProvider);
+    final pending = ref.watch(pendingSettingsProvider);
+    // credentialsPassProvider is autoDispose and only ever ref.read elsewhere
+    // (in _apply() and the invalidate/markVerified call sites) — without a
+    // watcher it disposes and resets to its default (true) the moment
+    // nothing is subscribed, which happens between an invalidating edit and
+    // the next Apply tap. Watching it here keeps it alive for the whole
+    // Settings flow, the same way `pending` above is kept alive.
+    ref.watch(credentialsPassProvider);
+    // Kept alive the same way as credentialsPassProvider above. Voice
+    // Models' "Review Settings" action sets this to request landing on the
+    // Connection tab (index 0) regardless of whichever tab was last active
+    // here; consumed and cleared as soon as it's applied below.
+    ref.watch(settingsTabRequestProvider);
+    ref.listen<int?>(settingsTabRequestProvider, (previous, next) {
+      if (next != null) {
+        if (_tabController != null && next < _tabController!.length) {
+          _tabController!.index = next;
+        }
+        ref.read(settingsTabRequestProvider.notifier).clear();
+      }
+    });
     final voiceCapabilities = ref.watch(voiceCapabilitiesProvider);
     final hasVoice =
         voiceCapabilities.isAsrAvailable || voiceCapabilities.isTtsAvailable;
@@ -780,6 +810,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ref
                     .read(settingsProvider.notifier)
                     .updateSelectedBackend(newSelection.first);
+                _invalidateCredentialsPass();
               },
             ),
             const SizedBox(height: 8),
@@ -805,7 +836,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   return urlSuggestions;
                 },
                 onSelected: (String selection) {
-                  _baseUrlController.text = selection;
+                  ref
+                      .read(pendingSettingsProvider.notifier)
+                      .updateDraft(
+                        (s) => s.copyWith(simpleChatBaseUrl: selection),
+                      );
+                  _invalidateCredentialsPass();
                 },
                 fieldViewBuilder:
                     (
@@ -814,16 +850,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       FocusNode fieldFocusNode,
                       VoidCallback onFieldSubmitted,
                     ) {
+                      if (_chatUrlFieldController !=
+                          fieldTextEditingController) {
+                        _chatUrlFieldController = fieldTextEditingController;
+                        fieldTextEditingController.addListener(() {
+                          if (_isSyncingChatUrlField) return;
+                          ref
+                              .read(pendingSettingsProvider.notifier)
+                              .updateDraft(
+                                (s) => s.copyWith(
+                                  simpleChatBaseUrl:
+                                      fieldTextEditingController.text,
+                                ),
+                              );
+                          _invalidateCredentialsPass();
+                        });
+                      }
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (fieldTextEditingController.text !=
-                            _baseUrlController.text) {
+                            pending.simpleChatBaseUrl) {
+                          _isSyncingChatUrlField = true;
                           fieldTextEditingController.text =
-                              _baseUrlController.text;
+                              pending.simpleChatBaseUrl;
+                          _isSyncingChatUrlField = false;
                         }
-                      });
-                      fieldTextEditingController.addListener(() {
-                        _baseUrlController.text =
-                            fieldTextEditingController.text;
                       });
                       return TextFormField(
                         controller: fieldTextEditingController,
@@ -859,7 +909,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   return modelSuggestions;
                 },
                 onSelected: (String selection) {
-                  _modelController.text = selection;
+                  ref
+                      .read(pendingSettingsProvider.notifier)
+                      .updateDraft(
+                        (s) => s.copyWith(simpleChatModel: selection),
+                      );
+                  _invalidateCredentialsPass();
                 },
                 fieldViewBuilder:
                     (
@@ -868,16 +923,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       FocusNode fieldFocusNode,
                       VoidCallback onFieldSubmitted,
                     ) {
+                      if (_chatModelFieldController !=
+                          fieldTextEditingController) {
+                        _chatModelFieldController = fieldTextEditingController;
+                        fieldTextEditingController.addListener(() {
+                          if (_isSyncingChatModelField) return;
+                          ref
+                              .read(pendingSettingsProvider.notifier)
+                              .updateDraft(
+                                (s) => s.copyWith(
+                                  simpleChatModel:
+                                      fieldTextEditingController.text,
+                                ),
+                              );
+                          _invalidateCredentialsPass();
+                        });
+                      }
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (fieldTextEditingController.text !=
-                            _modelController.text) {
+                            pending.simpleChatModel) {
+                          _isSyncingChatModelField = true;
                           fieldTextEditingController.text =
-                              _modelController.text;
+                              pending.simpleChatModel;
+                          _isSyncingChatModelField = false;
                         }
-                      });
-                      fieldTextEditingController.addListener(() {
-                        _modelController.text =
-                            fieldTextEditingController.text;
                       });
                       return TextFormField(
                         controller: fieldTextEditingController,
@@ -904,6 +973,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _primeMessageController,
+                onChanged: (v) => ref
+                    .read(pendingSettingsProvider.notifier)
+                    .updateDraft((s) => s.copyWith(primeMessage: v)),
                 decoration: const InputDecoration(
                   labelText: 'Prime Message',
                   hintText: 'System prompt sent with every request',
@@ -929,8 +1001,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 apiKeyController: _chatApiKeyController,
                 hasApiKey: settings.simpleChatHasApiKey,
                 basicAuthEnabled: _chatBasicAuthEnabled,
-                onBasicAuthToggleChanged: (v) =>
-                    setState(() => _chatBasicAuthEnabled = v),
+                onBasicAuthToggleChanged: (v) {
+                  setState(() => _chatBasicAuthEnabled = v);
+                  _invalidateCredentialsPass();
+                },
                 usernameController: _usernameController,
                 passwordController: _passwordController,
                 hasPassword: _hasPassword,
@@ -990,13 +1064,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   );
                 },
                 onSelected: (EngineUrlEntry selection) {
-                  _engineUrlController.text = selection.url;
+                  ref
+                      .read(pendingSettingsProvider.notifier)
+                      .updateDraft(
+                        (s) => s.copyWith(engineBaseUrl: selection.url),
+                      );
                   _engineBasicAuthEnabled =
                       selection.authType == AuthType.basic;
                   _engineUsernameController.text = selection.username ?? '';
                   _enginePasswordController.clear();
                   _engineApiKeyController.clear();
                   _hasEnginePassword = false;
+                  _invalidateCredentialsPass();
                 },
                 fieldViewBuilder:
                     (
@@ -1005,16 +1084,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       FocusNode fieldFocusNode,
                       VoidCallback onFieldSubmitted,
                     ) {
+                      if (_engineUrlFieldController !=
+                          fieldTextEditingController) {
+                        _engineUrlFieldController = fieldTextEditingController;
+                        fieldTextEditingController.addListener(() {
+                          if (_isSyncingEngineUrlField) return;
+                          ref
+                              .read(pendingSettingsProvider.notifier)
+                              .updateDraft(
+                                (s) => s.copyWith(
+                                  engineBaseUrl:
+                                      fieldTextEditingController.text,
+                                ),
+                              );
+                          _invalidateCredentialsPass();
+                        });
+                      }
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (fieldTextEditingController.text !=
-                            _engineUrlController.text) {
+                            pending.engineBaseUrl) {
+                          _isSyncingEngineUrlField = true;
                           fieldTextEditingController.text =
-                              _engineUrlController.text;
+                              pending.engineBaseUrl;
+                          _isSyncingEngineUrlField = false;
                         }
-                      });
-                      fieldTextEditingController.addListener(() {
-                        _engineUrlController.text =
-                            fieldTextEditingController.text;
                       });
                       return TextFormField(
                         controller: fieldTextEditingController,
@@ -1054,8 +1147,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 apiKeyController: _engineApiKeyController,
                 hasApiKey: settings.engineHasApiKey,
                 basicAuthEnabled: _engineBasicAuthEnabled,
-                onBasicAuthToggleChanged: (v) =>
-                    setState(() => _engineBasicAuthEnabled = v),
+                onBasicAuthToggleChanged: (v) {
+                  setState(() => _engineBasicAuthEnabled = v);
+                  _invalidateCredentialsPass();
+                },
                 usernameController: _engineUsernameController,
                 passwordController: _enginePasswordController,
                 hasPassword: _hasEnginePassword,
@@ -1099,19 +1194,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'TTS Speed: ${_ttsSpeed.toStringAsFixed(2)}x',
+              'TTS Speed: ${settings.ttsSpeed.toStringAsFixed(2)}x',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             Slider(
-              value: _ttsSpeed,
+              value: settings.ttsSpeed,
               min: 0.5,
               max: 2.0,
               divisions: 30,
-              label: '${_ttsSpeed.toStringAsFixed(2)}x',
+              label: '${settings.ttsSpeed.toStringAsFixed(2)}x',
               onChanged: (value) {
-                setState(() {
-                  _ttsSpeed = value;
-                });
+                ref.read(settingsProvider.notifier).updateTtsSpeed(value);
               },
             ),
             Text(
@@ -1121,16 +1214,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             if (getSelectedTtsSpeakerCount(settings) > 1) ...[
               const SizedBox(height: 16),
               Text(
-                'TTS Speaker ID: $_ttsSpeakerId',
+                'TTS Speaker ID: ${settings.ttsSpeakerId}',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               Slider(
-                value: _ttsSpeakerId.toDouble(),
+                value: settings.ttsSpeakerId.toDouble(),
                 min: 0,
                 max: (getSelectedTtsSpeakerCount(settings) - 1).toDouble(),
                 divisions: getSelectedTtsSpeakerCount(settings) - 1,
-                label: '$_ttsSpeakerId',
-                onChanged: (v) => setState(() => _ttsSpeakerId = v.round()),
+                label: '${settings.ttsSpeakerId}',
+                onChanged: (v) => ref
+                    .read(settingsProvider.notifier)
+                    .updateTtsSpeakerId(v.round()),
               ),
             ],
           ],
@@ -1187,7 +1282,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: DropdownButtonFormField<BackgroundListeningDuration>(
-                  initialValue: _backgroundListeningDuration,
+                  initialValue: settings.backgroundListeningDuration,
                   decoration: const InputDecoration(
                     labelText: 'Background Listening Duration',
                     border: OutlineInputBorder(),
@@ -1200,7 +1295,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   }).toList(),
                   onChanged: (newValue) {
                     if (newValue != null) {
-                      setState(() => _backgroundListeningDuration = newValue);
                       ref
                           .read(settingsProvider.notifier)
                           .updateBackgroundListeningDuration(newValue);
@@ -1214,77 +1308,47 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ),
     ];  // end tabViews
 
-    final colorScheme = Theme.of(context).colorScheme;
-    final tabBar = TabBar(tabs: tabs);
+    final tabController = _ensureTabController(tabs.length);
+    final tabBar = TabBar(controller: tabController, tabs: tabs);
 
-    return DefaultTabController(
-      length: tabs.length,
-      child: Focus(
-        autofocus: false,
-        skipTraversal: true,
-        onKeyEvent: (node, event) {
-          if (event is KeyDownEvent &&
-              event.logicalKey == LogicalKeyboardKey.escape) {
-            context.pop();
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        },
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('Settings'),
-            automaticallyImplyLeading: false,
-            leading: ExcludeFocus(
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.pop(),
-              ),
-            ),
-            bottom: tabs.length > 1
-                ? PreferredSize(
-                    preferredSize: tabBar.preferredSize,
-                    child: tabBar,
-                  )
-                : null,
-          ),
-          body: TabBarView(children: tabViews),
-          bottomNavigationBar: ColoredBox(
-            color: colorScheme.surfaceContainer,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _confirmReset,
-                      child: const Text('Reset'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: FilledButton(
-                      style: ButtonStyle(
-                        side: WidgetStateProperty.resolveWith((states) {
-                          if (states.contains(WidgetState.focused)) {
-                            return BorderSide(
-                              color: colorScheme.onPrimary,
-                              width: 2,
-                            );
-                          }
-                          return null;
-                        }),
-                      ),
-                      onPressed: _saveSettings,
-                      child: const Text('Save'),
-                    ),
-                  ),
-                ],
+    return Focus(
+      autofocus: false,
+      skipTraversal: true,
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          smartBack(
+            context,
+            ref,
+            hasExtraPendingChanges: _hasUnsavedCredentialChanges,
+          );
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Settings'),
+          automaticallyImplyLeading: false,
+          leading: ExcludeFocus(
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => smartBack(
+                context,
+                ref,
+                hasExtraPendingChanges: _hasUnsavedCredentialChanges,
               ),
             ),
           ),
+          bottom: tabs.length > 1
+              ? PreferredSize(
+                  preferredSize: tabBar.preferredSize,
+                  child: tabBar,
+                )
+              : null,
         ),
-        ),
+        body: TabBarView(controller: tabController, children: tabViews),
+        bottomNavigationBar: SettingsApplyBar(onApply: _apply),
       ),
     );
   }

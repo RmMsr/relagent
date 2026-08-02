@@ -10,6 +10,7 @@ import '/services/secure_credential_service.dart';
 import 'sessions_provider.dart';
 import 'settings_history_manager.dart';
 import 'settings_persistence_manager.dart';
+import '/voice/imported_model_registry.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('SharedPreferences must be overridden in main.dart');
@@ -67,11 +68,15 @@ class SettingsNotifier extends Notifier<Settings> {
     final asrId = state.selectedAsrModelId;
     final ttsId = state.selectedTtsModelId;
     bool changed = false;
-    if (asrId != null && !downloadedModels.contains(asrId)) {
+    if (asrId != null &&
+        !downloadedModels.contains(asrId) &&
+        ImportedModelRegistry.findById(asrId) == null) {
       state = state.copyWith(selectedAsrModelId: null);
       changed = true;
     }
-    if (ttsId != null && !downloadedModels.contains(ttsId)) {
+    if (ttsId != null &&
+        !downloadedModels.contains(ttsId) &&
+        ImportedModelRegistry.findById(ttsId) == null) {
       state = state.copyWith(selectedTtsModelId: null);
       changed = true;
     }

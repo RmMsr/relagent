@@ -42,7 +42,7 @@ def run_with_framework(framework: str, version: str) -> None:
         f"--volume={settings_file}:{Path('/app') / home_app_dir / 'settings.ini'}:ro",
         f"--volume={host_home_app_dir / 'data'}:{Path('/app') / home_app_dir / 'data'}:rw",
         f"--volume={host_hugging_face_dir}:{Path('/app') / hugging_face_dir}:rw",
-        "--env=PROVIDER_ADDITIONAL_ARGS",
+        "--env=$PROVIDER_ADDITIONAL_ARGS",
         "--publish=8000:8000",
         "--userns=keep-id:uid=1000,gid=1000",
         f"registry.gitlab.com/rmmsr/relagent:{version}",
