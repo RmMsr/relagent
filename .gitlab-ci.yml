@@ -10,7 +10,6 @@ variables:
   PACKAGE_VERSION: "${CI_COMMIT_REF_NAME}"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/app-releases"
   FLUTTER_IMAGE: ghcr.io/cirruslabs/flutter:3.41.9
-  PUB_CACHE: "$CI_PROJECT_DIR/.pub-cache"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle-cache"
 
 default:
@@ -80,6 +79,7 @@ build-android-apk:
     - bin/reproducible-build-prepare.sh
     - |
       pushd /tmp/build/org.venkado.relagent/apps
+      export PUB_CACHE="$(pwd)/.pub-cache"
       flutter build apk --release --split-per-abi
       popd
     - bin/reproducible-build-collect.sh
@@ -112,6 +112,7 @@ build-android-bundle:
     - bin/reproducible-build-prepare.sh
     - |
       pushd /tmp/build/org.venkado.relagent/apps
+      export PUB_CACHE="$(pwd)/.pub-cache"
       flutter build appbundle --release
       popd
     - bin/reproducible-build-collect.sh
