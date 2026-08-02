@@ -208,24 +208,32 @@ class _ApprovalCardState extends State<ApprovalCard> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: 'Approval: ',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: iconColor,
+                      child: GestureDetector(
+                        onTap: () => setState(
+                            () => _isPurposeExpanded = !_isPurposeExpanded),
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Approval: ',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: iconColor,
+                                ),
                               ),
-                            ),
-                            TextSpan(
-                              text: typeStr,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontFamily: 'monospace',
-                                color: iconColor,
+                              TextSpan(
+                                text: approval.purpose,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          maxLines: _isPurposeExpanded ? null : 1,
+                          overflow: _isPurposeExpanded
+                              ? TextOverflow.visible
+                              : TextOverflow.ellipsis,
                         ),
                       ),
                     ),
@@ -238,18 +246,11 @@ class _ApprovalCardState extends State<ApprovalCard> {
                   ],
                 ),
                 const SizedBox(height: 2),
-                GestureDetector(
-                  onTap: () => setState(() => _isPurposeExpanded = !_isPurposeExpanded),
-                  child: Text(
-                    approval.purpose,
-                    maxLines: _isPurposeExpanded ? null : 1,
-                    overflow: _isPurposeExpanded
-                        ? TextOverflow.visible
-                        : TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                Text(
+                  '[$typeStr]',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
