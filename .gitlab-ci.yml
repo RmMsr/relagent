@@ -55,6 +55,10 @@ build-engine:
         buildah push $CI_REGISTRY_IMAGE:latest-bundled
       fi
 
+# Reproducibility: build-android-apk and build-android-bundle both pin PUB_CACHE,
+# ANDROID_HOME, and ANDROID_SDK_ROOT to fixed paths. NDK-compiled libs (e.g.
+# package:jni) embed these absolute paths in debug info, which leaks into the
+# linker's build-id even after stripping.
 build-android-apk:
   stage: build
   tags:
@@ -80,6 +84,9 @@ build-android-apk:
     - |
       pushd /tmp/build/org.venkado.relagent/apps
       export PUB_CACHE="$(pwd)/.pub-cache"
+      ln -sfn "$ANDROID_HOME" /opt/android-sdk
+      export ANDROID_HOME=/opt/android-sdk
+      export ANDROID_SDK_ROOT=/opt/android-sdk
       flutter build apk --release --split-per-abi
       popd
     - bin/reproducible-build-collect.sh
@@ -113,6 +120,9 @@ build-android-bundle:
     - |
       pushd /tmp/build/org.venkado.relagent/apps
       export PUB_CACHE="$(pwd)/.pub-cache"
+      ln -sfn "$ANDROID_HOME" /opt/android-sdk
+      export ANDROID_HOME=/opt/android-sdk
+      export ANDROID_SDK_ROOT=/opt/android-sdk
       flutter build appbundle --release
       popd
     - bin/reproducible-build-collect.sh
