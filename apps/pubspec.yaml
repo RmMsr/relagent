@@ -1,7 +1,7 @@
 name: relagent
 description: "Relatable Agentic Minion - Privacy focused and open AI assistant"
 publish_to: "none"
-version: 0.1.28+25
+version: 0.1.29-pre+26
 
 environment:
   sdk: 3.11.5
