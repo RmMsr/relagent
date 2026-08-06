@@ -23,6 +23,36 @@ class InMemoryAudioSource extends StreamAudioSource {
   }
 }
 
+/// Appends [silence] worth of zero-amplitude PCM samples to a WAV file
+/// produced by [generateWavBytes], patching the RIFF/data size fields to
+/// match. Used to pace chunked TTS playback (e.g. a longer pause before a
+/// heading) without needing SSML support from the synthesis engine.
+Uint8List appendSilenceToWav(Uint8List wavBytes, Duration silence) {
+  if (silence <= Duration.zero || wavBytes.length < 44) return wavBytes;
+
+  final header = ByteData.sublistView(wavBytes, 0, 44);
+  final sampleRate = header.getUint32(24, Endian.little);
+  final numChannels = header.getUint16(22, Endian.little);
+  final bitsPerSample = header.getUint16(34, Endian.little);
+  final bytesPerFrame = numChannels * (bitsPerSample ~/ 8);
+
+  final silenceFrames = (sampleRate * silence.inMicroseconds / 1000000).round();
+  final silenceBytes = silenceFrames * bytesPerFrame;
+  if (silenceBytes <= 0) return wavBytes;
+
+  final result = Uint8List(wavBytes.length + silenceBytes);
+  result.setRange(0, wavBytes.length, wavBytes);
+  // Trailing bytes are already zero (silence) — Uint8List is zero-initialized.
+
+  final resultHeader = ByteData.sublistView(result, 0, 44);
+  final oldFileSize = header.getUint32(4, Endian.little);
+  resultHeader.setUint32(4, oldFileSize + silenceBytes, Endian.little);
+  final oldDataSize = header.getUint32(40, Endian.little);
+  resultHeader.setUint32(40, oldDataSize + silenceBytes, Endian.little);
+
+  return result;
+}
+
 /// Converts GeneratedAudio from Sherpa-ONNX to WAV bytes
 Uint8List generateWavBytes(dynamic audio) {
   final samples = audio.samples;

@@ -214,8 +214,20 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                                         break;
                                     }
                                   },
-                            getMessagePlaybackStatus: (messageId) =>
-                                ttsState.getMessageState(messageId).status,
+                            getMessageTtsState: (messageId) =>
+                                ttsState.getMessageState(messageId),
+                            onSkipPrevious:
+                                !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
+                                ? null
+                                : (messageId) => ref
+                                    .read(ttsProvider.notifier)
+                                    .skipPreviousChunk(messageId),
+                            onSkipNext:
+                                !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
+                                ? null
+                                : (messageId) => ref
+                                    .read(ttsProvider.notifier)
+                                    .skipNextChunk(messageId),
                             onChangeSensitivity: (level) {
                               ref
                                   .read(agenticChatProvider.notifier)

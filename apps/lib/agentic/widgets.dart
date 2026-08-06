@@ -12,8 +12,10 @@ import '/providers/tts_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/speech_recognition/recording_target.dart';
 import '/speech_recognition/widgets.dart';
+import '/tts/text_chunker.dart';
 import '/utils/logger.dart';
 import '/theme/app_colors.dart';
+import '/widgets/tts_chunk_controls.dart';
 import '/widgets/version_info_widget.dart';
 
 export '/agentic/approval_card.dart';
@@ -254,7 +256,9 @@ class AgenticChatHistory extends StatelessWidget {
   final List<AgenticMessage> messages;
   final bool showAssistantPending;
   final void Function(String, String)? onSpeak;
-  final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
+  final MessageTtsState Function(String)? getMessageTtsState;
+  final void Function(String messageId)? onSkipPrevious;
+  final void Function(String messageId)? onSkipNext;
   final EngineHealthResult? engineHealthResult;
   final VoidCallback? onRetry;
   final VoidCallback? onCancel;
@@ -275,7 +279,9 @@ class AgenticChatHistory extends StatelessWidget {
     required this.messages,
     this.showAssistantPending = false,
     this.onSpeak,
-    this.getMessagePlaybackStatus,
+    this.getMessageTtsState,
+    this.onSkipPrevious,
+    this.onSkipNext,
     this.engineHealthResult,
     this.onRetry,
     this.onCancel,
@@ -427,7 +433,9 @@ class AgenticChatHistory extends StatelessWidget {
               isFirstInGroup: isFirstInGroup,
               isLastInGroup: isLastInGroup,
               onSpeak: onSpeak,
-              getMessagePlaybackStatus: getMessagePlaybackStatus,
+              getMessageTtsState: getMessageTtsState,
+              onSkipPrevious: onSkipPrevious,
+              onSkipNext: onSkipNext,
               onRetry: onRetry,
               onCancel: onCancel,
             ),
@@ -467,7 +475,9 @@ class _AgenticMessageBubble extends StatelessWidget {
   final bool isFirstInGroup;
   final bool isLastInGroup;
   final void Function(String, String)? onSpeak;
-  final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
+  final MessageTtsState Function(String)? getMessageTtsState;
+  final void Function(String messageId)? onSkipPrevious;
+  final void Function(String messageId)? onSkipNext;
   final VoidCallback? onRetry;
   final VoidCallback? onCancel;
 
@@ -476,7 +486,9 @@ class _AgenticMessageBubble extends StatelessWidget {
     required this.isFirstInGroup,
     required this.isLastInGroup,
     this.onSpeak,
-    this.getMessagePlaybackStatus,
+    this.getMessageTtsState,
+    this.onSkipPrevious,
+    this.onSkipNext,
     this.onRetry,
     this.onCancel,
   });
@@ -537,7 +549,11 @@ class _AgenticMessageBubble extends StatelessWidget {
           else
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: GptMarkdown(message.text),
+              child: _buildMessageBody(
+                theme,
+                getMessageTtsState?.call(message.localId) ??
+                    const MessageTtsState(),
+              ),
             ),
           if (!isUser && !isError)
             Padding(
@@ -547,7 +563,9 @@ class _AgenticMessageBubble extends StatelessWidget {
                 messageText: message.text,
                 stats: message.stats,
                 onSpeak: onSpeak,
-                getMessagePlaybackStatus: getMessagePlaybackStatus,
+                getMessageTtsState: getMessageTtsState,
+                onSkipPrevious: onSkipPrevious,
+                onSkipNext: onSkipNext,
               ),
             ),
           if (isError && (onRetry != null || onCancel != null))
@@ -587,6 +605,38 @@ class _AgenticMessageBubble extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+
+  /// Renders the message as one [GptMarkdown] widget per paragraph so the
+  /// currently-speaking one can be highlighted while playback has focus.
+  Widget _buildMessageBody(ThemeData theme, MessageTtsState ttsMessageState) {
+    final paragraphs = splitRawParagraphs(message.text);
+    if (paragraphs.isEmpty) {
+      return GptMarkdown(message.text);
+    }
+
+    final activeIndex = ttsMessageState.hasPlaybackFocus
+        ? ttsMessageState.currentSourceParagraphIndex
+        : -1;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < paragraphs.length; i++)
+          Container(
+            margin: EdgeInsets.only(bottom: i == paragraphs.length - 1 ? 0 : 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: i == activeIndex
+                ? BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(4),
+                  )
+                : null,
+            child: GptMarkdown(paragraphs[i]),
+          ),
+      ],
     );
   }
 }
@@ -687,14 +737,18 @@ class _MessageActionsRow extends StatefulWidget {
   final String messageText;
   final AgentStats? stats;
   final void Function(String, String)? onSpeak;
-  final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
+  final MessageTtsState Function(String)? getMessageTtsState;
+  final void Function(String messageId)? onSkipPrevious;
+  final void Function(String messageId)? onSkipNext;
 
   const _MessageActionsRow({
     required this.messageId,
     required this.messageText,
     this.stats,
     this.onSpeak,
-    this.getMessagePlaybackStatus,
+    this.getMessageTtsState,
+    this.onSkipPrevious,
+    this.onSkipNext,
   });
 
   @override
@@ -720,7 +774,9 @@ class _MessageActionsRowState extends State<_MessageActionsRow> {
                 messageId: widget.messageId,
                 text: widget.messageText,
                 onSpeak: widget.onSpeak!,
-                getStatus: widget.getMessagePlaybackStatus,
+                getTtsState: widget.getMessageTtsState,
+                onSkipPrevious: widget.onSkipPrevious,
+                onSkipNext: widget.onSkipNext,
               ),
             if (hasStats)
               IconButton(
@@ -888,18 +944,23 @@ class _SpeakerButton extends StatelessWidget {
   final String messageId;
   final String text;
   final void Function(String, String) onSpeak;
-  final MessagePlaybackStatus Function(String)? getStatus;
+  final MessageTtsState Function(String)? getTtsState;
+  final void Function(String messageId)? onSkipPrevious;
+  final void Function(String messageId)? onSkipNext;
 
   const _SpeakerButton({
     required this.messageId,
     required this.text,
     required this.onSpeak,
-    this.getStatus,
+    this.getTtsState,
+    this.onSkipPrevious,
+    this.onSkipNext,
   });
 
   @override
   Widget build(BuildContext context) {
-    final status = getStatus?.call(messageId) ?? MessagePlaybackStatus.idle;
+    final ttsState = getTtsState?.call(messageId) ?? const MessageTtsState();
+    final status = ttsState.status;
 
     IconData icon;
     String tooltip;
@@ -919,7 +980,7 @@ class _SpeakerButton extends StatelessWidget {
         tooltip = 'Read aloud';
     }
 
-    return IconButton(
+    final singleButton = IconButton(
       icon: Icon(icon, size: 18),
       onPressed: status == MessagePlaybackStatus.generating
           ? null
@@ -929,6 +990,22 @@ class _SpeakerButton extends StatelessWidget {
       style: IconButton.styleFrom(
         padding: EdgeInsets.zero,
         minimumSize: const Size(32, 32),
+      ),
+    );
+
+    final hasPlaybackFocus =
+        status == MessagePlaybackStatus.playing ||
+        status == MessagePlaybackStatus.paused;
+
+    return AnimatedTtsControls(
+      showChunkControls:
+          hasPlaybackFocus && onSkipPrevious != null && onSkipNext != null,
+      singleButton: singleButton,
+      chunkControls: TtsChunkControls(
+        isPlaying: status == MessagePlaybackStatus.playing,
+        onPlayPause: () => onSpeak(text, messageId),
+        onSkipPrevious: () => onSkipPrevious?.call(messageId),
+        onSkipNext: () => onSkipNext?.call(messageId),
       ),
     );
   }

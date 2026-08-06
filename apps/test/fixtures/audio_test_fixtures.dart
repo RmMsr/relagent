@@ -12,7 +12,10 @@ import 'package:relagent/providers/audio_coordinator_provider.dart';
 import 'package:relagent/providers/model_download_provider.dart';
 import 'package:relagent/providers/playback_provider.dart';
 import 'package:relagent/providers/settings_provider.dart';
+import 'package:relagent/providers/voice_service_provider.dart';
 import 'package:relagent/voice/model_download_service.dart';
+import 'package:relagent/voice/voice_service.dart'
+    hide AudioInterruptionType, AudioInterruptionEvent;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'audio_test_fixtures.mocks.dart';
@@ -62,8 +65,11 @@ class AudioTestFixture {
   late MockAudioSession mockAudioSession;
   late MockAudioPlayer mockAudioPlayer;
 
-  /// Set up test environment with mocked dependencies
-  Future<void> setUp() async {
+  /// Set up test environment with mocked dependencies.
+  ///
+  /// Pass [voiceService] to override the platform voice service (e.g. with a
+  /// fake TTS implementation) — tests that don't need TTS can omit it.
+  Future<void> setUp({VoiceService? voiceService}) async {
     // Initialize Flutter test bindings
     TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -90,6 +96,8 @@ class AudioTestFixture {
         audioPlayerProvider.overrideWithValue(mockAudioPlayer),
         // Stub model download service so no async filesystem I/O outlives tests
         modelDownloadServiceProvider.overrideWithValue(_NoOpModelDownloadService()),
+        if (voiceService != null)
+          voiceServiceProvider.overrideWithValue(voiceService),
       ],
     );
   }
@@ -138,11 +146,14 @@ class AudioTestFixture {
     ).thenAnswer((_) => playerStateController.stream);
 
     // Playback control
+    Timer? autoCompleteTimer;
     when(mockAudioPlayer.play()).thenAnswer((_) async {
+      // A new play() session supersedes any earlier pending auto-complete.
+      autoCompleteTimer?.cancel();
       // Simulate playback starting
       playerStateController.add(PlayerState(true, ProcessingState.ready));
       // Complete playback after a short delay to allow tests to observe state
-      Future.delayed(const Duration(milliseconds: 50), () {
+      autoCompleteTimer = Timer(const Duration(milliseconds: 50), () {
         if (!playerStateController.isClosed) {
           playerStateController.add(
             PlayerState(false, ProcessingState.completed),
@@ -156,6 +167,9 @@ class AudioTestFixture {
     });
 
     when(mockAudioPlayer.stop()).thenAnswer((_) async {
+      // Real just_audio halts playback on stop() — no further completion
+      // event should arrive for whatever was playing before this call.
+      autoCompleteTimer?.cancel();
       playerStateController.add(PlayerState(false, ProcessingState.idle));
     });
 
@@ -164,6 +178,7 @@ class AudioTestFixture {
 
     // Disposal
     when(mockAudioPlayer.dispose()).thenAnswer((_) async {
+      autoCompleteTimer?.cancel();
       playerStateController.close();
     });
   }

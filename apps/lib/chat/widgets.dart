@@ -11,8 +11,10 @@ import '/providers/tts_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/speech_recognition/recording_target.dart';
 import '/speech_recognition/widgets.dart';
+import '/tts/text_chunker.dart';
 import '/utils/logger.dart';
 import '/theme/app_colors.dart';
+import '/widgets/tts_chunk_controls.dart';
 import '/widgets/version_info_widget.dart';
 
 class ChatInput extends ConsumerStatefulWidget {
@@ -253,7 +255,9 @@ class ChatHistory extends StatelessWidget {
   final RetryState retryState;
   final void Function(String)? onRetry;
   final void Function(String, String)? onSpeak;
-  final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
+  final MessageTtsState Function(String)? getMessageTtsState;
+  final void Function(String messageId)? onSkipPrevious;
+  final void Function(String messageId)? onSkipNext;
   final bool isVoiceAvailable;
 
   const ChatHistory({
@@ -263,7 +267,9 @@ class ChatHistory extends StatelessWidget {
     this.retryState = const RetryState(),
     this.onRetry,
     this.onSpeak,
-    this.getMessagePlaybackStatus,
+    this.getMessageTtsState,
+    this.onSkipPrevious,
+    this.onSkipNext,
     this.isVoiceAvailable = false,
   });
 
@@ -319,7 +325,9 @@ class ChatHistory extends StatelessWidget {
           showHeader: true,
           onRetry: onRetry,
           onSpeak: onSpeak,
-          getMessagePlaybackStatus: getMessagePlaybackStatus,
+          getMessageTtsState: getMessageTtsState,
+          onSkipPrevious: onSkipPrevious,
+          onSkipNext: onSkipNext,
         ),
       );
 
@@ -332,7 +340,9 @@ class ChatHistory extends StatelessWidget {
             showHeader: false,
             onRetry: onRetry,
             onSpeak: onSpeak,
-            getMessagePlaybackStatus: getMessagePlaybackStatus,
+            getMessageTtsState: getMessageTtsState,
+            onSkipPrevious: onSkipPrevious,
+            onSkipNext: onSkipNext,
           ),
         );
       }
@@ -417,7 +427,9 @@ class ChatMessageBubble extends StatelessWidget {
   final bool showHeader;
   final void Function(String)? onRetry;
   final void Function(String, String)? onSpeak;
-  final MessagePlaybackStatus Function(String)? getMessagePlaybackStatus;
+  final MessageTtsState Function(String)? getMessageTtsState;
+  final void Function(String messageId)? onSkipPrevious;
+  final void Function(String messageId)? onSkipNext;
 
   const ChatMessageBubble({
     super.key,
@@ -425,7 +437,9 @@ class ChatMessageBubble extends StatelessWidget {
     this.showHeader = true,
     this.onRetry,
     this.onSpeak,
-    this.getMessagePlaybackStatus,
+    this.getMessageTtsState,
+    this.onSkipPrevious,
+    this.onSkipNext,
   });
 
   @override
@@ -434,9 +448,9 @@ class ChatMessageBubble extends StatelessWidget {
     final time = DateFormat.Hms().format(message.timestamp.toLocal());
     final isError = message.role == ChatRole.error;
     final isUser = message.role == ChatRole.user;
-    final playbackStatus =
-        getMessagePlaybackStatus?.call(message.id) ??
-        MessagePlaybackStatus.idle;
+    final ttsMessageState =
+        getMessageTtsState?.call(message.id) ?? const MessageTtsState();
+    final playbackStatus = ttsMessageState.status;
 
     return Container(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -529,10 +543,7 @@ class ChatMessageBubble extends StatelessWidget {
                 children: [
                   SelectableRegion(
                     selectionControls: MaterialTextSelectionControls(),
-                    child: GptMarkdown(
-                      message.text,
-                      style: theme.textTheme.bodyMedium,
-                    ),
+                    child: _buildMessageBody(theme, ttsMessageState),
                   ),
                   if (onSpeak != null)
                     Padding(
@@ -559,6 +570,38 @@ class ChatMessageBubble extends StatelessWidget {
           },
         ],
       ),
+    );
+  }
+
+  /// Renders the message as one [GptMarkdown] widget per paragraph so the
+  /// currently-speaking one can be highlighted while playback has focus.
+  Widget _buildMessageBody(ThemeData theme, MessageTtsState ttsMessageState) {
+    final paragraphs = splitRawParagraphs(message.text);
+    if (paragraphs.isEmpty) {
+      return GptMarkdown(message.text, style: theme.textTheme.bodyMedium);
+    }
+
+    final activeIndex = ttsMessageState.hasPlaybackFocus
+        ? ttsMessageState.currentSourceParagraphIndex
+        : -1;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < paragraphs.length; i++)
+          Container(
+            margin: EdgeInsets.only(bottom: i == paragraphs.length - 1 ? 0 : 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: i == activeIndex
+                ? BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(4),
+                  )
+                : null,
+            child: GptMarkdown(paragraphs[i], style: theme.textTheme.bodyMedium),
+          ),
+      ],
     );
   }
 
@@ -601,7 +644,7 @@ class ChatMessageBubble extends StatelessWidget {
         break;
     }
 
-    return playbackStatus == MessagePlaybackStatus.generating
+    final singleButton = playbackStatus == MessagePlaybackStatus.generating
         ? _GeneratingIndicator(tooltip: ttsTooltip)
         : IconButton.outlined(
             icon: Icon(ttsIcon, size: 18, color: iconColor),
@@ -611,6 +654,23 @@ class ChatMessageBubble extends StatelessWidget {
             tooltip: ttsTooltip,
             onPressed: () => onSpeak!(message.text, messageId),
           );
+
+    final hasPlaybackFocus =
+        playbackStatus == MessagePlaybackStatus.playing ||
+        playbackStatus == MessagePlaybackStatus.paused;
+
+    return AnimatedTtsControls(
+      showChunkControls:
+          hasPlaybackFocus && onSkipPrevious != null && onSkipNext != null,
+      singleButton: singleButton,
+      chunkControls: TtsChunkControls(
+        outlined: true,
+        isPlaying: playbackStatus == MessagePlaybackStatus.playing,
+        onPlayPause: () => onSpeak!(message.text, messageId),
+        onSkipPrevious: () => onSkipPrevious?.call(messageId),
+        onSkipNext: () => onSkipNext?.call(messageId),
+      ),
+    );
   }
 }
 

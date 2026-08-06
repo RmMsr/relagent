@@ -137,7 +137,16 @@ class PlaybackService extends Notifier<PlaybackState> {
 
     _completeCurrentItem();
 
-    final newQueue = List<PlaybackItem>.from(state.queue)..insert(0, item);
+    // The current item (queue.first, whenever one exists — see _processNext)
+    // is being abandoned by this jump, not resumed later, so it must not
+    // survive into the new queue: otherwise it sits right behind [item] and
+    // gets played next once [item] finishes, as if it were freshly queued.
+    // Anything else already queued behind it (e.g. a different message's
+    // prefetched chunk) is unrelated to this jump and stays put.
+    final rest = state.currentItem != null
+        ? state.queue.skip(1).toList()
+        : List<PlaybackItem>.from(state.queue);
+    final newQueue = [item, ...rest];
     state = state.copyWith(queue: newQueue);
 
     _processNext();
@@ -180,6 +189,49 @@ class PlaybackService extends Notifier<PlaybackState> {
     Logger.debug('PlaybackProvider: Resuming playback');
     state = state.copyWith(status: PlaybackStatus.playing);
     await _player.play();
+  }
+
+  /// Current playback position within the item that is playing or paused.
+  Duration currentPosition() => _player.position;
+
+  /// Restarts the currently playing/paused item from its beginning.
+  Future<void> seekToStart() async {
+    if (state.currentItem == null) return;
+    await _player.seek(Duration.zero);
+  }
+
+  /// Ends the current item immediately and lets the queue advance to
+  /// whatever comes next (another queued item, or idle if none).
+  Future<void> skipCurrent() async {
+    final current = state.currentItem;
+    if (current == null) return;
+
+    await _player.stop();
+    await _finishAndNext(current);
+  }
+
+  /// Removes not-yet-playing items matching [test] from the queue, leaving
+  /// the current item (if any) untouched. Used to drop stale prefetched
+  /// items when a caller re-sequences upcoming playback (e.g. jumping to an
+  /// earlier item invalidates whatever was queued ahead of the old one).
+  void removeQueued(bool Function(PlaybackItem item) test) {
+    if (state.queue.length <= 1) return;
+
+    final head = state.queue.take(1).toList();
+    final tail = state.queue.skip(1);
+    final kept = <PlaybackItem>[];
+    for (final item in tail) {
+      if (test(item)) {
+        if (!item.onFinished.isCompleted) item.onFinished.complete();
+      } else {
+        kept.add(item);
+      }
+    }
+
+    if (kept.length != state.queue.length - 1) {
+      _queueChangeCount++;
+      state = state.copyWith(queue: [...head, ...kept]);
+    }
   }
 
   void _completeQueuedItems() {
@@ -225,7 +277,9 @@ class PlaybackService extends Notifier<PlaybackState> {
       return;
     }
 
-    if (nextItem.requiresLock) {
+    // Already holding the lock (e.g. jumpQueue replacing what's currently
+    // playing without releasing ownership in between) — nothing to request.
+    if (nextItem.requiresLock && !_ownsPlaybackLock) {
       final granted = await ref
           .read(audioCoordinatorProvider.notifier)
           .requestPlayback();

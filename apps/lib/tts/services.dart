@@ -11,8 +11,9 @@ class TtsService {
   bool _isInitialized = false;
   final Map<String, Uint8List> _audioCache = {};
 
-  // LRU cache management (max 20 messages)
-  final int _maxCacheItems = 20;
+  // LRU cache management (max 60 chunks, since cache keys are now
+  // per-chunk rather than per-message)
+  final int _maxCacheItems = 60;
   final List<String> _cacheOrder = [];
 
   // TTS generation settings
@@ -25,18 +26,29 @@ class TtsService {
   TtsService(this._voiceService);
 
   Future<void> _init() async {
-    if (!_isInitialized) {
-      developer.Timeline.startSync('TTS_BackgroundInitialization');
-      try {
-        await _voiceService.initializeTts(resolvedTtsModel: resolvedTtsModel);
-        _isInitialized = true;
-        Logger.debug('TTS initialized via VoiceService');
-      } catch (e) {
-        Logger.error('Failed to initialize TTS: $e');
-        rethrow;
-      } finally {
-        developer.Timeline.finishSync();
-      }
+    if (_isInitialized) return;
+    if (resolvedTtsModel == null) {
+      // Nothing resolved yet — e.g. a model is selected but settings or
+      // the downloaded-models scan hadn't finished loading the moment this
+      // was first called. NativeVoiceService.initializeTts(null) is a
+      // legitimate no-op (genuinely "no model"), not a failure, so it
+      // won't throw here — but treating that no-op as a real success would
+      // leave _isInitialized stuck true forever with nothing actually
+      // initialized. Stay uninitialized instead, so the next call (once
+      // TtsNotifier._getService has re-resolved resolvedTtsModel) retries
+      // for real instead of silently no-op'ing again.
+      return;
+    }
+    developer.Timeline.startSync('TTS_BackgroundInitialization');
+    try {
+      await _voiceService.initializeTts(resolvedTtsModel: resolvedTtsModel);
+      _isInitialized = true;
+      Logger.debug('TTS initialized via VoiceService');
+    } catch (e) {
+      Logger.error('Failed to initialize TTS: $e');
+      rethrow;
+    } finally {
+      developer.Timeline.finishSync();
     }
   }
 
@@ -113,9 +125,14 @@ class TtsService {
   }
 
   void cleanup(Set<String> messageIdsToRemove) {
-    for (final messageId in messageIdsToRemove) {
-      _audioCache.remove(messageId);
-      _cacheOrder.remove(messageId);
+    final keysToRemove = _cacheOrder
+        .where(
+          (key) => messageIdsToRemove.any((id) => key.startsWith('$id#')),
+        )
+        .toList();
+    for (final key in keysToRemove) {
+      _audioCache.remove(key);
+      _cacheOrder.remove(key);
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
 import 'package:relagent/providers/audio_coordinator_provider.dart';
 import 'package:relagent/providers/playback_provider.dart';
 
@@ -251,6 +252,160 @@ void main() {
       expect(
         fixture.container.read(playbackProvider).status,
         PlaybackStatus.idle,
+      );
+    });
+  });
+
+  group('PlaybackProvider Chunk Navigation Primitives', () {
+    test('position reads through to the underlying player', () {
+      final playback = fixture.container.read(playbackProvider.notifier);
+      when(
+        fixture.mockAudioPlayer.position,
+      ).thenReturn(const Duration(seconds: 5));
+
+      expect(playback.currentPosition(), const Duration(seconds: 5));
+    });
+
+    test('seekToStart seeks to zero when an item is current', () async {
+      final playback = fixture.container.read(playbackProvider.notifier);
+      final item = PlaybackItem(
+        id: 'seek-test',
+        content: Future.value(Uint8List.fromList([1])),
+      );
+      await playback.enqueue(item);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      await playback.seekToStart();
+
+      verify(fixture.mockAudioPlayer.seek(Duration.zero)).called(1);
+    });
+
+    test('seekToStart is a no-op when nothing is playing', () async {
+      final playback = fixture.container.read(playbackProvider.notifier);
+
+      await playback.seekToStart();
+
+      verifyNever(fixture.mockAudioPlayer.seek(any));
+    });
+
+    test('skipCurrent advances to the next queued item', () async {
+      final playback = fixture.container.read(playbackProvider.notifier);
+      final items = [
+        PlaybackItem(
+          id: 'skip-1',
+          content: Future.value(Uint8List.fromList([1])),
+        ),
+        PlaybackItem(
+          id: 'skip-2',
+          content: Future.value(Uint8List.fromList([2])),
+        ),
+      ];
+      await playback.enqueue(items[0]);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await playback.enqueue(items[1]);
+
+      await playback.skipCurrent();
+      // Short delay: observe the mid-flight state before item-1's mock
+      // playback timer (scheduled ~50ms after its own play() call) fires.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(items[0].onFinished.isCompleted, true);
+      expect(
+        fixture.container.read(playbackProvider).currentItem?.id,
+        'skip-2',
+      );
+      expect(
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.playing,
+      );
+    });
+
+    test('skipCurrent with nothing queued afterward goes idle', () async {
+      final playback = fixture.container.read(playbackProvider.notifier);
+      final item = PlaybackItem(
+        id: 'skip-only',
+        content: Future.value(Uint8List.fromList([1])),
+      );
+      await playback.enqueue(item);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      await playback.skipCurrent();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      expect(item.onFinished.isCompleted, true);
+      expect(
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.idle,
+      );
+      expect(
+        fixture.container.read(audioCoordinatorProvider).mode,
+        AudioMode.idle,
+      );
+    });
+
+    test('skipCurrent is a no-op when idle', () async {
+      final playback = fixture.container.read(playbackProvider.notifier);
+
+      await playback.skipCurrent();
+
+      expect(
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.idle,
+      );
+      verifyNever(fixture.mockAudioPlayer.stop());
+    });
+
+    test('removeQueued drops matching not-yet-playing items', () async {
+      final playback = fixture.container.read(playbackProvider.notifier);
+      final item0 = PlaybackItem(
+        id: 'rq-0',
+        content: Future.value(Uint8List.fromList([0])),
+      );
+      final item1 = PlaybackItem(
+        id: 'rq-1',
+        content: Future.value(Uint8List.fromList([1])),
+      );
+      final item2 = PlaybackItem(
+        id: 'rq-2',
+        content: Future.value(Uint8List.fromList([2])),
+      );
+      await playback.enqueue(item0);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await playback.enqueue(item1);
+      await playback.enqueue(item2);
+
+      playback.removeQueued((item) => item.id == 'rq-1');
+
+      expect(item1.onFinished.isCompleted, true);
+      expect(
+        fixture.container
+            .read(playbackProvider)
+            .queue
+            .map((i) => i.id)
+            .toList(),
+        ['rq-0', 'rq-2'],
+      );
+      expect(
+        fixture.container.read(playbackProvider).currentItem?.id,
+        'rq-0',
+      );
+    });
+
+    test('removeQueued never touches the current item', () async {
+      final playback = fixture.container.read(playbackProvider.notifier);
+      final item0 = PlaybackItem(
+        id: 'rq-current',
+        content: Future.value(Uint8List.fromList([0])),
+      );
+      await playback.enqueue(item0);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      playback.removeQueued((item) => true);
+
+      expect(item0.onFinished.isCompleted, false);
+      expect(
+        fixture.container.read(playbackProvider).currentItem?.id,
+        'rq-current',
       );
     });
   });

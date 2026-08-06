@@ -267,8 +267,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                         break;
                                     }
                                   },
-                            getMessagePlaybackStatus: (messageId) =>
-                                ttsState.getMessageState(messageId).status,
+                            getMessageTtsState: (messageId) =>
+                                ttsState.getMessageState(messageId),
+                            onSkipPrevious: !voiceCapabilities.isTtsAvailable
+                                ? null
+                                : (messageId) => ref
+                                    .read(ttsProvider.notifier)
+                                    .skipPreviousChunk(messageId),
+                            onSkipNext: !voiceCapabilities.isTtsAvailable
+                                ? null
+                                : (messageId) => ref
+                                    .read(ttsProvider.notifier)
+                                    .skipNextChunk(messageId),
                           ),
                         ],
                       ),
