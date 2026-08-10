@@ -86,6 +86,26 @@ class PlaybackService extends Notifier<PlaybackState> {
       }
     });
 
+    // AudioCoordinator can force mode away from `playing` on its own (e.g. a
+    // real audio focus interruption forces mode to idle without asking us).
+    // Without this, our bookkeeping never learns the lock is gone: we keep
+    // believing we own it while the coordinator may later re-grant `playing`
+    // to nobody once the interruption ends, orphaning the lock forever.
+    ref.listen<AudioCoordinatorState>(audioCoordinatorProvider, (
+      previous,
+      next,
+    ) {
+      if (_ownsPlaybackLock &&
+          previous?.mode == AudioMode.playing &&
+          next.mode != AudioMode.playing) {
+        Logger.debug(
+          'PlaybackProvider: Coordinator revoked the playback lock, resyncing',
+        );
+        _ownsPlaybackLock = false;
+        _forceStop();
+      }
+    });
+
     ref.onDispose(() {
       _playerStateSub?.cancel();
       // Provider handles AudioPlayer disposal
@@ -157,14 +177,30 @@ class PlaybackService extends Notifier<PlaybackState> {
     await _player.stop();
 
     if (_ownsPlaybackLock) {
-      await ref.read(audioCoordinatorProvider.notifier).releasePlayback();
+      // Clear before releasing: releasePlayback() synchronously notifies our
+      // own AudioCoordinator listener above, which must see we've already
+      // given up the lock so it doesn't redundantly re-run this cleanup.
       _ownsPlaybackLock = false;
+      await ref.read(audioCoordinatorProvider.notifier).releasePlayback();
     }
 
     // Complete current item and all queued items
     _completeCurrentItem();
     _completeQueuedItems();
 
+    state = const PlaybackState();
+  }
+
+  /// Cleans up local state after the coordinator has already revoked our
+  /// playback lock out from under us (see the AudioCoordinator listener in
+  /// [build]). Unlike [stop], it must not call releasePlayback() - we no
+  /// longer own the lock, so that would either no-op or release someone
+  /// else's.
+  Future<void> _forceStop() async {
+    _queueChangeCount++;
+    await _player.stop();
+    _completeCurrentItem();
+    _completeQueuedItems();
     state = const PlaybackState();
   }
 
@@ -250,8 +286,8 @@ class PlaybackService extends Notifier<PlaybackState> {
       // currentItem already cleared in _finishAndNext, no state update needed
       // Only release the lock if we own it
       if (_ownsPlaybackLock) {
-        await ref.read(audioCoordinatorProvider.notifier).releasePlayback();
         _ownsPlaybackLock = false;
+        await ref.read(audioCoordinatorProvider.notifier).releasePlayback();
       }
       return;
     }
@@ -368,15 +404,15 @@ class PlaybackService extends Notifier<PlaybackState> {
       );
     }
 
-    // Release playback lock before processing next item
-    // This ensures the lock is available for the next item to acquire
-    if (currentQueue.isNotEmpty && _ownsPlaybackLock) {
-      await ref.read(audioCoordinatorProvider.notifier).releasePlayback();
-      // Check if provider is still mounted after async gap
-      if (!ref.mounted) return;
-      _ownsPlaybackLock = false;
-    }
-
+    // Deliberately NOT releasing the playback lock here when another item
+    // is already queued: it's about to play right after this one under the
+    // same owner, so releasing and having _processNext() immediately
+    // reacquire it would tear down and reconfigure the native audio
+    // session (Bluetooth routing/focus) between every chunk of a chunked
+    // TTS message, audible as a gap or crackle. _processNext() already
+    // skips re-requesting the lock when it's still held (see its
+    // `requiresLock && !_ownsPlaybackLock` check), and releases it itself
+    // once the queue actually runs dry.
     _processNext();
   }
 

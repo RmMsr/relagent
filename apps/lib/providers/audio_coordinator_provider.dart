@@ -154,10 +154,15 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
         audioFocusState: const AudioFocusState(status: AudioFocusStatus.normal),
       );
 
+      // Only recording auto-resumes here: it's an ambient/continuous mode
+      // that can safely restart from nothing. Playback is a one-shot
+      // content stream - by now PlaybackService has already treated the
+      // forced mode change as a stop (see its AudioCoordinator listener)
+      // and given up its queue, so re-granting `playing` here would hand
+      // the lock to no one, leaving it orphaned until something else
+      // happens to force mode away from playing again.
       if (previousMode == AudioMode.recording) {
         await requestRecording();
-      } else if (previousMode == AudioMode.playing) {
-        await requestPlayback();
       }
     } else {
       state = state.copyWith(
@@ -256,9 +261,37 @@ class AudioCoordinator extends Notifier<AudioCoordinatorState> {
     }
   }
 
+  /// Unconditionally forces mode to idle and voice mode to silent,
+  /// regardless of what's currently active or what it was before.
+  ///
+  /// Used by the notification "stop" action. That action used to only call
+  /// `updateVoiceMode(silent)` and rely on PlaybackService's/RecordingProvider's
+  /// listener for the *edge* of a voiceMode transition to actually stop
+  /// anything - but `silent` is voiceMode's resting default outside
+  /// continuous voice, so for ordinary chat playback the mode was already
+  /// silent and the update was a same-value no-op that never notified
+  /// anyone. Forcing `mode` to idle directly re-triggers the same
+  /// lock-revocation listeners the interruption-recovery path already
+  /// relies on (see PlaybackService's AudioCoordinator listener), which
+  /// stops playback/recording unconditionally instead of depending on a
+  /// settings transition that may never fire.
+  void forceStop() {
+    Logger.debug('AudioCoordinator: forceStop() - mode: ${state.mode}');
+    if (state.mode != AudioMode.idle) {
+      state = state.copyWith(mode: AudioMode.idle);
+    }
+
+    final currentSettings = ref.read(settingsProvider);
+    if (currentSettings.voiceMode != VoiceMode.silent) {
+      ref.read(settingsProvider.notifier).updateVoiceMode(VoiceMode.silent);
+    }
+  }
+
   Future<void> _resetAudioSession() async {
     try {
-      Logger.debug('AudioCoordinator: Resetting audio session for clean routing');
+      Logger.debug(
+        'AudioCoordinator: Resetting audio session for clean routing',
+      );
       await _voiceService.deactivateAudioSession();
       Logger.debug('AudioCoordinator: Audio session deactivated');
 

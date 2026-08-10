@@ -121,9 +121,7 @@ class BackgroundServiceNotifier extends Notifier<BackgroundServiceState> {
         Logger.debug(
           'BackgroundServiceProvider: User requested silence via notification',
         );
-        await ref
-            .read(settingsProvider.notifier)
-            .updateVoiceMode(VoiceMode.silent);
+        ref.read(audioCoordinatorProvider.notifier).forceStop();
       }
     });
   }

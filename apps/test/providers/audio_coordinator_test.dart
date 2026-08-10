@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:relagent/models/model_catalog.dart';
+import 'package:relagent/models/settings.dart';
 import 'package:relagent/providers/audio_coordinator_provider.dart';
 import 'package:relagent/providers/model_download_provider.dart';
 import 'package:relagent/providers/settings_provider.dart';
@@ -221,6 +222,48 @@ void main() {
         container.read(audioCoordinatorProvider).mode,
         AudioMode.recording,
       );
+    });
+  });
+
+  group('forceStop', () {
+    // The notification "stop" action needs a way to halt whatever is
+    // active unconditionally. It cannot rely on updateVoiceMode(silent)
+    // alone: silent is voiceMode's resting default outside continuous
+    // voice, so for ordinary chat playback the value never actually
+    // changes and settings listeners elsewhere never fire.
+    test('forces playing mode to idle', () async {
+      final coordinator = container.read(audioCoordinatorProvider.notifier);
+      await coordinator.requestPlayback();
+
+      coordinator.forceStop();
+
+      expect(container.read(audioCoordinatorProvider).mode, AudioMode.idle);
+    });
+
+    test('forces recording mode to idle', () async {
+      final coordinator = container.read(audioCoordinatorProvider.notifier);
+      await coordinator.requestRecording();
+
+      coordinator.forceStop();
+
+      expect(container.read(audioCoordinatorProvider).mode, AudioMode.idle);
+    });
+
+    test('is idempotent when already idle', () {
+      final coordinator = container.read(audioCoordinatorProvider.notifier);
+
+      coordinator.forceStop();
+
+      expect(container.read(audioCoordinatorProvider).mode, AudioMode.idle);
+    });
+
+    test('silences voice mode even when it was already silent', () async {
+      final coordinator = container.read(audioCoordinatorProvider.notifier);
+      expect(container.read(settingsProvider).voiceMode, VoiceMode.silent);
+
+      coordinator.forceStop();
+
+      expect(container.read(settingsProvider).voiceMode, VoiceMode.silent);
     });
   });
 }

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
+import 'package:relagent/providers/audio_coordinator_provider.dart';
 import 'package:relagent/providers/playback_provider.dart';
 import 'package:relagent/providers/tts_provider.dart';
 import 'package:relagent/tts/text_chunker.dart';
@@ -389,6 +390,39 @@ void main() {
           .getMessageState('msg-old');
       expect(oldState.hasPlaybackFocus, isFalse);
       expect(oldState.status, MessagePlaybackStatus.idle);
+    });
+
+    test(
+        'an external force-stop (e.g. the notification Stop button) resets '
+        'the message it interrupts mid-playback, so its UI reverts to a '
+        'single play button instead of staying stuck on back/pause/forward',
+        () async {
+      final tts = fixture.container.read(ttsProvider.notifier);
+      final coordinator = fixture.container.read(
+        audioCoordinatorProvider.notifier,
+      );
+
+      await tts.enqueue(_threeParagraphMessage, 'msg-stopped');
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      // Mid-message: chunk 0 of 3, not the last chunk - same gap as the
+      // playNow case above, but this time nothing at the call site knows
+      // which message is being interrupted to manually reset it first.
+      expect(
+        fixture.container
+            .read(ttsProvider)
+            .getMessageState('msg-stopped')
+            .status,
+        MessagePlaybackStatus.playing,
+      );
+
+      coordinator.forceStop();
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      final state = fixture.container
+          .read(ttsProvider)
+          .getMessageState('msg-stopped');
+      expect(state.hasPlaybackFocus, isFalse);
+      expect(state.status, MessagePlaybackStatus.idle);
     });
   });
 }

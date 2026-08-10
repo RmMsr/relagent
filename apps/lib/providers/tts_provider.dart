@@ -687,6 +687,32 @@ class TtsNotifier extends Notifier<TtsState> {
               info.messageId,
               status: MessagePlaybackStatus.completed,
             );
+          } else {
+            // Cut off mid-message (not its last chunk). _finishAndNext
+            // publishes an intermediate currentItem: null state while
+            // _processNext works out what plays next - during ordinary
+            // chunk-to-chunk progression the message's next chunk is
+            // already sitting in `next.queue` at that point (prefetched
+            // one chunk ahead), so checking the queue (not just
+            // next.currentItem, which lags a beat behind it) is what tells
+            // a genuine in-flight advance apart from an actual interrupt.
+            // Most callers that interrupt a message themselves (playNow)
+            // already reset it, but external stops - the notification Stop
+            // button, an audio focus interruption - land here with no such
+            // call site, so this is the only place that can catch them;
+            // otherwise the message is left reporting playback focus
+            // forever, stuck showing back/pause/forward controls for
+            // content that already stopped.
+            final sameMessageContinues = next.queue.any(
+              (queued) => _chunkItemInfo[queued.id]?.messageId == info.messageId,
+            );
+            if (!sameMessageContinues) {
+              _chunkedMessages.remove(info.messageId);
+              _updateMessageState(
+                info.messageId,
+                status: MessagePlaybackStatus.idle,
+              );
+            }
           }
         }
       }

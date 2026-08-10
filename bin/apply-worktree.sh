@@ -12,7 +12,7 @@ SUCCESS_SYM="✅"
 # 2. Work on changes in the worktree directory
 # 3. Run apply-worktree.sh from within the worktree to:
 #    - Commit pending changes with AI-generated message
-#    - Squash all commits not in local main
+#    - Squash all commits not in local main (unless --no-squash)
 #    - Switch to main branch in source directory
 #    - Fast-forward merge the worktree branch
 #    - Remove the worktree
@@ -20,10 +20,12 @@ SUCCESS_SYM="✅"
 #
 # Usage: Run from within a worktree directory created by start-worktree.sh
 # Optional parameter: --target-branch BRANCH_NAME (default: main)
+# Optional parameter: --no-squash (keep individual commits instead of squashing)
 
 set -eu
 
 TARGET_BRANCH="main"
+SQUASH=true
 
 # Parse command line arguments
 while [ $# -gt 0 ]; do
@@ -32,9 +34,13 @@ while [ $# -gt 0 ]; do
             TARGET_BRANCH="$2"
             shift 2
             ;;
+        --no-squash)
+            SQUASH=false
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--target-branch BRANCH_NAME]"
+            echo "Usage: $0 [--target-branch BRANCH_NAME] [--no-squash]"
             exit 1
             ;;
     esac
@@ -145,7 +151,9 @@ main() {
 
     commit_if_needed
 
-    squash_changes
+    if [ "$SQUASH" = true ]; then
+        squash_changes
+    fi
 
     # Switch to target branch in source directory
     echo "Switching to worktree main and $TARGET_BRANCH branch..."
