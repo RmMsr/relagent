@@ -15,6 +15,7 @@ import '/speech_recognition/widgets.dart';
 import '/tts/text_chunker.dart';
 import '/utils/logger.dart';
 import '/theme/app_colors.dart';
+import '/widgets/message_markdown_actions.dart';
 import '/widgets/tts_chunk_controls.dart';
 import '/widgets/version_info_widget.dart';
 
@@ -550,10 +551,16 @@ class _AgenticMessageBubble extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: _buildMessageBody(
+                context,
                 theme,
                 getMessageTtsState?.call(message.localId) ??
                     const MessageTtsState(),
               ),
+            ),
+          if (isUser && !isError)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, right: 4),
+              child: MessageCopyButton(text: message.text),
             ),
           if (!isUser && !isError)
             Padding(
@@ -610,10 +617,14 @@ class _AgenticMessageBubble extends StatelessWidget {
 
   /// Renders the message as one [GptMarkdown] widget per paragraph so the
   /// currently-speaking one can be highlighted while playback has focus.
-  Widget _buildMessageBody(ThemeData theme, MessageTtsState ttsMessageState) {
+  Widget _buildMessageBody(
+    BuildContext context,
+    ThemeData theme,
+    MessageTtsState ttsMessageState,
+  ) {
     final paragraphs = splitRawParagraphs(message.text);
     if (paragraphs.isEmpty) {
-      return GptMarkdown(message.text);
+      return GptMarkdown(message.text, onLinkTap: linkTapHandler(context));
     }
 
     final activeIndex = ttsMessageState.hasPlaybackFocus
@@ -634,7 +645,7 @@ class _AgenticMessageBubble extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   )
                 : null,
-            child: GptMarkdown(paragraphs[i]),
+            child: GptMarkdown(paragraphs[i], onLinkTap: linkTapHandler(context)),
           ),
       ],
     );
@@ -769,7 +780,7 @@ class _MessageActionsRowState extends State<_MessageActionsRow> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (widget.onSpeak != null)
+            if (widget.onSpeak != null) ...[
               _SpeakerButton(
                 messageId: widget.messageId,
                 text: widget.messageText,
@@ -778,6 +789,10 @@ class _MessageActionsRowState extends State<_MessageActionsRow> {
                 onSkipPrevious: widget.onSkipPrevious,
                 onSkipNext: widget.onSkipNext,
               ),
+              const SizedBox(width: 8),
+            ],
+            MessageCopyButton(text: widget.messageText),
+            if (hasStats) const SizedBox(width: 8),
             if (hasStats)
               IconButton(
                 icon: Icon(

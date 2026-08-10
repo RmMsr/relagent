@@ -14,6 +14,7 @@ import '/speech_recognition/widgets.dart';
 import '/tts/text_chunker.dart';
 import '/utils/logger.dart';
 import '/theme/app_colors.dart';
+import '/widgets/message_markdown_actions.dart';
 import '/widgets/tts_chunk_controls.dart';
 import '/widgets/version_info_widget.dart';
 
@@ -511,26 +512,35 @@ class ChatMessageBubble extends StatelessWidget {
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.primary,
                         ),
+                        onLinkTap: linkTapHandler(context),
                       ),
                     ),
-                  if (onRetry != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: IconButton.outlined(
-                          icon: const Icon(Icons.refresh, size: 18),
-                          iconSize: 18,
-                          padding: const EdgeInsets.all(8),
-                          constraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 36,
-                          ),
-                          tooltip: 'Retry',
-                          onPressed: () => onRetry!(message.text),
-                        ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (onRetry != null) ...[
+                            IconButton.outlined(
+                              icon: const Icon(Icons.refresh, size: 18),
+                              iconSize: 18,
+                              padding: const EdgeInsets.all(8),
+                              constraints: const BoxConstraints(
+                                minWidth: 36,
+                                minHeight: 36,
+                              ),
+                              tooltip: 'Retry',
+                              onPressed: () => onRetry!(message.text),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          MessageCopyButton(text: message.text),
+                        ],
                       ),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -543,13 +553,21 @@ class ChatMessageBubble extends StatelessWidget {
                 children: [
                   SelectableRegion(
                     selectionControls: MaterialTextSelectionControls(),
-                    child: _buildMessageBody(theme, ttsMessageState),
+                    child: _buildMessageBody(context, theme, ttsMessageState),
                   ),
-                  if (onSpeak != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: _buildTtsButton(theme, playbackStatus, message.id),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (onSpeak != null) ...[
+                          _buildTtsButton(theme, playbackStatus, message.id),
+                          const SizedBox(width: 8),
+                        ],
+                        MessageCopyButton(text: message.text),
+                      ],
                     ),
+                  ),
                 ],
               ),
             ),
@@ -575,10 +593,18 @@ class ChatMessageBubble extends StatelessWidget {
 
   /// Renders the message as one [GptMarkdown] widget per paragraph so the
   /// currently-speaking one can be highlighted while playback has focus.
-  Widget _buildMessageBody(ThemeData theme, MessageTtsState ttsMessageState) {
+  Widget _buildMessageBody(
+    BuildContext context,
+    ThemeData theme,
+    MessageTtsState ttsMessageState,
+  ) {
     final paragraphs = splitRawParagraphs(message.text);
     if (paragraphs.isEmpty) {
-      return GptMarkdown(message.text, style: theme.textTheme.bodyMedium);
+      return GptMarkdown(
+        message.text,
+        style: theme.textTheme.bodyMedium,
+        onLinkTap: linkTapHandler(context),
+      );
     }
 
     final activeIndex = ttsMessageState.hasPlaybackFocus
@@ -599,7 +625,11 @@ class ChatMessageBubble extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   )
                 : null,
-            child: GptMarkdown(paragraphs[i], style: theme.textTheme.bodyMedium),
+            child: GptMarkdown(
+              paragraphs[i],
+              style: theme.textTheme.bodyMedium,
+              onLinkTap: linkTapHandler(context),
+            ),
           ),
       ],
     );
