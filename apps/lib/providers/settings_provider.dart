@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '/models/settings.dart';
-import 'agentic_chat_provider.dart';
 import 'chat_provider.dart';
 import 'credentials_manager.dart';
+import 'displayed_session_provider.dart';
 import 'engine_health_check_provider.dart';
 import 'model_download_provider.dart';
 import '/services/secure_credential_service.dart';
@@ -225,6 +225,12 @@ class SettingsNotifier extends Notifier<Settings> {
       // Clear runtime state in dependent providers
       ref.read(engineHealthCheckProvider.notifier).clearResult();
       ref.read(sessionsProvider.notifier).clearSessions();
+      ref.read(displayedSessionProvider.notifier).show(null);
+      // NOT ttsProvider here: it depends on settingsProvider (via
+      // ref.listen in its own build()), so settingsProvider reaching back
+      // into it — at any timing, deferred or not — trips Riverpod's
+      // circular-dependency safety check. It reacts to this same
+      // engineBaseUrl change itself instead; see tts_provider.dart.
     }
 
     state = state.copyWith(engineBaseUrl: url);

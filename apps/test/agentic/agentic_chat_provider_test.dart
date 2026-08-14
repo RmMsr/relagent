@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -11,16 +11,13 @@ import 'package:relagent/providers/agentic_chat_provider.dart';
 import 'package:relagent/providers/settings_provider.dart';
 
 /// Minimal settings stub — avoids SharedPreferences, modelDownloadProvider,
-/// and path_provider so these tests run as pure unit tests.
+/// and path_provider so these tests run as pure unit tests. Session
+/// identity now lives entirely in the family key, not Settings, so this
+/// only needs to supply engine connection config.
 class _StubSettingsNotifier extends SettingsNotifier {
-  final String? sessionId;
-  _StubSettingsNotifier({this.sessionId});
-
   @override
-  Settings build() => Settings.defaults().copyWith(
-        agenticSessionId: sessionId,
-        engineBaseUrl: 'http://localhost:0',
-      );
+  Settings build() =>
+      Settings.defaults().copyWith(engineBaseUrl: 'http://localhost:0');
 
   @override
   Future<String?> getEnginePassword({String? url}) async => null;
@@ -47,23 +44,20 @@ ApprovalData _pendingApproval(String id) {
   );
 }
 
-ProviderContainer _makeContainer({String? sessionId}) {
+ProviderContainer _makeContainer() {
   return ProviderContainer(
-    overrides: [
-      settingsProvider.overrideWith(() => _StubSettingsNotifier(sessionId: sessionId)),
-    ],
+    overrides: [settingsProvider.overrideWith(() => _StubSettingsNotifier())],
   );
 }
 
 void main() {
   group('AgenticChatNotifier immutability', () {
-    // No session ID → triggerContinuation exits immediately, no async side effects.
     late ProviderContainer container;
     late AgenticChatNotifier notifier;
 
     setUp(() {
       container = _makeContainer();
-      notifier = container.read(agenticChatProvider.notifier);
+      notifier = container.read(agenticChatProvider('s1').notifier);
     });
 
     tearDown(() => container.dispose());
@@ -74,12 +68,16 @@ void main() {
 
       notifier.setStateForTest(AgenticChatState(messages: [message]));
 
-      final before = container.read(agenticChatProvider).messages.first.approvals!.first;
+      final before =
+          container.read(agenticChatProvider('s1')).messages.first.approvals!.first;
       expect(before.resolution, ApprovalResolution.pending);
 
-      notifier.declineApproval('a1');
+      // Hits the network in the test env and fails; that's fine — only the
+      // synchronous optimistic update (before the first await) is asserted.
+      notifier.declineApproval('a1').catchError((_) {});
 
-      final after = container.read(agenticChatProvider).messages.first.approvals!.first;
+      final after =
+          container.read(agenticChatProvider('s1')).messages.first.approvals!.first;
       expect(after.resolution, ApprovalResolution.declined);
 
       // Original object unchanged — confirms immutability
@@ -91,11 +89,11 @@ void main() {
       final message = _systemMessageWithApprovals([_pendingApproval('a1')]);
       notifier.setStateForTest(AgenticChatState(messages: [message]));
 
-      final beforeMsg = container.read(agenticChatProvider).messages.first;
+      final beforeMsg = container.read(agenticChatProvider('s1')).messages.first;
 
-      notifier.declineApproval('a1');
+      notifier.declineApproval('a1').catchError((_) {});
 
-      final afterMsg = container.read(agenticChatProvider).messages.first;
+      final afterMsg = container.read(agenticChatProvider('s1')).messages.first;
       expect(identical(beforeMsg, afterMsg), isFalse);
     });
 
@@ -105,24 +103,18 @@ void main() {
       final message = _systemMessageWithApprovals([a1, a2]);
       notifier.setStateForTest(AgenticChatState(messages: [message]));
 
-      notifier.declineApproval('a1');
+      notifier.declineApproval('a1').catchError((_) {});
 
-      final approvals = container.read(agenticChatProvider).messages.first.approvals!;
+      final approvals =
+          container.read(agenticChatProvider('s1')).messages.first.approvals!;
       expect(approvals[0].resolution, ApprovalResolution.declined);
       expect(approvals[1].resolution, ApprovalResolution.pending);
     });
 
     test('changeSensitivity marks pending approvals stale via new instances', () async {
-      // Needs its own container with a session ID so changeSensitivity doesn't
-      // short-circuit. The test is async so async side effects complete before
-      // tearDown disposes the container.
-      final localContainer = _makeContainer(sessionId: 'test-session');
-      addTearDown(localContainer.dispose);
-      final localNotifier = localContainer.read(agenticChatProvider.notifier);
-
       final approval = _pendingApproval('a1');
       final message = _systemMessageWithApprovals([approval]);
-      localNotifier.setStateForTest(
+      notifier.setStateForTest(
         AgenticChatState(
           messages: [message],
           sensitivityLevel: SensitivityLevel.personal,
@@ -131,11 +123,11 @@ void main() {
 
       // Await so the HTTP call (which will fail) completes before tearDown.
       // Only sensitivity level is reverted on failure — messages remain stale.
-      await localNotifier
+      await notifier
           .changeSensitivity(SensitivityLevel.confidential)
           .catchError((_) {});
 
-      final updatedMsg = localContainer.read(agenticChatProvider).messages.first;
+      final updatedMsg = container.read(agenticChatProvider('s1')).messages.first;
       expect(updatedMsg.isStale, isTrue);
       expect(
         updatedMsg.approvals!.first.resolution,
@@ -238,31 +230,11 @@ void main() {
     late AgenticChatNotifier notifier;
 
     setUp(() {
-      container = _makeContainer(sessionId: 'test-session');
-      notifier = container.read(agenticChatProvider.notifier);
+      container = _makeContainer();
+      notifier = container.read(agenticChatProvider('test-session').notifier);
     });
 
     tearDown(() => container.dispose());
-
-    test('clears queued message when active session id changes', () {
-      // Seed a queued message tied to session 'test-session'.
-      notifier.setStateForTest(
-        const AgenticChatState(messages: [], queuedMessage: 'for session A'),
-      );
-      expect(
-        container.read(agenticChatProvider).queuedMessage,
-        'for session A',
-      );
-
-      // Switch to a different active session — queue must NOT carry over,
-      // otherwise it would auto-dispatch into the wrong session.
-      final settingsNotifier = container.read(settingsProvider.notifier);
-      settingsNotifier.state = settingsNotifier.state.copyWith(
-        agenticSessionId: 'different-session',
-      );
-
-      expect(container.read(agenticChatProvider).queuedMessage, isNull);
-    });
 
     test('retryFailedMessages on stuck continuation keeps the SystemAction',
         () async {
@@ -303,7 +275,7 @@ void main() {
       // was the recovery branch taken.
       await notifier.retryFailedMessages().catchError((_) {});
 
-      final messages = container.read(agenticChatProvider).messages;
+      final messages = container.read(agenticChatProvider('test-session')).messages;
       // SystemAction (msg-sys-1) survived the strip.
       expect(
         messages.any(
@@ -347,7 +319,7 @@ void main() {
       // we only assert the original error survived and the user wasn't dupbed.
       await notifier.retryFailedMessages().catchError((_) {});
 
-      final messages = container.read(agenticChatProvider).messages;
+      final messages = container.read(agenticChatProvider('test-session')).messages;
 
       expect(
         messages.any(
@@ -363,32 +335,17 @@ void main() {
       expect(userMessages.first.messageId, 'msg-user-0');
     });
 
-    test('preserves queued message when active session id is unchanged', () {
-      notifier.setStateForTest(
-        const AgenticChatState(messages: [], queuedMessage: 'still here'),
-      );
-
-      // Re-set the same id — listener selects on agenticSessionId so the
-      // no-op change must not fire the queue-clear callback.
-      final settingsNotifier = container.read(settingsProvider.notifier);
-      settingsNotifier.state = settingsNotifier.state.copyWith(
-        agenticSessionId: 'test-session',
-      );
-
-      expect(container.read(agenticChatProvider).queuedMessage, 'still here');
-    });
-
     test('sendMessage enqueues when awaiting and does not append', () async {
       // Seed an in-flight trailing system message (pending approval).
       final pending = _systemMessageWithApprovals([_pendingApproval('a1')]);
       notifier.setStateForTest(AgenticChatState(messages: [pending]));
 
       // Sanity: cycle is in-flight per state machine.
-      expect(container.read(agenticChatProvider).isAwaiting, isTrue);
+      expect(container.read(agenticChatProvider('test-session')).isAwaiting, isTrue);
 
       await notifier.sendMessage('queue me');
 
-      final state = container.read(agenticChatProvider);
+      final state = container.read(agenticChatProvider('test-session'));
       expect(state.queuedMessage, 'queue me');
       // Original message list unchanged (no user bubble appended).
       expect(state.messages.length, 1);
@@ -403,7 +360,7 @@ void main() {
 
       await notifier.sendMessage('second');
 
-      expect(container.read(agenticChatProvider).queuedMessage, 'second');
+      expect(container.read(agenticChatProvider('test-session')).queuedMessage, 'second');
     });
 
     test('sendMessage ignores blank queued submissions', () async {
@@ -412,7 +369,7 @@ void main() {
 
       await notifier.sendMessage('   ');
 
-      expect(container.read(agenticChatProvider).queuedMessage, isNull);
+      expect(container.read(agenticChatProvider('test-session')).queuedMessage, isNull);
     });
 
     test('editQueued returns the text and clears the slot', () {
@@ -423,8 +380,8 @@ void main() {
       final text = notifier.editQueued();
 
       expect(text, 'draft');
-      expect(container.read(agenticChatProvider).queuedMessage, isNull);
-      expect(container.read(agenticChatProvider).inputEnabled, isTrue);
+      expect(container.read(agenticChatProvider('test-session')).queuedMessage, isNull);
+      expect(container.read(agenticChatProvider('test-session')).inputEnabled, isTrue);
     });
 
     test('editQueued returns null when nothing is queued', () {
@@ -439,12 +396,12 @@ void main() {
 
     setUp(() {
       container = _makeContainer();
-      notifier = container.read(agenticChatProvider.notifier);
+      notifier = container.read(agenticChatProvider('s1').notifier);
     });
 
     tearDown(() => container.dispose());
 
-    AgenticMessage _msg(
+    AgenticMessage msg(
       String messageId,
       AgenticRole role, {
       bool isFinal = true,
@@ -462,65 +419,65 @@ void main() {
     test('new message is appended', () {
       notifier.setStateForTest(AgenticChatState(messages: []));
 
-      notifier.ingestMessagesForTest([_msg('m1', AgenticRole.user, text: 'hi')]);
+      notifier.ingestMessagesForTest([msg('m1', AgenticRole.user, text: 'hi')]);
 
-      final msgs = container.read(agenticChatProvider).messages;
+      final msgs = container.read(agenticChatProvider('s1')).messages;
       expect(msgs.length, 1);
       expect(msgs[0].messageId, 'm1');
     });
 
     test('present-and-final message is skipped (not overwritten)', () {
-      final existing = _msg('m1', AgenticRole.assistant, text: 'original');
+      final existing = msg('m1', AgenticRole.assistant, text: 'original');
       notifier.setStateForTest(AgenticChatState(messages: [existing]));
 
       notifier.ingestMessagesForTest(
-        [_msg('m1', AgenticRole.assistant, text: 'CHANGED')],
+        [msg('m1', AgenticRole.assistant, text: 'CHANGED')],
       );
 
-      final msgs = container.read(agenticChatProvider).messages;
+      final msgs = container.read(agenticChatProvider('s1')).messages;
       expect(msgs.length, 1);
       expect(msgs[0].text, 'original');
     });
 
     test('present-and-non-final message is replaced', () {
       final existing =
-          _msg('m1', AgenticRole.system, isFinal: false, text: 'old');
+          msg('m1', AgenticRole.system, isFinal: false, text: 'old');
       notifier.setStateForTest(AgenticChatState(messages: [existing]));
 
       notifier.ingestMessagesForTest(
-        [_msg('m1', AgenticRole.system, text: 'updated')],
+        [msg('m1', AgenticRole.system, text: 'updated')],
       );
 
-      final msgs = container.read(agenticChatProvider).messages;
+      final msgs = container.read(agenticChatProvider('s1')).messages;
       expect(msgs.length, 1);
       expect(msgs[0].text, 'updated');
       expect(msgs[0].isFinal, isTrue);
     });
 
     test('repeated call with same message is idempotent', () {
-      final msg = _msg('m1', AgenticRole.user, text: 'hello');
-      notifier.setStateForTest(AgenticChatState(messages: [msg]));
+      final message = msg('m1', AgenticRole.user, text: 'hello');
+      notifier.setStateForTest(AgenticChatState(messages: [message]));
 
-      notifier.ingestMessagesForTest([msg]);
-      notifier.ingestMessagesForTest([msg]);
+      notifier.ingestMessagesForTest([message]);
+      notifier.ingestMessagesForTest([message]);
 
-      expect(container.read(agenticChatProvider).messages.length, 1);
+      expect(container.read(agenticChatProvider('s1')).messages.length, 1);
     });
 
     test('multiple new messages appended in order', () {
       notifier.setStateForTest(
         AgenticChatState(
-          messages: [_msg('m1', AgenticRole.user, text: 'first')],
+          messages: [msg('m1', AgenticRole.user, text: 'first')],
         ),
       );
 
       notifier.ingestMessagesForTest([
-        _msg('m2', AgenticRole.assistant, text: 'second'),
-        _msg('m3', AgenticRole.system, text: 'third'),
+        msg('m2', AgenticRole.assistant, text: 'second'),
+        msg('m3', AgenticRole.system, text: 'third'),
       ]);
 
       final texts =
-          container.read(agenticChatProvider).messages.map((m) => m.text);
+          container.read(agenticChatProvider('s1')).messages.map((m) => m.text);
       expect(texts.toList(), ['first', 'second', 'third']);
     });
 
@@ -537,7 +494,7 @@ void main() {
     });
   });
 
-  group('AgenticChatNotifier — loadHistory sensitivity', () {
+  group('AgenticChatNotifier — loadHistory / refreshFromServer', () {
     test('sets sensitivityLevel from response on full load', () async {
       final mockClient = MockClient((request) async {
         return http.Response(
@@ -550,13 +507,13 @@ void main() {
         );
       });
 
-      final container = _makeContainer(sessionId: 'test-session');
+      final container = _makeContainer();
       addTearDown(container.dispose);
-      final notifier = container.read(agenticChatProvider.notifier);
+      final notifier = container.read(agenticChatProvider('test-session').notifier);
 
       await notifier.loadHistory(client: mockClient);
 
-      final state = container.read(agenticChatProvider);
+      final state = container.read(agenticChatProvider('test-session'));
       expect(state.sensitivityLevel, SensitivityLevel.confidential);
     });
 
@@ -572,13 +529,13 @@ void main() {
         );
       });
 
-      final container = _makeContainer(sessionId: 'test-session');
+      final container = _makeContainer();
       addTearDown(container.dispose);
-      final notifier = container.read(agenticChatProvider.notifier);
+      final notifier = container.read(agenticChatProvider('test-session').notifier);
 
       await notifier.loadHistory(afterMessageId: 'cursor', client: mockClient);
 
-      final state = container.read(agenticChatProvider);
+      final state = container.read(agenticChatProvider('test-session'));
       expect(state.sensitivityLevel, SensitivityLevel.confidential);
     });
 
@@ -593,9 +550,9 @@ void main() {
         );
       });
 
-      final container = _makeContainer(sessionId: 'test-session');
+      final container = _makeContainer();
       addTearDown(container.dispose);
-      final notifier = container.read(agenticChatProvider.notifier);
+      final notifier = container.read(agenticChatProvider('test-session').notifier);
 
       notifier.setStateForTest(
         AgenticChatState(
@@ -606,8 +563,262 @@ void main() {
 
       await notifier.loadHistory(client: mockClient);
 
-      final state = container.read(agenticChatProvider);
+      final state = container.read(agenticChatProvider('test-session'));
       expect(state.sensitivityLevel, SensitivityLevel.confidential);
+    });
+
+    test('refreshFromServer fetches everything for a fresh instance (no cursor)',
+        () async {
+      Uri? requestedUri;
+      final mockClient = MockClient((request) async {
+        requestedUri = request.url;
+        return http.Response(
+          jsonEncode({'session_id': 'test-session', 'messages': []}),
+          200,
+        );
+      });
+
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(agenticChatProvider('test-session').notifier);
+
+      await notifier.refreshFromServer(client: mockClient);
+
+      expect(
+        requestedUri!.queryParameters.containsKey('after'),
+        isFalse,
+        reason: 'a fresh instance has no final messages, so its cursor is '
+            'null — the same code path degrades to a full load',
+      );
+    });
+
+    test('refreshFromServer fetches since the last known final message',
+        () async {
+      Uri? requestedUri;
+      final mockClient = MockClient((request) async {
+        requestedUri = request.url;
+        return http.Response(
+          jsonEncode({'session_id': 'test-session', 'messages': []}),
+          200,
+        );
+      });
+
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(agenticChatProvider('test-session').notifier);
+      notifier.setStateForTest(
+        AgenticChatState(
+          messages: [
+            AgenticMessage(
+              messageId: 'm-final',
+              localId: 'm-final',
+              text: 'hi',
+              role: AgenticRole.assistant,
+              isFinal: true,
+            ),
+          ],
+        ),
+      );
+
+      await notifier.refreshFromServer(client: mockClient);
+
+      expect(requestedUri!.queryParameters['after'], 'm-final');
+    });
+
+    test('refreshFromServer coalesces concurrent calls into one re-fetch',
+        () async {
+      var requestCount = 0;
+      final firstRequestStarted = Completer<void>();
+      final releaseFirstResponse = Completer<void>();
+      final secondRequestCompleted = Completer<void>();
+      final mockClient = MockClient((request) async {
+        requestCount++;
+        if (requestCount == 1) {
+          firstRequestStarted.complete();
+          await releaseFirstResponse.future;
+        }
+        final response = http.Response(
+          jsonEncode({'session_id': 'test-session', 'messages': []}),
+          200,
+        );
+        if (requestCount == 2) secondRequestCompleted.complete();
+        return response;
+      });
+
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+      // Keep the instance alive across the awaits below — matches a
+      // realistically-displayed session and avoids relying on autoDispose
+      // timing luck within the test itself.
+      final subscription =
+          container.listen(agenticChatProvider('test-session'), (_, _) {});
+      addTearDown(subscription.close);
+      final notifier = container.read(agenticChatProvider('test-session').notifier);
+
+      unawaited(notifier.refreshFromServer(client: mockClient));
+      await firstRequestStarted.future;
+      // Fired while the first is still in flight — must coalesce into a
+      // single re-fetch after it completes, not a second overlapping one.
+      unawaited(notifier.refreshFromServer(client: mockClient));
+      unawaited(notifier.refreshFromServer(client: mockClient));
+
+      releaseFirstResponse.complete();
+      await secondRequestCompleted.future;
+
+      expect(
+        requestCount,
+        2,
+        reason: 'the in-flight call plus exactly one coalesced re-fetch',
+      );
+    });
+  });
+
+  group('AgenticChatNotifier — seedFirstExchange', () {
+    test('merges the user message and response, marking both final when the '
+        'response is final', () {
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(agenticChatProvider('new-session').notifier);
+
+      final userMessage = AgenticMessage.user('hello');
+      final response = AgenticMessage.assistant('hi there');
+
+      notifier.seedFirstExchange(
+        userMessage: userMessage,
+        response: response,
+        sensitivityLevel: SensitivityLevel.confidential,
+      );
+
+      final state = container.read(agenticChatProvider('new-session'));
+      expect(state.messages.map((m) => m.messageId), [
+        userMessage.messageId,
+        response.messageId,
+      ]);
+      expect(state.messages.every((m) => m.isFinal), isTrue);
+      expect(state.sensitivityLevel, SensitivityLevel.confidential);
+    });
+
+    test('leaves the response non-final when it is not final (e.g. a pending approval)',
+        () {
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(agenticChatProvider('new-session').notifier);
+
+      final userMessage = AgenticMessage.user('do the thing');
+      final response = _systemMessageWithApprovals([_pendingApproval('a1')]);
+
+      notifier.seedFirstExchange(
+        userMessage: userMessage,
+        response: response,
+        sensitivityLevel: SensitivityLevel.personal,
+      );
+
+      final state = container.read(agenticChatProvider('new-session'));
+      expect(state.isAwaiting, isTrue);
+    });
+  });
+
+  group('AgenticChatNotifier — per-session isolation', () {
+    test('two different session ids produce independent instances', () {
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+
+      final notifierA = container.read(agenticChatProvider('session-a').notifier);
+      notifierA.setStateForTest(
+        AgenticChatState(messages: [AgenticMessage.assistant('only in A')]),
+      );
+
+      final stateB = container.read(agenticChatProvider('session-b'));
+      expect(
+        stateB.messages,
+        isEmpty,
+        reason: 'family instances are separate objects by construction — '
+            'nothing written to session-a can reach session-b',
+      );
+    });
+  });
+
+  group('AgenticChatNotifier — disposal policy', () {
+    test('a session with an in-flight cycle is not disposed when unwatched',
+        () {
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+
+      // Simulate the page watching this session (e.g. it's displayed).
+      final subscription =
+          container.listen(agenticChatProvider('s1'), (_, _) {});
+
+      final notifier = container.read(agenticChatProvider('s1').notifier);
+      final pending = _systemMessageWithApprovals([_pendingApproval('a1')]);
+      notifier.setStateForTest(AgenticChatState(messages: [pending]));
+      expect(container.read(agenticChatProvider('s1')).isAwaiting, isTrue);
+
+      // Simulate navigating away: the widget stops watching.
+      subscription.close();
+
+      // The in-flight cycle must keep it alive — re-reading it must return
+      // the same state, not a freshly-rebuilt empty one, even though
+      // nothing is watching it anymore.
+      final stillThere = container.read(agenticChatProvider('s1'));
+      expect(stillThere.messages, hasLength(1));
+      expect(
+        stillThere.messages.first.approvals!.first.resolution,
+        ApprovalResolution.pending,
+      );
+    });
+
+    test(
+        'an idle session survives a quick flip back within the linger window',
+        () async {
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+
+      var subscription = container.listen(agenticChatProvider('s1'), (_, _) {});
+      final notifier = container.read(agenticChatProvider('s1').notifier);
+      notifier.setStateForTest(
+        AgenticChatState(messages: [AgenticMessage.assistant('hello')]),
+      );
+      expect(container.read(agenticChatProvider('s1')).isAwaiting, isFalse);
+
+      subscription.close();
+      // Immediately re-watch, well within the idle-linger grace window.
+      subscription = container.listen(agenticChatProvider('s1'), (_, _) {});
+
+      final state = container.read(agenticChatProvider('s1'));
+      expect(
+        state.messages,
+        hasLength(1),
+        reason: 'a quick flip back must reuse the still-warm instance, not '
+            'a freshly disposed-and-rebuilt empty one',
+      );
+      subscription.close();
+    });
+
+    test('an idle session is disposed after the linger window if never rewatched',
+        () async {
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+
+      final subscription = container.listen(agenticChatProvider('s1'), (_, _) {});
+      final notifier = container.read(agenticChatProvider('s1').notifier);
+      notifier.setStateForTest(
+        AgenticChatState(messages: [AgenticMessage.assistant('hello')]),
+      );
+
+      subscription.close();
+      // Past the 500ms idle-linger window, still unwatched.
+      await Future.delayed(const Duration(milliseconds: 700));
+
+      final freshWatch = container.listen(agenticChatProvider('s1'), (_, _) {});
+      final state = container.read(agenticChatProvider('s1'));
+      expect(
+        state.messages,
+        isEmpty,
+        reason: 'genuinely idle and unwatched past the linger window — '
+            'disposed and rebuilt fresh on next display, matching the '
+            'always-reconcile-on-redisplay design',
+      );
+      freshWatch.close();
     });
   });
 }

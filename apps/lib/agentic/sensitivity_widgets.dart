@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/agentic/models.dart';
 import '/providers/agentic_chat_provider.dart';
+import '/providers/displayed_session_provider.dart';
+import '/providers/new_chat_draft_provider.dart';
 
 // -- Sensitivity Indicator & Picker --
 
@@ -15,15 +17,21 @@ class SensitivityIndicator extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final level = ref.watch(
-      agenticChatProvider.select((s) => s.sensitivityLevel),
-    );
+    final displayedSessionId = ref.watch(displayedSessionProvider);
+    final level = displayedSessionId == null
+        ? ref.watch(newChatDraftProvider.select((s) => s.sensitivityLevel))
+        : ref.watch(
+            agenticChatProvider(
+              displayedSessionId,
+            ).select((s) => s.sensitivityLevel),
+          );
     final isNarrow = MediaQuery.of(context).size.width < 500;
 
     if (inAppBar) {
       return IconButton(
         tooltip: 'Sensitivity level: ${level.label}',
-        onPressed: () => _showSensitivityPicker(context, ref, level),
+        onPressed: () =>
+            _showSensitivityPicker(context, ref, displayedSessionId, level),
         style: isNarrow
             ? IconButton.styleFrom(
                 backgroundColor: level.color,
@@ -57,7 +65,8 @@ class SensitivityIndicator extends ConsumerWidget {
     }
 
     return GestureDetector(
-      onTap: () => _showSensitivityPicker(context, ref, level),
+      onTap: () =>
+          _showSensitivityPicker(context, ref, displayedSessionId, level),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
@@ -91,6 +100,7 @@ class SensitivityIndicator extends ConsumerWidget {
   void _showSensitivityPicker(
     BuildContext context,
     WidgetRef ref,
+    String? displayedSessionId,
     SensitivityLevel currentLevel,
   ) {
     showModalBottomSheet<void>(
@@ -100,7 +110,13 @@ class SensitivityIndicator extends ConsumerWidget {
         onSelected: (level) {
           Navigator.pop(context);
           if (level != currentLevel) {
-            ref.read(agenticChatProvider.notifier).changeSensitivity(level);
+            if (displayedSessionId == null) {
+              ref.read(newChatDraftProvider.notifier).changeSensitivity(level);
+            } else {
+              ref
+                  .read(agenticChatProvider(displayedSessionId).notifier)
+                  .changeSensitivity(level);
+            }
           }
         },
       ),

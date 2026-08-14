@@ -8,64 +8,93 @@ import '/utils/logger.dart';
 
 sealed class SseEvent {
   final int id;
-  const SseEvent({required this.id});
+  /// When the engine emitted this event. Present on every event envelope
+  /// server-side (`BaseEvent.created_at`); used e.g. to bump a
+  /// non-displayed session's activity timestamp without a full fetch.
+  final DateTime createdAt;
+  const SseEvent({required this.id, required this.createdAt});
 
   factory SseEvent.fromSse(String eventType, String id, String data) {
     final parsedId = int.parse(id);
     final json = jsonDecode(data) as Map<String, dynamic>;
+    final createdAt = DateTime.parse(json['created_at'] as String).toUtc();
     return switch (eventType) {
       'session.created' => SessionCreatedEvent(
         id: parsedId,
+        createdAt: createdAt,
         sessionId: json['session_id'] as String,
       ),
       'session.deleted' => SessionDeletedEvent(
         id: parsedId,
+        createdAt: createdAt,
         sessionId: json['session_id'] as String,
       ),
       'session.updated' => SessionUpdatedEvent(
         id: parsedId,
+        createdAt: createdAt,
         sessionId: json['session_id'] as String,
       ),
       'session.messages.appended' => MessagesAppendedEvent(
         id: parsedId,
+        createdAt: createdAt,
         sessionId: json['session_id'] as String,
       ),
-      _ => UnknownEvent(id: parsedId, eventType: eventType),
+      _ => UnknownEvent(id: parsedId, createdAt: createdAt, eventType: eventType),
     };
   }
 }
 
 class SessionCreatedEvent extends SseEvent {
   final String sessionId;
-  const SessionCreatedEvent({required super.id, required this.sessionId});
+  const SessionCreatedEvent({
+    required super.id,
+    required super.createdAt,
+    required this.sessionId,
+  });
   @override
   String toString() => 'SessionCreatedEvent(id=$id, session=$sessionId)';
 }
 
 class SessionDeletedEvent extends SseEvent {
   final String sessionId;
-  const SessionDeletedEvent({required super.id, required this.sessionId});
+  const SessionDeletedEvent({
+    required super.id,
+    required super.createdAt,
+    required this.sessionId,
+  });
   @override
   String toString() => 'SessionDeletedEvent(id=$id, session=$sessionId)';
 }
 
 class SessionUpdatedEvent extends SseEvent {
   final String sessionId;
-  const SessionUpdatedEvent({required super.id, required this.sessionId});
+  const SessionUpdatedEvent({
+    required super.id,
+    required super.createdAt,
+    required this.sessionId,
+  });
   @override
   String toString() => 'SessionUpdatedEvent(id=$id, session=$sessionId)';
 }
 
 class MessagesAppendedEvent extends SseEvent {
   final String sessionId;
-  const MessagesAppendedEvent({required super.id, required this.sessionId});
+  const MessagesAppendedEvent({
+    required super.id,
+    required super.createdAt,
+    required this.sessionId,
+  });
   @override
   String toString() => 'MessagesAppendedEvent(id=$id, session=$sessionId)';
 }
 
 class UnknownEvent extends SseEvent {
   final String eventType;
-  const UnknownEvent({required super.id, required this.eventType});
+  const UnknownEvent({
+    required super.id,
+    required super.createdAt,
+    required this.eventType,
+  });
   @override
   String toString() => 'UnknownEvent(id=$id, type=$eventType)';
 }

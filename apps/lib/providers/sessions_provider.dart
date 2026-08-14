@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/agentic/models.dart';
 import '/agentic/services.dart';
+import '/providers/displayed_session_provider.dart';
 import '/providers/settings_provider.dart';
 import '../utils/logger.dart';
 
@@ -69,7 +70,7 @@ class SessionsNotifier extends Notifier<SessionsState> {
         apiKey: apiKey,
       );
 
-      final activeSessionId = settings.agenticSessionId;
+      final activeSessionId = ref.read(displayedSessionProvider);
 
       final sessionItems = sessions.map((session) {
         return SessionListItem(
@@ -175,6 +176,45 @@ class SessionsNotifier extends Notifier<SessionsState> {
         'Sessions: Updated and reordered session ${sessionInfo.sessionId}',
       );
     }
+  }
+
+  /// Lightweight update for a session with no live `agenticChatProvider`
+  /// instance: bump its last-activity timestamp and move it to the top,
+  /// without a `getSessionInfo()` fetch. Used when a `messages.appended`
+  /// SSE event arrives for a session nothing is currently displaying (see
+  /// `specs/agentic-chat/spec.md`'s Sessions List Reflects Background
+  /// Activity requirement).
+  ///
+  /// No-ops if the session isn't in the list, or if [timestamp] is not
+  /// strictly newer than what's already shown — events can arrive
+  /// out of order across an SSE reconnect, and an older timestamp must
+  /// not regress an already-newer displayed one.
+  void bumpActivity(String sessionId, DateTime timestamp) {
+    final index = state.sessions.indexWhere(
+      (item) => item.sessionInfo.sessionId == sessionId,
+    );
+    if (index < 0) return;
+
+    final current = state.sessions[index];
+    if (!timestamp.isAfter(current.sessionInfo.updatedAt)) return;
+
+    final bumped = SessionListItem(
+      sessionInfo: SessionInfo(
+        sessionId: current.sessionInfo.sessionId,
+        title: current.sessionInfo.title,
+        createdAt: current.sessionInfo.createdAt,
+        updatedAt: timestamp,
+      ),
+      isActive: current.isActive,
+    );
+
+    final updatedSessions = state.sessions
+        .where((item) => item.sessionInfo.sessionId != sessionId)
+        .toList();
+    updatedSessions.insert(0, bumped);
+
+    state = state.copyWith(sessions: updatedSessions);
+    Logger.debug('Sessions: Bumped activity for $sessionId');
   }
 
   void removeSession(String sessionId) {

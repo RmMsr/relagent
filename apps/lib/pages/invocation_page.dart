@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '/models/settings.dart';
-import '/providers/agentic_chat_provider.dart';
 import '/providers/chat_provider.dart';
+import '/providers/displayed_session_provider.dart';
 import '/providers/invocation_provider.dart';
+import '/providers/new_chat_draft_provider.dart';
 import '/providers/settings_provider.dart';
+import '/providers/tts_provider.dart';
 
 const _defaultInstruction = 'Please explain this';
 
@@ -60,9 +62,12 @@ class _InvocationPageState extends ConsumerState<InvocationPage> {
 
     final backend = ref.read(settingsProvider).selectedBackend;
     if (backend == ChatBackendType.relagentEngine) {
-      await ref.read(agenticChatProvider.notifier).clearChat();
+      // Abandon whatever session was displayed and start fresh through the
+      // draft flow, same as tapping "New Session" then sending.
+      ref.read(displayedSessionProvider.notifier).show(null);
+      ref.read(ttsProvider.notifier).onChatCleared();
       // ignore: discarded_futures
-      ref.read(agenticChatProvider.notifier).sendMessage(message);
+      ref.read(newChatDraftProvider.notifier).sendMessage(message);
     } else {
       ref.read(chatProvider.notifier).clearChat();
       // ignore: discarded_futures

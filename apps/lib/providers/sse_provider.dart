@@ -1,12 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/agentic/services.dart';
 import '/agentic/sse_client.dart';
 import '/providers/agentic_chat_provider.dart';
+import '/providers/displayed_session_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/sessions_provider.dart';
+import '/providers/tts_provider.dart';
 import '/utils/logger.dart';
 
 const _lastEventIdKey = 'sse_last_event_id';
@@ -51,8 +54,6 @@ final sseProvider = NotifierProvider<SseNotifier, SseState>(() {
 class SseNotifier extends Notifier<SseState> {
   SseClient? _client;
   StreamSubscription<SseEvent>? _eventSubscription;
-  bool _fetchInFlight = false;
-  bool _refetchPending = false;
 
   @override
   SseState build() {
@@ -81,11 +82,9 @@ class SseNotifier extends Notifier<SseState> {
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final prefs = ref.read(sharedPreferencesProvider);
 
-    // Disconnect existing client and reset fetch state
+    // Disconnect existing client
     _eventSubscription?.cancel();
     _client?.dispose();
-    _fetchInFlight = false;
-    _refetchPending = false;
 
     final password = await settingsNotifier.getEnginePassword();
     final apiKey = await settingsNotifier.getEngineApiKey();
@@ -109,36 +108,13 @@ class SseNotifier extends Notifier<SseState> {
     state = state.copyWith(isConnected: true);
   }
 
-  /// Fetch messages since the last final message (UUID cursor). Coalesces
-  /// concurrent calls: if a fetch is in-flight, marks a re-fetch pending so
-  /// one more fetch runs after the current one completes.
-  Future<void> fetchSinceCursor() async {
-    if (_fetchInFlight) {
-      _refetchPending = true;
-      return;
-    }
-    _fetchInFlight = true;
-    final messages = ref.read(agenticChatProvider).messages;
-    final finalMessages = messages.where((m) => m.isFinal);
-    final cursor = finalMessages.isEmpty ? null : finalMessages.last.messageId;
-    try {
-      await ref
-          .read(agenticChatProvider.notifier)
-          .loadHistory(afterMessageId: cursor);
-    } finally {
-      _fetchInFlight = false;
-      if (_refetchPending) {
-        _refetchPending = false;
-        unawaited(fetchSinceCursor());
-      }
-    }
-  }
+  @visibleForTesting
+  Future<void> handleEventForTest(SseEvent event) => _handleEvent(event);
 
   Future<void> _handleEvent(SseEvent event) async {
     _persistLastEventId(event.id);
 
-    final settings = ref.read(settingsProvider);
-    final currentSessionId = settings.agenticSessionId;
+    final displayedSessionId = ref.read(displayedSessionProvider);
 
     switch (event) {
       case SessionCreatedEvent(:final sessionId):
@@ -161,10 +137,11 @@ class SseNotifier extends Notifier<SseState> {
 
           ref.read(sessionsProvider.notifier).addSession(sessionInfo);
 
-          // Re-read active session ID (may have been set by sendMessage() concurrently)
-          final activeSessionId = ref.read(settingsProvider).agenticSessionId;
-          if (activeSessionId != null && sessionId == activeSessionId) {
-            ref.read(agenticChatProvider.notifier).loadSessionInfo();
+          // Re-read displayed session (may have been set by the draft
+          // flow's sendMessage() concurrently)
+          final currentDisplayed = ref.read(displayedSessionProvider);
+          if (currentDisplayed != null && sessionId == currentDisplayed) {
+            ref.read(agenticChatProvider(sessionId).notifier).loadSessionInfo();
           }
 
           Logger.debug('SSE: Added new session to list: ${sessionInfo.title}');
@@ -173,20 +150,19 @@ class SseNotifier extends Notifier<SseState> {
         }
       case SessionDeletedEvent(:final sessionId):
         Logger.debug('SSE: Session deleted: $sessionId');
-        if (currentSessionId != null && sessionId == currentSessionId) {
+        if (displayedSessionId != null && sessionId == displayedSessionId) {
           Logger.debug(
-            'SSE: Active session was deleted, clearing chat state...',
+            'SSE: Displayed session was deleted, clearing chat state...',
           );
-          // Clear the active session from settings
+          ref.read(displayedSessionProvider.notifier).show(null);
           ref.read(settingsProvider.notifier).clearAgenticSessionId();
-          // Clear the chat state to start a new empty session
-          ref.read(agenticChatProvider.notifier).clearChat();
+          ref.read(ttsProvider.notifier).onChatCleared();
           // Remove from sessions list if present
           ref.read(sessionsProvider.notifier).removeSession(sessionId);
           // Set flag to show snackbar notification
           state = state.copyWith(activeSessionDeleted: sessionId);
         } else {
-          // Just remove from sessions list if not the active session
+          // Just remove from sessions list if not the displayed session
           ref.read(sessionsProvider.notifier).removeSession(sessionId);
         }
       case SessionUpdatedEvent(:final sessionId):
@@ -209,22 +185,33 @@ class SseNotifier extends Notifier<SseState> {
 
           ref.read(sessionsProvider.notifier).updateSession(sessionInfo);
 
-          // Also refresh chat session info if this is the active session
-          if (currentSessionId != null && sessionId == currentSessionId) {
-            ref.read(agenticChatProvider.notifier).loadSessionInfo();
+          // Also refresh chat session info if this is the displayed session
+          if (displayedSessionId != null && sessionId == displayedSessionId) {
+            ref.read(agenticChatProvider(sessionId).notifier).loadSessionInfo();
           }
         } catch (e) {
           Logger.debug('SSE: Failed to fetch updated session info: $e');
         }
-      case MessagesAppendedEvent(:final sessionId):
-        if (currentSessionId == null || sessionId != currentSessionId) {
-          Logger.debug(
-            'SSE: Ignoring messages.appended for different session: $sessionId',
+      case MessagesAppendedEvent(:final sessionId, :final createdAt):
+        // Route to a live instance if one exists (displayed, in-flight, or
+        // within its idle linger) — never instantiate one just to handle
+        // this event, or the SSE loop itself would defeat the memory bound
+        // `agenticChatProvider`'s disposal policy relies on (design
+        // Decision 4). Otherwise, this session has no full state to
+        // reconcile right now — just surface that something happened via a
+        // lightweight sessions-list activity bump (design Decision 4 /
+        // Sessions List Reflects Background Activity).
+        if (ref.exists(agenticChatProvider(sessionId))) {
+          Logger.debug('SSE: Messages appended, refreshing $sessionId');
+          unawaited(
+            ref.read(agenticChatProvider(sessionId).notifier).refreshFromServer(),
           );
-          return;
+        } else {
+          Logger.debug(
+            'SSE: Messages appended for inactive session $sessionId, bumping activity',
+          );
+          ref.read(sessionsProvider.notifier).bumpActivity(sessionId, createdAt);
         }
-        Logger.debug('SSE: Messages appended, fetching since cursor');
-        unawaited(fetchSinceCursor());
       case UnknownEvent(:final eventType):
         Logger.debug('SSE: Unknown event type: $eventType');
     }

@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '/agentic/health_check.dart';
+import '/agentic/models.dart';
 import '/agentic/widgets.dart';
 import '/providers/agentic_chat_provider.dart';
 import '/providers/audio_coordinator_provider.dart';
+import '/providers/displayed_session_provider.dart';
 import '/providers/engine_health_check_provider.dart';
+import '/providers/new_chat_draft_provider.dart';
 import '/providers/recording_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/sse_provider.dart';
@@ -29,19 +32,44 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
   bool _healthCheckBannerDismissed = false;
   final GlobalKey _chatInputKey = GlobalKey();
 
+  // Tracks the fields that should trigger an auto-scroll, across whichever
+  // of the two possible source providers (draft or a session's own
+  // instance) is currently backing `chatState` below.
+  int? _lastMessageCount;
+  bool? _lastShowAssistantPending;
+  String? _lastQueuedMessage;
+
   @override
   Widget build(BuildContext context) {
-    final chatState = ref.watch(agenticChatProvider);
+    final displayedSessionId = ref.watch(displayedSessionProvider);
+
+    final AgenticChatState chatState;
+    if (displayedSessionId == null) {
+      final draft = ref.watch(newChatDraftProvider);
+      chatState = AgenticChatState(
+        messages: [
+          if (draft.pendingUserMessage != null) draft.pendingUserMessage!,
+          if (draft.error != null) AgenticMessage.error(draft.error!),
+        ],
+        isLoading: draft.isLoading,
+        showAssistantPending: draft.isLoading,
+        sensitivityLevel: draft.sensitivityLevel,
+      );
+    } else {
+      chatState = ref.watch(agenticChatProvider(displayedSessionId));
+    }
+
     final ttsState = ref.watch(ttsProvider);
     final healthCheckState = ref.watch(engineHealthCheckProvider);
 
-    ref.listen<AgenticChatState>(agenticChatProvider, (previous, next) {
-      if (previous?.messages.length != next.messages.length ||
-          previous?.showAssistantPending != next.showAssistantPending ||
-          previous?.queuedMessage != next.queuedMessage) {
-        _scrollToBottom();
-      }
-    });
+    if (_lastMessageCount != chatState.messages.length ||
+        _lastShowAssistantPending != chatState.showAssistantPending ||
+        _lastQueuedMessage != chatState.queuedMessage) {
+      _lastMessageCount = chatState.messages.length;
+      _lastShowAssistantPending = chatState.showAssistantPending;
+      _lastQueuedMessage = chatState.queuedMessage;
+      _scrollToBottom();
+    }
 
     ref.listen<AudioCoordinatorState>(audioCoordinatorProvider, (
       previous,
@@ -73,7 +101,10 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
         setState(() {
           _healthCheckBannerDismissed = true;
         });
-        ref.read(agenticChatProvider.notifier).loadHistory();
+        final sessionId = ref.read(displayedSessionProvider);
+        if (sessionId != null) {
+          ref.read(agenticChatProvider(sessionId).notifier).refreshFromServer();
+        }
         ref.read(sseProvider.notifier).reconnect();
       }
     });
@@ -134,7 +165,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
             const SizedBox(width: 8),
           ],
           const SensitivityIndicator(inAppBar: true),
-          if (ref.watch(settingsProvider).agenticSessionId != null)
+          if (displayedSessionId != null)
             IconButton(
               icon: const Icon(Icons.local_fire_department_outlined),
               tooltip: 'Purge session',
@@ -144,7 +175,8 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
             icon: const Icon(Icons.restore_page_outlined),
             tooltip: 'New Session',
             onPressed: () {
-              ref.read(agenticChatProvider.notifier).clearChat();
+              ref.read(displayedSessionProvider.notifier).show(null);
+              ref.read(ttsProvider.notifier).onChatCleared();
               _showSnackBar('New session started');
             },
           ),
@@ -180,16 +212,28 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                             isVoiceAvailable: ref
                                 .watch(voiceCapabilitiesProvider)
                                 .isAsrAvailable,
-                            onRetry: () {
-                              ref
-                                  .read(agenticChatProvider.notifier)
-                                  .retryFailedMessages();
-                            },
-                            onCancel: () {
-                              ref
-                                  .read(agenticChatProvider.notifier)
-                                  .cancelFailedMessages();
-                            },
+                            onRetry: displayedSessionId == null
+                                ? null
+                                : () {
+                                    ref
+                                        .read(
+                                          agenticChatProvider(
+                                            displayedSessionId,
+                                          ).notifier,
+                                        )
+                                        .retryFailedMessages();
+                                  },
+                            onCancel: displayedSessionId == null
+                                ? null
+                                : () {
+                                    ref
+                                        .read(
+                                          agenticChatProvider(
+                                            displayedSessionId,
+                                          ).notifier,
+                                        )
+                                        .cancelFailedMessages();
+                                  },
                             onSpeak:
                                 !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
                                 ? null
@@ -229,40 +273,78 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                                     .read(ttsProvider.notifier)
                                     .skipNextChunk(messageId),
                             onChangeSensitivity: (level) {
-                              ref
-                                  .read(agenticChatProvider.notifier)
-                                  .changeSensitivity(level);
+                              if (displayedSessionId == null) {
+                                ref
+                                    .read(newChatDraftProvider.notifier)
+                                    .changeSensitivity(level);
+                              } else {
+                                ref
+                                    .read(
+                                      agenticChatProvider(
+                                        displayedSessionId,
+                                      ).notifier,
+                                    )
+                                    .changeSensitivity(level);
+                              }
                             },
-                            onGrantApproval: (approval, grant, isGlobal) {
-                              // ignore: discarded_futures
-                              ref
-                                  .read(agenticChatProvider.notifier)
-                                  .grantApproval(
-                                    approvalId: approval.id,
-                                    grant: grant,
-                                    isGlobal: isGlobal,
-                                  );
-                            },
-                            onDeclineApproval: (approvalId) {
-                              // ignore: discarded_futures
-                              ref
-                                  .read(agenticChatProvider.notifier)
-                                  .declineApproval(approvalId);
-                            },
-                            onDeclineAllApprovals: (approvalIds) {
-                              // ignore: discarded_futures
-                              ref
-                                  .read(agenticChatProvider.notifier)
-                                  .declineAllAndContinue(approvalIds);
-                            },
-                            onContinue: () {
-                              ref
-                                  .read(agenticChatProvider.notifier)
-                                  .triggerContinuation();
-                            },
-                            onStop: _onStop,
+                            onGrantApproval: displayedSessionId == null
+                                ? null
+                                : (approval, grant, isGlobal) {
+                                    // ignore: discarded_futures
+                                    ref
+                                        .read(
+                                          agenticChatProvider(
+                                            displayedSessionId,
+                                          ).notifier,
+                                        )
+                                        .grantApproval(
+                                          approvalId: approval.id,
+                                          grant: grant,
+                                          isGlobal: isGlobal,
+                                        );
+                                  },
+                            onDeclineApproval: displayedSessionId == null
+                                ? null
+                                : (approvalId) {
+                                    // ignore: discarded_futures
+                                    ref
+                                        .read(
+                                          agenticChatProvider(
+                                            displayedSessionId,
+                                          ).notifier,
+                                        )
+                                        .declineApproval(approvalId);
+                                  },
+                            onDeclineAllApprovals: displayedSessionId == null
+                                ? null
+                                : (approvalIds) {
+                                    // ignore: discarded_futures
+                                    ref
+                                        .read(
+                                          agenticChatProvider(
+                                            displayedSessionId,
+                                          ).notifier,
+                                        )
+                                        .declineAllAndContinue(approvalIds);
+                                  },
+                            onContinue: displayedSessionId == null
+                                ? null
+                                : () {
+                                    ref
+                                        .read(
+                                          agenticChatProvider(
+                                            displayedSessionId,
+                                          ).notifier,
+                                        )
+                                        .triggerContinuation();
+                                  },
+                            onStop: displayedSessionId == null
+                                ? null
+                                : _onStop,
                             queuedMessage: chatState.queuedMessage,
-                            onEditQueued: _pullQueuedToInput,
+                            onEditQueued: displayedSessionId == null
+                                ? null
+                                : _pullQueuedToInput,
                           ),
                         ],
                       ),
@@ -275,7 +357,14 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
               key: _chatInputKey,
               enabled: chatState.inputEnabled,
               onSubmitted: (text) {
-                ref.read(agenticChatProvider.notifier).sendMessage(text);
+                final sessionId = ref.read(displayedSessionProvider);
+                if (sessionId == null) {
+                  ref.read(newChatDraftProvider.notifier).sendMessage(text);
+                } else {
+                  ref
+                      .read(agenticChatProvider(sessionId).notifier)
+                      .sendMessage(text);
+                }
               },
             ),
           ],
@@ -297,8 +386,12 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
-      ref.read(agenticChatProvider.notifier).loadHistory();
-      ref.read(agenticChatProvider.notifier).loadSessionInfo();
+      final sessionId = ref.read(displayedSessionProvider);
+      if (sessionId != null) {
+        final notifier = ref.read(agenticChatProvider(sessionId).notifier);
+        notifier.refreshFromServer();
+        notifier.loadSessionInfo();
+      }
       final capabilities = ref.read(voiceCapabilitiesProvider);
       if (capabilities.isAsrAvailable) {
         ref.read(recordingProvider.notifier).checkAutoStart();
@@ -319,6 +412,13 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(sseProvider.notifier).connect();
+      // SSE reconnect trusts `lastEventId` replay, which can miss events
+      // across a gap. Reconcile the displayed session directly rather than
+      // relying on that alone (see design Decision 5).
+      final sessionId = ref.read(displayedSessionProvider);
+      if (sessionId != null) {
+        ref.read(agenticChatProvider(sessionId).notifier).refreshFromServer();
+      }
     }
   }
 
@@ -450,7 +550,10 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
 
     // Check engine health after settings change
     ref.read(engineHealthCheckProvider.notifier).triggerHealthCheck();
-    ref.read(agenticChatProvider.notifier).loadHistory();
+    final sessionId = ref.read(displayedSessionProvider);
+    if (sessionId != null) {
+      ref.read(agenticChatProvider(sessionId).notifier).refreshFromServer();
+    }
     ref.read(sseProvider.notifier).reconnect();
 
     // Reset banner if health status changed
@@ -467,7 +570,9 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
   }
 
   void _pullQueuedToInput() {
-    final text = ref.read(agenticChatProvider.notifier).editQueued();
+    final sessionId = ref.read(displayedSessionProvider);
+    if (sessionId == null) return;
+    final text = ref.read(agenticChatProvider(sessionId).notifier).editQueued();
     if (text == null) return;
     final inputState = _chatInputKey.currentState as AgenticChatInputState?;
     inputState?.setText(text);
@@ -476,9 +581,11 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
   // Stop with queued: pull queued text back into input first, then stop.
   // Per §11.8 the queued message is preserved as input rather than discarded.
   void _onStop() {
+    final sessionId = ref.read(displayedSessionProvider);
+    if (sessionId == null) return;
     _pullQueuedToInput();
     // ignore: discarded_futures
-    ref.read(agenticChatProvider.notifier).stopCycle();
+    ref.read(agenticChatProvider(sessionId).notifier).stopCycle();
   }
 
   void _scrollToBottom() {
@@ -496,6 +603,9 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
   }
 
   Future<void> _showPurgeConfirmation() async {
+    final sessionId = ref.read(displayedSessionProvider);
+    if (sessionId == null) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -521,7 +631,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
     );
 
     if (confirmed == true) {
-      await ref.read(agenticChatProvider.notifier).purgeSession();
+      await ref.read(agenticChatProvider(sessionId).notifier).purgeSession();
       if (!mounted) return;
       _showSnackBar('Session purged');
     }

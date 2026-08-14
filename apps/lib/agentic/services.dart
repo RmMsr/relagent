@@ -474,6 +474,7 @@ Future<void> grantSessionApproval({
   String? username,
   String? password,
   String? apiKey,
+  @visibleForTesting http.Client? client,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse(
@@ -491,7 +492,9 @@ Future<void> grantSessionApproval({
 
   final http.Response response;
   try {
-    response = await http.post(uri, headers: headers, body: body);
+    final effectiveClient = client ?? http.Client();
+    response = await effectiveClient.post(uri, headers: headers, body: body);
+    if (client == null) effectiveClient.close();
   } catch (e) {
     throw _networkException(e, uri);
   }
@@ -544,6 +547,7 @@ Future<List<AgenticMessage>> stopSession({
   String? username,
   String? password,
   String? apiKey,
+  @visibleForTesting http.Client? client,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse(
@@ -559,7 +563,9 @@ Future<List<AgenticMessage>> stopSession({
 
   final http.Response response;
   try {
-    response = await http.post(uri, headers: headers);
+    final effectiveClient = client ?? http.Client();
+    response = await effectiveClient.post(uri, headers: headers);
+    if (client == null) effectiveClient.close();
   } catch (e) {
     throw _networkException(e, uri);
   }
@@ -591,6 +597,7 @@ Future<ChatResponseData> continueSession({
   String? username,
   String? password,
   String? apiKey,
+  @visibleForTesting http.Client? client,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse(
@@ -606,7 +613,9 @@ Future<ChatResponseData> continueSession({
 
   final http.Response response;
   try {
-    response = await http.post(uri, headers: headers);
+    final effectiveClient = client ?? http.Client();
+    response = await effectiveClient.post(uri, headers: headers);
+    if (client == null) effectiveClient.close();
   } catch (e) {
     throw _networkException(e, uri);
   }

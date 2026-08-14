@@ -25,7 +25,7 @@ void main() {
       final event = SseEvent.fromSse(
         'session.updated',
         '7',
-        '{"session_id": "abc-123"}',
+        '{"session_id": "abc-123", "created_at": "2025-01-01T00:00:00Z"}',
       );
 
       expect(event, isA<SessionUpdatedEvent>());
@@ -38,7 +38,7 @@ void main() {
       final event = SseEvent.fromSse(
         'session.messages.appended',
         '42',
-        '{"session_id": "sess-1"}',
+        '{"session_id": "sess-1", "created_at": "2025-01-01T00:00:00Z"}',
       );
 
       expect(event, isA<MessagesAppendedEvent>());
@@ -51,7 +51,7 @@ void main() {
       final event = SseEvent.fromSse(
         'some.future.event',
         '3',
-        '{"foo": "bar"}',
+        '{"foo": "bar", "created_at": "2025-01-01T00:00:00Z"}',
       );
 
       expect(event, isA<UnknownEvent>());
@@ -64,10 +64,20 @@ void main() {
       final event = SseEvent.fromSse(
         'session.updated',
         '12345',
-        '{"session_id": "x"}',
+        '{"session_id": "x", "created_at": "2025-01-01T00:00:00Z"}',
       );
 
       expect(event.id, 12345);
+    });
+
+    test('parses created_at from the event envelope', () {
+      final event = SseEvent.fromSse(
+        'session.updated',
+        '1',
+        '{"session_id": "x", "created_at": "2025-06-15T12:30:00Z"}',
+      );
+
+      expect(event.createdAt, DateTime.utc(2025, 6, 15, 12, 30));
     });
   });
 
@@ -90,7 +100,7 @@ void main() {
         utf8.encode(
           'event: session.updated\n'
           'id: 1\n'
-          'data: {"session_id": "abc"}\n'
+          'data: {"session_id": "abc", "created_at": "2025-01-01T00:00:00Z"}\n'
           '\n',
         ),
       );
@@ -193,7 +203,7 @@ void main() {
         utf8.encode(
           'event: session.updated\n'
           'id: 5\n'
-          'data: {"session_id": "x"}\n'
+          'data: {"session_id": "x", "created_at": "2025-01-01T00:00:00Z"}\n'
           '\n',
         ),
       );
@@ -226,7 +236,7 @@ void main() {
           '\n'
           'event: session.updated\n'
           'id: 1\n'
-          'data: {"session_id": "x"}\n'
+          'data: {"session_id": "x", "created_at": "2025-01-01T00:00:00Z"}\n'
           '\n',
         ),
       );

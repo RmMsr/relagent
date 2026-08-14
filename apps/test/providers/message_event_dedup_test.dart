@@ -1,13 +1,17 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:relagent/agentic/models.dart';
+import 'package:relagent/agentic/sse_client.dart';
 import 'package:relagent/models/settings.dart';
 import 'package:relagent/providers/agentic_chat_provider.dart';
+import 'package:relagent/providers/sessions_provider.dart';
 import 'package:relagent/providers/settings_provider.dart';
 import 'package:relagent/providers/sse_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+/// Session identity is the family key now, not something read off Settings.
 class _StubSettingsNotifier extends SettingsNotifier {
   @override
   Settings build() => Settings.defaults();
@@ -19,119 +23,140 @@ class _StubSettingsNotifier extends SettingsNotifier {
   Future<String?> getEngineApiKey({String? url}) async => null;
 }
 
-/// Tracks calls to loadHistory and optionally pauses them via a Completer.
+/// Tracks calls to refreshFromServer instead of making real network calls.
 class _TrackingChatNotifier extends AgenticChatNotifier {
-  int loadHistoryCount = 0;
-  Completer<void>? _pauseCompleter;
-
-  void pauseNextLoad() {
-    _pauseCompleter = Completer<void>();
-  }
-
-  void resumeLoad() {
-    final c = _pauseCompleter;
-    _pauseCompleter = null;
-    c?.complete();
-  }
+  _TrackingChatNotifier(super.sessionId);
+  int refreshCount = 0;
 
   @override
-  Future<void> loadHistory({String? afterMessageId, http.Client? client}) async {
-    loadHistoryCount++;
-    final c = _pauseCompleter;
-    if (c != null) await c.future;
+  Future<void> refreshFromServer({http.Client? client}) async {
+    refreshCount++;
   }
 }
 
-ProviderContainer _makeContainer(_TrackingChatNotifier tracker) {
+int _nextEventId = 1;
+MessagesAppendedEvent _appendedEvent(String sessionId, {DateTime? createdAt}) {
+  return MessagesAppendedEvent(
+    id: _nextEventId++,
+    createdAt: createdAt ?? DateTime.now().toUtc(),
+    sessionId: sessionId,
+  );
+}
+
+Future<ProviderContainer> _makeContainer({
+  List<Override> extraOverrides = const [],
+}) async {
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
   return ProviderContainer(
     overrides: [
       settingsProvider.overrideWith(() => _StubSettingsNotifier()),
-      agenticChatProvider.overrideWith(() => tracker),
+      sharedPreferencesProvider.overrideWithValue(prefs),
+      ...extraOverrides,
     ],
   );
 }
 
 void main() {
-  group('SseNotifier.fetchSinceCursor coalescing', () {
-    test('single call proceeds immediately', () async {
-      final tracker = _TrackingChatNotifier();
-      final container = _makeContainer(tracker);
+  group('SseNotifier — messages.appended routing', () {
+    // The coalescing behavior this file used to test lived in
+    // SseNotifier.fetchSinceCursor(); that method is gone — coalescing now
+    // lives in AgenticChatNotifier.refreshFromServer() itself (see design
+    // Decision 5) and is covered directly in agentic_chat_provider_test.dart.
+    // What's specific to SseNotifier now is the routing decision itself:
+    // an existing instance gets refreshed; a session with none gets a
+    // lightweight sessions-list bump instead (design Decision 4).
+
+    test("routes to an existing instance's refreshFromServer", () async {
+      final tracker = _TrackingChatNotifier('s1');
+      final container = await _makeContainer(
+        extraOverrides: [agenticChatProvider('s1').overrideWith(() => tracker)],
+      );
       addTearDown(container.dispose);
 
-      await container.read(sseProvider.notifier).fetchSinceCursor();
+      // Materialize the instance first — matches a displayed session.
+      final subscription = container.listen(agenticChatProvider('s1'), (_, _) {});
+      addTearDown(subscription.close);
 
-      expect(tracker.loadHistoryCount, 1);
+      final sseNotifier = container.read(sseProvider.notifier);
+      await sseNotifier.handleEventForTest(_appendedEvent('s1'));
+
+      expect(tracker.refreshCount, 1);
     });
 
-    test('sequential calls each execute independently', () async {
-      final tracker = _TrackingChatNotifier();
-      final container = _makeContainer(tracker);
+    test('does not create a new instance for a session with no live instance',
+        () async {
+      final container = await _makeContainer();
       addTearDown(container.dispose);
 
-      final notifier = container.read(sseProvider.notifier);
-      await notifier.fetchSinceCursor();
-      await notifier.fetchSinceCursor();
+      final sseNotifier = container.read(sseProvider.notifier);
+      await sseNotifier.handleEventForTest(_appendedEvent('never-watched'));
 
-      expect(tracker.loadHistoryCount, 2);
+      expect(
+        container.exists(agenticChatProvider('never-watched')),
+        isFalse,
+        reason: 'the SSE handler itself must not be a reason instances get '
+            'created — that would defeat the memory bound the disposal '
+            'policy relies on',
+      );
     });
 
-    test('concurrent call while in-flight coalesces into one refetch', () async {
-      final tracker = _TrackingChatNotifier();
-      tracker.pauseNextLoad();
-      final container = _makeContainer(tracker);
+    test('bumps the sessions list activity for a session with no live instance',
+        () async {
+      final container = await _makeContainer();
       addTearDown(container.dispose);
 
-      final notifier = container.read(sseProvider.notifier);
+      final oldTime = DateTime.utc(2020, 1, 1);
+      container.read(sessionsProvider.notifier).addSession(
+            SessionInfo(
+              sessionId: 'bg-session',
+              title: 'Background',
+              createdAt: oldTime,
+              updatedAt: oldTime,
+            ),
+          );
 
-      final first = notifier.fetchSinceCursor();
-      // Second call arrives while first is paused — should set pending, not start new load
-      unawaited(notifier.fetchSinceCursor());
+      final newTime = DateTime.utc(2025, 6, 1);
+      final sseNotifier = container.read(sseProvider.notifier);
+      await sseNotifier.handleEventForTest(
+        _appendedEvent('bg-session', createdAt: newTime),
+      );
 
-      tracker.resumeLoad();
-      await first;
-
-      // Allow pending refetch to complete
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-
-      // Total: original + one coalesced refetch
-      expect(tracker.loadHistoryCount, 2);
+      final sessions = container.read(sessionsProvider).sessions;
+      expect(sessions.first.sessionInfo.sessionId, 'bg-session');
+      expect(sessions.first.sessionInfo.updatedAt, newTime);
+      expect(
+        container.exists(agenticChatProvider('bg-session')),
+        isFalse,
+        reason: 'a lightweight activity bump must not materialize the full '
+            'chat-state instance',
+      );
     });
 
-    test('multiple concurrent calls coalesce into one refetch', () async {
-      final tracker = _TrackingChatNotifier();
-      tracker.pauseNextLoad();
-      final container = _makeContainer(tracker);
+    test(
+        'an older/out-of-order created_at does not regress an already-newer timestamp',
+        () async {
+      final container = await _makeContainer();
       addTearDown(container.dispose);
 
-      final notifier = container.read(sseProvider.notifier);
+      final newTime = DateTime.utc(2025, 6, 1);
+      container.read(sessionsProvider.notifier).addSession(
+            SessionInfo(
+              sessionId: 'bg-session',
+              title: 'Background',
+              createdAt: newTime,
+              updatedAt: newTime,
+            ),
+          );
 
-      final first = notifier.fetchSinceCursor();
-      unawaited(notifier.fetchSinceCursor());
-      unawaited(notifier.fetchSinceCursor());
-      unawaited(notifier.fetchSinceCursor());
+      final olderTime = DateTime.utc(2020, 1, 1);
+      final sseNotifier = container.read(sseProvider.notifier);
+      await sseNotifier.handleEventForTest(
+        _appendedEvent('bg-session', createdAt: olderTime),
+      );
 
-      tracker.resumeLoad();
-      await first;
-
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-
-      // Still only 2: the original + one coalesced refetch regardless of how
-      // many calls arrived while in-flight
-      expect(tracker.loadHistoryCount, 2);
-    });
-
-    test('no pending refetch when second call arrives after first completes', () async {
-      final tracker = _TrackingChatNotifier();
-      final container = _makeContainer(tracker);
-      addTearDown(container.dispose);
-
-      final notifier = container.read(sseProvider.notifier);
-
-      await notifier.fetchSinceCursor();
-      // Not concurrent — arrives after first is done
-      await notifier.fetchSinceCursor();
-
-      expect(tracker.loadHistoryCount, 2);
+      final sessions = container.read(sessionsProvider).sessions;
+      expect(sessions.first.sessionInfo.updatedAt, newTime);
     });
   });
 }

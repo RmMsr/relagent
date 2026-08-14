@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show KeepAliveLink;
 import 'package:http/http.dart' as http;
 
 import '/agentic/models.dart';
 import '/agentic/services.dart';
+import '/providers/displayed_session_provider.dart';
 import '/providers/sessions_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/tts_provider.dart';
@@ -80,40 +84,138 @@ class AgenticChatState {
   }
 }
 
-final agenticChatProvider =
-    NotifierProvider<AgenticChatNotifier, AgenticChatState>(() {
-      return AgenticChatNotifier();
-    });
+/// One isolated instance per session. A response for session A can never be
+/// applied to session B's state, because they are different instances —
+/// see `specs/agentic-chat/spec.md`'s Session Isolation requirement.
+final agenticChatProvider = NotifierProvider.autoDispose
+    .family<AgenticChatNotifier, AgenticChatState, String>(
+      (sessionId) => AgenticChatNotifier(sessionId),
+    );
 
 class AgenticChatNotifier extends Notifier<AgenticChatState> {
+  static const _idleLinger = Duration(milliseconds: 500);
+
+  final String sessionId;
+  Timer? _lingerTimer;
+  KeepAliveLink? _keepAliveLink;
+  // Riverpod forbids reading `state`/`ref` from inside onCancel/onResume
+  // (`_debugCallbackStack` guard) — this plain field mirrors
+  // `state.isAwaiting` so onCancel can check it without touching `state`.
+  bool _isAwaiting = false;
+
+  AgenticChatNotifier(this.sessionId);
+
   @override
   AgenticChatState build() {
-    // The queued message is per-session by intent (it's about to be sent on
-    // *this* session). Drop it whenever the active session id changes so a
-    // queue created in session A can never auto-dispatch to session B.
-    ref.listen(
-      settingsProvider.select((s) => s.agenticSessionId),
-      (previous, next) {
-        if (previous != next && state.queuedMessage != null) {
-          Logger.debug(
-            'AgenticChat: Active session changed — dropping queued message',
-          );
-          state = state.copyWith(clearQueuedMessage: true);
-        }
-      },
-    );
-    // Clear chat whenever the engine URL changes so stale messages from the
-    // previous server are not shown. This avoids the circular dependency that
-    // arises when SettingsNotifier tries to reach into agenticChatProvider.
-    ref.listen(
-      settingsProvider.select((s) => s.engineBaseUrl),
-      (previous, next) {
-        if (previous != null && previous != next) {
-          clearMessages();
-        }
-      },
-    );
+    // Disposal policy: while this session has an unwatched but genuinely
+    // idle instance, allow a short linger before disposal so a quick flip
+    // back to it reuses the still-warm state. While a cycle is actually in
+    // flight, hold indefinitely regardless of watch state — a background
+    // approval must not be silently dropped. See design Decision 3.
+    ref.onCancel(() {
+      if (_isAwaiting) return; // already held indefinitely by the setter
+      // Riverpod forbids calling ref.keepAlive() synchronously from within
+      // a life-cycle callback (`_debugCallbackStack` guard covers
+      // onCancel/onResume/onDispose alike). Defer to the next microtask —
+      // by then the callback-stack restriction has cleared — and re-check
+      // ref.mounted (a plain getter, unrestricted) since disposal could in
+      // principle have already completed by the time this runs.
+      scheduleMicrotask(() {
+        if (ref.mounted) _armIdleLinger();
+      });
+    });
+    ref.onResume(() {
+      _lingerTimer?.cancel();
+      _lingerTimer = null;
+      _keepAliveLink?.close();
+      _keepAliveLink = null;
+    });
+    ref.onDispose(() {
+      _lingerTimer?.cancel();
+    });
+
     return AgenticChatState.initial();
+  }
+
+  // `listenSelf` isn't reachable from a hand-written (non-codegen) Notifier
+  // in this Riverpod version, so the same "react to every state change"
+  // hook is done by overriding the setter instead. Does not fire for the
+  // initial `build()` return value — the framework sets that via a
+  // different internal path — but that value is always non-awaiting, so
+  // there is nothing to arm here for it.
+  @override
+  set state(AgenticChatState value) {
+    super.state = value;
+    _isAwaiting = value.isAwaiting;
+    if (_isAwaiting) {
+      _lingerTimer?.cancel();
+      _lingerTimer = null;
+      _keepAliveLink ??= ref.keepAlive();
+    } else {
+      _armIdleLinger();
+    }
+  }
+
+  void _armIdleLinger() {
+    _lingerTimer?.cancel();
+    _keepAliveLink ??= ref.keepAlive();
+    _lingerTimer = Timer(_idleLinger, () {
+      _keepAliveLink?.close();
+      _keepAliveLink = null;
+    });
+  }
+
+  /// Seeds a freshly-created session's instance with its first exchange,
+  /// right after the engine assigns it a session id (see
+  /// `NewChatDraftNotifier.sendMessage`).
+  void seedFirstExchange({
+    required AgenticMessage userMessage,
+    required AgenticMessage response,
+    required SensitivityLevel sensitivityLevel,
+  }) {
+    if (response.isFinal) {
+      _ingestMessages([userMessage.copyWith(isFinal: true), response]);
+    } else {
+      _ingestMessages([userMessage, response]);
+    }
+    state = state.copyWith(sensitivityLevel: sensitivityLevel);
+  }
+
+  bool _refreshInFlight = false;
+  bool _refreshPending = false;
+
+  /// Fetch anything new since the last known final message (or everything,
+  /// if none is known yet — a fresh instance naturally has none) and merge
+  /// it in. The single entry point for "make sure this matches the server":
+  /// used on first display, session switch, app resume, and SSE-triggered
+  /// refresh alike. Cheap when nothing changed, correct regardless of
+  /// source (see design Decision 5).
+  ///
+  /// Coalesces concurrent calls (e.g. rapid-fire SSE events for this same
+  /// session): if a fetch is already in flight, marks one more re-fetch
+  /// pending rather than firing overlapping requests.
+  Future<void> refreshFromServer({
+    @visibleForTesting http.Client? client,
+  }) async {
+    if (!ref.mounted) return;
+    if (_refreshInFlight) {
+      _refreshPending = true;
+      return;
+    }
+    _refreshInFlight = true;
+    try {
+      final finalMessages = state.messages.where((m) => m.isFinal);
+      final cursor = finalMessages.isEmpty
+          ? null
+          : finalMessages.last.messageId;
+      await loadHistory(afterMessageId: cursor, client: client);
+    } finally {
+      _refreshInFlight = false;
+      if (_refreshPending) {
+        _refreshPending = false;
+        if (ref.mounted) unawaited(refreshFromServer(client: client));
+      }
+    }
   }
 
   @visibleForTesting
@@ -123,13 +225,6 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
   }) async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final sessionId = settings.agenticSessionId;
-
-    // No session yet - nothing to load
-    if (sessionId == null) {
-      Logger.debug('AgenticChat: No session ID, skipping history load');
-      return;
-    }
 
     state = state.copyWith(isLoadingHistory: true, error: null);
 
@@ -147,6 +242,12 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         apiKey: apiKey,
         client: client,
       );
+
+      // Disposed mid-flight (e.g. the idle linger ran out while this
+      // request was still in the air, or the whole container tore down).
+      // Nothing left to apply this to — and touching `state`/`ref` past
+      // disposal throws.
+      if (!ref.mounted) return;
 
       final sensitivityLevel = historyData.sensitivityLevel;
       final messages = historyData.messages;
@@ -181,6 +282,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         );
       }
     } catch (e) {
+      if (!ref.mounted) return;
       Logger.debug('AgenticChat: Failed to load history: $e');
       state = state.copyWith(
         isLoadingHistory: false,
@@ -189,7 +291,10 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     }
   }
 
-  Future<void> sendMessage(String text) async {
+  Future<void> sendMessage(
+    String text, {
+    @visibleForTesting http.Client? client,
+  }) async {
     if (text.trim().isEmpty) return;
 
     // Strict-ordering: if a cycle is in flight, hold the message in the
@@ -200,13 +305,15 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       return;
     }
 
-    await _dispatchUserMessage(AgenticMessage.user(text));
+    await _dispatchUserMessage(AgenticMessage.user(text), client: client);
   }
 
-  Future<void> _dispatchUserMessage(AgenticMessage userMessage) async {
+  Future<void> _dispatchUserMessage(
+    AgenticMessage userMessage, {
+    @visibleForTesting http.Client? client,
+  }) async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final sessionId = settings.agenticSessionId;
 
     // Optimistic add (in-flight: isFinal defaults to false)
     _ingestMessages([userMessage]);
@@ -226,37 +333,12 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         username: settings.engineUsername,
         password: password,
         apiKey: apiKey,
+        client: client,
       );
 
+      if (!ref.mounted) return;
+
       final response = chatResponse.message;
-      final bool isNewSession =
-          response.sessionId != null && response.sessionId != sessionId;
-
-      if (isNewSession) {
-        await settingsNotifier.setAgenticSessionId(response.sessionId!);
-        Logger.debug('AgenticChat: Stored new session ID: ${response.sessionId}');
-
-        // Apply locally-chosen sensitivity to the newly created session
-        if (state.sensitivityLevel != chatResponse.sensitivityLevel) {
-          try {
-            await setSensitivityLevel(
-              baseUrl: settings.engineBaseUrl,
-              sessionId: response.sessionId!,
-              sensitivityValue: state.sensitivityLevel.value,
-              authType: settings.engineAuthType,
-              username: settings.engineUsername,
-              password: password,
-              apiKey: apiKey,
-            );
-            Logger.debug(
-              'AgenticChat: Applied sensitivity ${state.sensitivityLevel.label} '
-              'to new session',
-            );
-          } catch (e) {
-            Logger.debug('AgenticChat: Failed to apply sensitivity: $e');
-          }
-        }
-      }
 
       if (response.isFinal) {
         final settled = state.messages
@@ -270,8 +352,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       state = state.copyWith(
         isLoading: false,
         showAssistantPending: false,
-        sensitivityLevel:
-            isNewSession ? state.sensitivityLevel : chatResponse.sensitivityLevel,
+        sensitivityLevel: chatResponse.sensitivityLevel,
       );
 
       final preview = response.text.length > 50
@@ -285,6 +366,8 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
       if (response.isFinal) _dispatchQueuedIfAny();
     } catch (e) {
+      if (!ref.mounted) return;
+
       final errorText = e is EngineApiException ? e.userMessage : e.toString();
       final technicalDetails = e is EngineApiException ? e.technicalDetails : null;
 
@@ -357,54 +440,38 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     sendMessage(queued);
   }
 
-  Future<void> clearChat() async {
-    // Clear session ID so next message starts a new session
-    await ref.read(settingsProvider.notifier).clearAgenticSessionId();
-
-    // Clear messages and session title
-    state = AgenticChatState.initial();
-
-    // Clear TTS queue
-    ref.read(ttsProvider.notifier).onChatCleared();
-
-    Logger.debug('AgenticChat: Chat cleared and session reset');
-  }
-
-  /// Deletes the current session on the server, removes it from the sessions
-  /// list, then starts a fresh empty session.
+  /// Deletes this session on the server, removes it from the sessions list,
+  /// then hands display back to the "start a new chat" draft.
   Future<void> purgeSession() async {
     final settings = ref.read(settingsProvider);
-    final sessionId = settings.agenticSessionId;
 
-    if (sessionId != null) {
-      try {
-        final settingsNotifier = ref.read(settingsProvider.notifier);
-        final password = await settingsNotifier.getEnginePassword();
-        final apiKey = await settingsNotifier.getEngineApiKey();
+    try {
+      final settingsNotifier = ref.read(settingsProvider.notifier);
+      final password = await settingsNotifier.getEnginePassword();
+      final apiKey = await settingsNotifier.getEngineApiKey();
 
-        await deleteSessionApi(
-          baseUrl: settings.engineBaseUrl,
-          sessionId: sessionId,
-          authType: settings.engineAuthType,
-          username: settings.engineUsername,
-          password: password,
-          apiKey: apiKey,
-        );
+      await deleteSessionApi(
+        baseUrl: settings.engineBaseUrl,
+        sessionId: sessionId,
+        authType: settings.engineAuthType,
+        username: settings.engineUsername,
+        password: password,
+        apiKey: apiKey,
+      );
 
-        ref.read(sessionsProvider.notifier).removeSession(sessionId);
+      if (!ref.mounted) return;
+      ref.read(sessionsProvider.notifier).removeSession(sessionId);
 
-        Logger.debug('AgenticChat: Purged session $sessionId');
-      } catch (e) {
-        // Continue with clearing chat even if deletion fails
-        Logger.debug('AgenticChat: Failed to purge session: $e');
-      }
+      Logger.debug('AgenticChat: Purged session $sessionId');
+    } catch (e) {
+      // Continue with clearing chat even if deletion fails
+      Logger.debug('AgenticChat: Failed to purge session: $e');
     }
 
-    await clearChat();
-  }
-
-  void clearMessages() {
-    state = AgenticChatState.initial();
+    if (!ref.mounted) return;
+    ref.read(displayedSessionProvider.notifier).show(null);
+    await ref.read(settingsProvider.notifier).clearAgenticSessionId();
+    if (!ref.mounted) return;
     ref.read(ttsProvider.notifier).onChatCleared();
   }
 
@@ -415,11 +482,6 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
   Future<void> loadSessionInfo() async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final sessionId = settings.agenticSessionId;
-
-    if (sessionId == null) {
-      return;
-    }
 
     try {
       final password = await settingsNotifier.getEnginePassword();
@@ -434,6 +496,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         apiKey: apiKey,
       );
 
+      if (!ref.mounted) return;
       state = state.copyWith(sessionTitle: sessionInfo.title);
       Logger.debug('AgenticChat: Loaded session title: ${sessionInfo.title}');
     } catch (e) {
@@ -446,13 +509,10 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
   /// Marks any pending approval messages as stale.
   Future<void> changeSensitivity(SensitivityLevel newLevel) async {
     final settings = ref.read(settingsProvider);
-    final sessionId = settings.agenticSessionId;
     final previousLevel = state.sensitivityLevel;
 
     // Optimistic update
     state = state.copyWith(sensitivityLevel: newLevel);
-
-    if (sessionId == null) return;
 
     final settingsNotifier = ref.read(settingsProvider.notifier);
 
@@ -490,7 +550,9 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       Logger.debug('AgenticChat: Sensitivity changed to ${newLevel.label}');
     } catch (e) {
       // Revert on failure
-      state = state.copyWith(sensitivityLevel: previousLevel);
+      if (ref.mounted) {
+        state = state.copyWith(sensitivityLevel: previousLevel);
+      }
       Logger.debug('AgenticChat: Failed to change sensitivity: $e');
       rethrow;
     }
@@ -507,12 +569,10 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     required String approvalId,
     required GrantRequest grant,
     required bool isGlobal,
+    @visibleForTesting http.Client? client,
   }) async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final sessionId = settings.agenticSessionId;
-
-    if (sessionId == null) return;
 
     try {
       final password = await settingsNotifier.getEnginePassword();
@@ -538,8 +598,10 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         username: settings.engineUsername,
         password: password,
         apiKey: apiKey,
+        client: client,
       );
 
+      if (!ref.mounted) return;
       _updateApprovalResolution(
         approvalId,
         ApprovalResolution.granted,
@@ -549,6 +611,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       Logger.debug('AgenticChat: Granted approval $approvalId');
     } catch (e) {
       Logger.debug('AgenticChat: Failed to grant approval: $e');
+      if (!ref.mounted) return;
       final errorText = e is EngineApiException ? e.userMessage : e.toString();
       final technicalDetails =
           e is EngineApiException ? e.technicalDetails : null;
@@ -568,9 +631,6 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final sessionId = settings.agenticSessionId;
-
-    if (sessionId == null) return;
 
     try {
       final password = await settingsNotifier.getEnginePassword();
@@ -595,6 +655,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       rethrow;
     }
 
+    if (!ref.mounted) return;
     await triggerContinuation();
   }
 
@@ -605,9 +666,6 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final sessionId = settings.agenticSessionId;
-
-    if (sessionId == null) return;
 
     try {
       final password = await settingsNotifier.getEnginePassword();
@@ -633,12 +691,9 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
   /// Stop the in-flight cycle — engine settles by declining undecided
   /// approvals and marking all in-flight messages final. No assistant
   /// response is produced for the stopped cycle.
-  Future<void> stopCycle() async {
+  Future<void> stopCycle({@visibleForTesting http.Client? client}) async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final sessionId = settings.agenticSessionId;
-
-    if (sessionId == null) return;
 
     try {
       final password = await settingsNotifier.getEnginePassword();
@@ -651,8 +706,10 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         username: settings.engineUsername,
         password: password,
         apiKey: apiKey,
+        client: client,
       );
 
+      if (!ref.mounted) return;
       _ingestMessages(settled);
       state = state.copyWith(isLoading: false, showAssistantPending: false);
 
@@ -665,12 +722,11 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
   }
 
   /// Continue the session — triggers an agent run with current state.
-  Future<void> triggerContinuation() async {
+  Future<void> triggerContinuation({
+    @visibleForTesting http.Client? client,
+  }) async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final sessionId = settings.agenticSessionId;
-
-    if (sessionId == null) return;
 
     state = state.copyWith(
       isLoading: true,
@@ -688,7 +744,10 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
         username: settings.engineUsername,
         password: password,
         apiKey: apiKey,
+        client: client,
       );
+
+      if (!ref.mounted) return;
 
       final response = chatResponse.message;
       if (response.isFinal) {
@@ -709,6 +768,8 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       Logger.debug('AgenticChat: Continuation response received');
       if (response.isFinal) _dispatchQueuedIfAny();
     } catch (e) {
+      if (!ref.mounted) return;
+
       final errorText = e is EngineApiException ? e.userMessage : e.toString();
       final technicalDetails =
           e is EngineApiException ? e.technicalDetails : null;
@@ -861,6 +922,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     // response (or a new error) is appended after the preserved error.
     for (final userMsg in retryMessages) {
       await _dispatchUserMessage(userMsg);
+      if (!ref.mounted) break;
       if (state.messages.isNotEmpty &&
           state.messages.last.role == AgenticRole.error) {
         break;

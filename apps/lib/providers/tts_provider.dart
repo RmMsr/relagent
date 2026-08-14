@@ -176,6 +176,14 @@ class TtsNotifier extends Notifier<TtsState> {
         _clearInitError();
         _handleTtsModelChanged();
       }
+      // Stop reading whatever was queued from the previous server once the
+      // engine URL changes — this notifier depends on settingsProvider, so
+      // it must react to the change itself rather than settingsProvider
+      // reaching back into it (that direction trips Riverpod's circular-
+      // dependency safety check).
+      if (previous != null && previous.engineBaseUrl != next.engineBaseUrl) {
+        onChatCleared();
+      }
     });
 
     // Listen to playback state to update our internal message states

@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '/providers/agentic_chat_provider.dart';
+import '/providers/displayed_session_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/sessions_provider.dart';
+import '/providers/tts_provider.dart';
 
 class SessionsPage extends ConsumerStatefulWidget {
   const SessionsPage({super.key});
@@ -40,13 +42,15 @@ class _SessionsPageState extends ConsumerState<SessionsPage> {
   }
 
   Future<void> _switchToSession(String sessionId) async {
-    final settingsNotifier = ref.read(settingsProvider.notifier);
+    ref.read(displayedSessionProvider.notifier).show(sessionId);
+    await ref.read(settingsProvider.notifier).setAgenticSessionId(sessionId);
 
-    await settingsNotifier.setAgenticSessionId(sessionId);
-
-    // Reload chat for the new session
-    await ref.read(agenticChatProvider.notifier).loadHistory();
-    await ref.read(agenticChatProvider.notifier).loadSessionInfo();
+    // Reconcile against the server rather than an unconditional full
+    // reload — cheap if this instance is already warm, correct regardless
+    // (see design Decision 5).
+    final notifier = ref.read(agenticChatProvider(sessionId).notifier);
+    await notifier.refreshFromServer();
+    await notifier.loadSessionInfo();
 
     if (mounted) {
       context.go('/chat');
@@ -83,14 +87,11 @@ class _SessionsPageState extends ConsumerState<SessionsPage> {
           .deleteSession(sessionId);
 
       if (success) {
-        // Check if the deleted session was the active session
-        final settings = ref.read(settingsProvider);
-        if (settings.agenticSessionId == sessionId) {
-          // Clear the active session from settings
+        // Check if the deleted session was the displayed one
+        if (ref.read(displayedSessionProvider) == sessionId) {
+          ref.read(displayedSessionProvider.notifier).show(null);
           await ref.read(settingsProvider.notifier).clearAgenticSessionId();
-
-          // Clear the chat state to start a new empty session
-          ref.read(agenticChatProvider.notifier).clearChat();
+          ref.read(ttsProvider.notifier).onChatCleared();
 
           if (mounted) {
             // Show a snackbar to inform the user
