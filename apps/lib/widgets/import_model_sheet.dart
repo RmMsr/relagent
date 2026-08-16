@@ -195,7 +195,7 @@ class _ImportModelSheetState extends State<_ImportModelSheet> {
                   Expanded(
                     child: Text(
                       'Detected: ${architectureLabel(widget.detectedArchitecture!)}. '
-                      'Wrong architecture will crash the app.',
+                      'Wrong architecture might crash the app.',
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: theme.colorScheme.error),
                     ),

@@ -110,22 +110,40 @@ class ModelDownloadService {
     _activeModelId = entry.id;
 
     try {
-      final request = http.Request('GET', Uri.parse(entry.downloadUrl));
-      final response = await client.send(request);
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File(p.join(tempDir.path, '${entry.id}.tar.bz2'));
+      var existingBytes =
+          await tempFile.exists() ? await tempFile.length() : 0;
 
-      if (response.statusCode != 200) {
+      var response = await client.send(_buildRequest(entry, existingBytes));
+
+      if (existingBytes > 0 && response.statusCode != 206) {
+        // The server ignored our Range request (or the partial file no
+        // longer matches what it would serve) — drop it and start over
+        // instead of appending onto or corrupting the archive.
+        Logger.info(
+          'Resume not honored for ${entry.id}; restarting download',
+        );
+        if (await tempFile.exists()) await tempFile.delete();
+        existingBytes = 0;
+        response = await client.send(_buildRequest(entry, existingBytes));
+      }
+
+      if (response.statusCode != 200 && response.statusCode != 206) {
         throw HttpException(
           'Download failed: HTTP ${response.statusCode}',
           uri: Uri.parse(entry.downloadUrl),
         );
       }
 
-      final totalBytes = response.contentLength ?? 0;
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File(p.join(tempDir.path, '${entry.id}.tar.bz2'));
-
-      final sink = tempFile.openWrite();
-      var bytesReceived = 0;
+      final isResuming = existingBytes > 0 && response.statusCode == 206;
+      // existingBytes is 0 whenever isResuming is false, so this covers both
+      // a fresh download and a resumed one.
+      final totalBytes = existingBytes + (response.contentLength ?? 0);
+      final sink = tempFile.openWrite(
+        mode: isResuming ? FileMode.append : FileMode.write,
+      );
+      var bytesReceived = existingBytes;
 
       try {
         await for (final chunk in response.stream) {
@@ -143,20 +161,41 @@ class ModelDownloadService {
         await sink.close();
       } catch (e) {
         await sink.close();
-        if (await tempFile.exists()) await tempFile.delete();
+        // Keep the partial file on disk so the next attempt can resume
+        // instead of redownloading a possibly multi-minute transfer from
+        // scratch — this can't distinguish a cancellation from a genuine
+        // failure, but resuming is safe either way.
         rethrow;
       }
 
       Logger.info('Downloaded ${entry.id}: $bytesReceived bytes');
       return tempFile;
     } on http.ClientException {
-      // Client was closed (cancellation)
-      Logger.info('Download cancelled for ${entry.id}');
-      return null;
+      // cancelDownload() nulls _activeClient before calling client.close(),
+      // so by the time that close() surfaces here as a ClientException,
+      // _activeClient is already null only for a deliberate cancellation.
+      // A dropped connection (e.g. a flaky mobile network mid-download)
+      // throws this same exception type but leaves _activeClient set, so it
+      // must be treated as a real failure, not swallowed as a no-op.
+      if (_activeClient == null) {
+        Logger.info('Download cancelled for ${entry.id}');
+        return null;
+      }
+      rethrow;
     } finally {
       _activeClient = null;
       _activeModelId = null;
     }
+  }
+
+  /// Builds the GET request for a download, adding a Range header to
+  /// continue from [existingBytes] when resuming a partial download.
+  http.Request _buildRequest(CatalogEntry entry, int existingBytes) {
+    final request = http.Request('GET', Uri.parse(entry.downloadUrl));
+    if (existingBytes > 0) {
+      request.headers['Range'] = 'bytes=$existingBytes-';
+    }
+    return request;
   }
 
   /// Extract a .tar.bz2 archive to the model directory.

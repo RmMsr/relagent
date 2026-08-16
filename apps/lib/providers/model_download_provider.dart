@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '/models/model_catalog.dart';
 import '/voice/model_download_service.dart';
@@ -68,7 +69,34 @@ final modelDownloadProvider =
     });
 
 class ModelDownloadNotifier extends Notifier<ModelDownloadState> {
+  /// Max attempts for a single downloadModel() call, including the first.
+  /// Downloads resume from where they left off (ModelDownloadService keeps
+  /// the partial file between attempts), so a retry here just continues an
+  /// interrupted transfer instead of redoing it from scratch.
+  static const _maxAttempts = 4;
+  static const _retryDelay = Duration(seconds: 2);
+
   late final ModelDownloadService _service;
+
+  /// Model IDs whose in-progress download was cancelled by the user, so the
+  /// retry loop in [downloadModel] knows to stop even if cancellation lands
+  /// during the delay between attempts rather than mid-request.
+  final _cancelledIds = <String>{};
+
+  /// Number of downloads currently holding the wakelock. Downloads can run
+  /// concurrently, so this is reference-counted rather than a plain bool —
+  /// the lock should only release once every active download is done.
+  int _wakelockHolders = 0;
+
+  Future<void> _acquireWakelock() async {
+    _wakelockHolders++;
+    if (_wakelockHolders == 1) await WakelockPlus.enable();
+  }
+
+  Future<void> _releaseWakelock() async {
+    if (_wakelockHolders > 0) _wakelockHolders--;
+    if (_wakelockHolders == 0) await WakelockPlus.disable();
+  }
 
   @override
   ModelDownloadState build() {
@@ -98,6 +126,7 @@ class ModelDownloadNotifier extends Notifier<ModelDownloadState> {
 
     if (state.isDownloadingModel(modelId)) return;
 
+    _cancelledIds.remove(modelId);
     _updateProgress(modelId, DownloadProgress(
       modelId: modelId,
       bytesReceived: 0,
@@ -105,32 +134,63 @@ class ModelDownloadNotifier extends Notifier<ModelDownloadState> {
     ));
     state = state.copyWith(error: () => null);
 
+    Object? lastError;
+    // Held for the whole retry loop: on Android, the CPU going into deep
+    // sleep once the screen locks can pause an in-flight socket, which is a
+    // common cause of a long download dying partway through.
+    await _acquireWakelock();
     try {
-      await _service.downloadModel(
-        entry,
-        onProgress: (progress) => _updateProgress(modelId, progress),
-      );
+      for (var attempt = 1; attempt <= _maxAttempts; attempt++) {
+        if (_cancelledIds.contains(modelId)) break;
+        try {
+          await _service.downloadModel(
+            entry,
+            onProgress: (progress) => _updateProgress(modelId, progress),
+          );
+          lastError = null;
+          break;
+        } catch (e) {
+          lastError = e;
+          if (attempt == _maxAttempts || _cancelledIds.contains(modelId)) {
+            break;
+          }
+          // The service keeps the partial file on disk, so this retry
+          // resumes the transfer instead of starting over.
+          await Future<void>.delayed(_retryDelay);
+        }
+      }
+    } finally {
+      await _releaseWakelock();
+    }
 
-      // Signal extracting phase while scanning filesystem.
-      _updateProgress(modelId, DownloadProgress(
-        modelId: modelId,
-        bytesReceived: 0,
-        totalBytes: 0,
-        isExtracting: true,
-      ));
-      await _refreshDownloadedModels();
+    if (lastError != null) {
       _removeProgress(modelId);
-      state = state.copyWith(
-        lastCompletedModelName: () => entry.displayName,
-      );
-    } catch (e) {
-      _removeProgress(modelId);
-      state = state.copyWith(error: () => 'Download failed: $e');
+      state = state.copyWith(error: () => 'Download failed: $lastError');
+      return;
+    }
+
+    // Signal extracting phase while scanning filesystem.
+    _updateProgress(modelId, DownloadProgress(
+      modelId: modelId,
+      bytesReceived: 0,
+      totalBytes: 0,
+      isExtracting: true,
+    ));
+    await _refreshDownloadedModels();
+    _removeProgress(modelId);
+
+    // downloadModel() also returns normally on a deliberate cancellation
+    // (nothing thrown, nothing extracted), so only report completion if the
+    // model actually ended up downloaded — otherwise a cancelled transfer
+    // would show a misleading "downloaded" notification.
+    if (state.isDownloaded(modelId)) {
+      state = state.copyWith(lastCompletedModelName: () => entry.displayName);
     }
   }
 
   /// Cancel a specific download.
   void cancelDownload(String modelId) {
+    _cancelledIds.add(modelId);
     _service.cancelDownload(modelId);
     _removeProgress(modelId);
   }

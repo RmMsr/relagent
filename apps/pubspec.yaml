@@ -38,6 +38,7 @@ dependencies:
   receive_sharing_intent: ">=1.8.1 <1.9.0"
   file_picker: ^11.0.2
   archive: ^4.0.9
+  wakelock_plus: ^1.5.2
 
 dev_dependencies:
   flutter_test:
@@ -47,6 +48,7 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   mockito: ^5.6.1
   build_runner: ^2.10.4
+  wakelock_plus_platform_interface: ^1.6.0
 
 flutter:
   uses-material-design: true
