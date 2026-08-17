@@ -29,8 +29,16 @@ ModelArchitecture? detectArchitecture(List<String> entryNames) {
   final hasEspeak = entryNames.any((e) => e.contains('espeak-ng-data'));
   final hasNemo = entryNames.any((e) => e.toLowerCase().contains('nemo'));
 
-  // Transducer: encoder + decoder + joiner (covers Zipformer and NeMo transducer)
-  if (hasEncoder && hasDecoder && hasJoiner) return ModelArchitecture.transducer;
+  // encoder + decoder + joiner covers both live Transducer (Zipformer) and
+  // chunked NeMo Transducer exports — the layout alone can't tell them apart
+  // (see isAmbiguousTransducerShape). "nemo" in the path is a weak hint
+  // toward the chunked NeMo export, but not proof: some NeMo *streaming*
+  // exports (e.g. "nemotron") also use this layout and are actually live.
+  if (hasEncoder && hasDecoder && hasJoiner) {
+    return hasNemo
+        ? ModelArchitecture.offlineNemoTransducer
+        : ModelArchitecture.transducer;
+  }
 
   // Piper VITS: single model file + espeak data (TTS)
   if (hasModel && hasEspeak) return ModelArchitecture.vitsPiper;
@@ -43,4 +51,22 @@ ModelArchitecture? detectArchitecture(List<String> entryNames) {
   if (hasModel && hasTokens) return ModelArchitecture.ctc;
 
   return null;
+}
+
+/// Whether [entryNames] match the encoder+decoder+joiner layout shared by
+/// both live Transducer and chunked NeMo Transducer. [detectArchitecture]
+/// always has to guess one of the two for this shape, but the guess (even
+/// the "nemo"-in-path hint) is never reliable enough to trust outright.
+bool isAmbiguousTransducerShape(List<String> entryNames) {
+  final names = entryNames.map((e) => e.split('/').last.toLowerCase()).toSet();
+  final hasEncoder = names.any(
+    (n) => n.startsWith('encoder') && n.endsWith('.onnx'),
+  );
+  final hasDecoder = names.any(
+    (n) => n.startsWith('decoder') && n.endsWith('.onnx'),
+  );
+  final hasJoiner = names.any(
+    (n) => n.startsWith('joiner') && n.endsWith('.onnx'),
+  );
+  return hasEncoder && hasDecoder && hasJoiner;
 }

@@ -16,6 +16,7 @@ import '/providers/voice_service_provider.dart';
 import '/services/api_health_check.dart';
 import '/utils/settings_navigation.dart';
 import '/voice/model_resolver.dart';
+import '/widgets/import_model_sheet.dart' show architectureLabel;
 import '/widgets/settings_apply_bar.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -703,7 +704,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('${entry.displayName} · ${entry.downloadSizeMb.round()} MB'),
-          Text(id, style: muted),
+          Wrap(
+            spacing: 8,
+            runSpacing: 2,
+            children: [
+              Text(id, style: muted),
+              Text(architectureLabel(entry.architecture), style: muted),
+            ],
+          ),
         ],
       );
     }
@@ -713,7 +721,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('${imported.displayName} · Imported'),
-          Text(id, style: muted),
+          Wrap(
+            spacing: 8,
+            runSpacing: 2,
+            children: [
+              Text(id, style: muted),
+              Text(architectureLabel(imported.architecture), style: muted),
+            ],
+          ),
         ],
       );
     }

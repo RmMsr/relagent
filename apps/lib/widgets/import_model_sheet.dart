@@ -10,6 +10,8 @@ Future<ImportedModelEntry?> showImportModelSheet(
   BuildContext context, {
   required String suggestedName,
   ModelArchitecture? detectedArchitecture,
+  ModelArchitecture? initialArchitecture,
+  bool isAmbiguousShape = false,
   ModelType initialType = ModelType.asr,
   List<String> initialLanguages = const [],
 }) {
@@ -20,6 +22,8 @@ Future<ImportedModelEntry?> showImportModelSheet(
     builder: (_) => _ImportModelSheet(
       suggestedName: suggestedName,
       detectedArchitecture: detectedArchitecture,
+      initialArchitecture: initialArchitecture ?? detectedArchitecture,
+      isAmbiguousShape: isAmbiguousShape,
       initialType: initialType,
       initialLanguages: initialLanguages,
     ),
@@ -28,13 +32,24 @@ Future<ImportedModelEntry?> showImportModelSheet(
 
 class _ImportModelSheet extends StatefulWidget {
   final String suggestedName;
+  // What re-running detection against the actual files says right now.
+  // Used only to judge/label the current pick — never to silently override it.
   final ModelArchitecture? detectedArchitecture;
+  // What the dropdown starts on: the previously-saved pick when editing, or
+  // the detected guess when importing fresh.
+  final ModelArchitecture? initialArchitecture;
+  // Whether the files match the encoder+decoder+joiner layout shared by
+  // live Transducer and chunked NeMo Transducer — neither guess is trustworthy
+  // here, regardless of which one detection landed on.
+  final bool isAmbiguousShape;
   final ModelType initialType;
   final List<String> initialLanguages;
 
   const _ImportModelSheet({
     required this.suggestedName,
     required this.detectedArchitecture,
+    required this.initialArchitecture,
+    required this.isAmbiguousShape,
     required this.initialType,
     required this.initialLanguages,
   });
@@ -57,10 +72,10 @@ class _ImportModelSheetState extends State<_ImportModelSheet> {
       text: widget.initialLanguages.join(', '),
     );
     _modelType = widget.initialType;
-    // Only pre-select the detected arch if it is valid for the initial type.
+    // Only pre-select the initial arch if it is valid for the initial type.
     final allowed = _modelType == ModelType.tts ? _ttsArchitectures : _asrArchitectures;
-    _architecture = allowed.contains(widget.detectedArchitecture)
-        ? widget.detectedArchitecture
+    _architecture = allowed.contains(widget.initialArchitecture)
+        ? widget.initialArchitecture
         : null;
   }
 
@@ -96,6 +111,42 @@ class _ImportModelSheetState extends State<_ImportModelSheet> {
       _modelType == ModelType.tts ? _ttsArchitectures : _asrArchitectures;
 
   bool get _canImport => _architecture != null;
+
+  // Live Transducer and chunked NeMo Transducer share the exact same files,
+  // so whichever one detection guessed isn't trustworthy — treat both picks
+  // the same way rather than only warning when they differ from the guess.
+  bool get _isAmbiguousPick =>
+      widget.isAmbiguousShape &&
+      (_architecture == ModelArchitecture.transducer ||
+          _architecture == ModelArchitecture.offlineNemoTransducer);
+
+  Widget _noteRow((String, String) labelAndRest, Color? color) {
+    final (label, rest) = labelAndRest;
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(color: color);
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('•  ', style: style),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                style: style,
+                children: [
+                  TextSpan(
+                    text: '$label ',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  TextSpan(text: rest),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _confirm() {
     final name = _nameController.text.trim().isEmpty
@@ -183,32 +234,35 @@ class _ImportModelSheetState extends State<_ImportModelSheet> {
           ),
           if (widget.detectedArchitecture != null) ...[
             const SizedBox(height: 4),
-            if (_architecture != widget.detectedArchitecture)
-              Row(
-                children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    size: 16,
-                    color: theme.colorScheme.error,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      'Detected: ${architectureLabel(widget.detectedArchitecture!)}. '
-                      'Wrong architecture might crash the app.',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.error),
-                    ),
-                  ),
-                ],
+            if (_isAmbiguousPick)
+              _noteRow(
+                (
+                  'Ambiguous format:',
+                  'if it leads to app crash, try the other Transducer.',
+                ),
+                theme.colorScheme.error,
+              ),
+            if (_isAmbiguousPick || _architecture == widget.detectedArchitecture)
+              _noteRow(
+                ('Detected:', architectureFamilyLabel(widget.detectedArchitecture!)),
+                _isAmbiguousPick
+                    ? theme.colorScheme.onSurfaceVariant
+                    : theme.colorScheme.primary,
               )
             else
-              Text(
-                'Auto-detected from archive',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.primary),
+              _noteRow(
+                (
+                  'Architecture mismatch:',
+                  'Detected ${architectureFamilyLabel(widget.detectedArchitecture!)}',
+                ),
+                theme.colorScheme.error,
               ),
           ],
+          if (_architecture != null && architectureHint(_architecture!) != null)
+            _noteRow(
+              architectureHint(_architecture!)!,
+              theme.colorScheme.onSurfaceVariant,
+            ),
           const SizedBox(height: 16),
 
           // Languages
@@ -247,18 +301,58 @@ class _ImportModelSheetState extends State<_ImportModelSheet> {
 String architectureLabel(ModelArchitecture a) {
   switch (a) {
     case ModelArchitecture.transducer:
-      return 'Transducer (Zipformer)';
+      return 'Transducer (live)';
     case ModelArchitecture.ctc:
-      return 'CTC (Paraformer / offline)';
+      return 'CTC (live)';
     case ModelArchitecture.vitsPiper:
       return 'Piper VITS (TTS)';
     case ModelArchitecture.kokoro:
       return 'Kokoro (TTS)';
     case ModelArchitecture.onlineNemoCtc:
-      return 'NeMo CTC (streaming)';
+      return 'NeMo CTC (live)';
     case ModelArchitecture.offlineNemoTransducer:
-      return 'NeMo Transducer (offline)';
+      return 'NeMo Transducer (chunked)';
     case ModelArchitecture.pocket:
       return 'Pocket (TTS)';
+  }
+}
+
+/// Bare architecture family name, without the live/chunked/TTS qualifier —
+/// used for "Detected: …" since detection only found a file shape, not a
+/// confirmed behavior (the shape can be ambiguous between two behaviors).
+String architectureFamilyLabel(ModelArchitecture a) {
+  switch (a) {
+    case ModelArchitecture.transducer:
+      return 'Transducer';
+    case ModelArchitecture.ctc:
+      return 'CTC';
+    case ModelArchitecture.vitsPiper:
+      return 'Piper VITS';
+    case ModelArchitecture.kokoro:
+      return 'Kokoro';
+    case ModelArchitecture.onlineNemoCtc:
+      return 'NeMo CTC';
+    case ModelArchitecture.offlineNemoTransducer:
+      return 'NeMo Transducer';
+    case ModelArchitecture.pocket:
+      return 'Pocket';
+  }
+}
+
+/// (label, description) explaining what picking this architecture means for
+/// recognition behavior, shown as a list row in the import sheet. Null for
+/// architectures with nothing behavior-relevant to add (the TTS ones).
+(String, String)? architectureHint(ModelArchitecture a) {
+  switch (a) {
+    case ModelArchitecture.transducer:
+    case ModelArchitecture.ctc:
+    case ModelArchitecture.onlineNemoCtc:
+      return ('Live:', 'text appears continuously as you speak.');
+    case ModelArchitecture.offlineNemoTransducer:
+      return ('Chunked:', 'waits for a pause, then transcribes a few words at once.');
+    case ModelArchitecture.vitsPiper:
+    case ModelArchitecture.kokoro:
+    case ModelArchitecture.pocket:
+      return null;
   }
 }
