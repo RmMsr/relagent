@@ -32,7 +32,7 @@ class ModelDownloadService {
     final dir = modelDir(type, id);
 
     if (isDownloaded(type, id)) {
-      print('[Download] $id already in cache, skipping download');
+      print('[Download] Already in cache, skipping download');
       return dir;
     }
 
@@ -40,7 +40,7 @@ class ModelDownloadService {
     final dirObj = Directory(dir);
     if (await dirObj.exists()) await dirObj.delete(recursive: true);
 
-    print('[Download] Downloading $id...');
+    print('[Download] Downloading...');
     final tempFile = await _download(id, downloadUrl, onProgress: onProgress);
 
     try {
@@ -57,7 +57,7 @@ class ModelDownloadService {
     final dir = Directory(modelDir(type, id));
     if (await dir.exists()) {
       await dir.delete(recursive: true);
-      print('[Download] Deleted $id from cache');
+      print('[Download] Deleted from cache');
     }
   }
 

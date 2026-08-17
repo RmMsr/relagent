@@ -161,5 +161,26 @@
     "status": "approved",
     "recommended": true,
     "notes": ""
+  },
+  {
+    "id": "omnilingual-asr-300m-ctc-int8",
+    "displayName": "Omnilingual ASR 300M (1600 languages) - CTC",
+    "type": "asr",
+    "architecture": "ctc",
+    "languages": ["multi"],
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12.tar.bz2",
+    "downloadSizeMb": 350,
+    "fileStructure": {
+      "encoder": "model.int8.onnx",
+      "tokens": "tokens.txt"
+    },
+    "origin": "Omnilingual ASR / Meta FAIR / k2-fsa",
+    "sourceUrl": "https://github.com/facebookresearch/omnilingual-asr",
+    "license": "Apache-2.0",
+    "speakerCount": 0,
+    "releaseDate": "2025-11",
+    "status": "approved",
+    "recommended": false,
+    "notes": ""
   }
 ]

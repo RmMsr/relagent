@@ -11,6 +11,7 @@ import 'package:sherpa_voice/tts_config.dart';
 
 import 'catalog_index.dart';
 import 'download_service.dart';
+import 'entry_scope.dart';
 
 /// Resolves model files by joining a base directory with the relative path.
 class _DirectoryModelLoader implements ModelLoader {
@@ -57,8 +58,7 @@ class VoiceCatalogEvaluator {
   final bool keep;
   final bool debug;
   final Set<String>? limitToIds;
-  final String? typeFilter;
-  final Set<String> languages;
+  final EntryScope scope;
 
   /// Which entry status to target: 'pending', 'failed', or 'approved'.
   final String evalStatus;
@@ -70,8 +70,7 @@ class VoiceCatalogEvaluator {
     this.keep = false,
     this.debug = false,
     this.limitToIds,
-    this.typeFilter,
-    this.languages = const {},
+    this.scope = const EntryScope(),
     this.evalStatus = 'pending',
   });
 
@@ -92,9 +91,7 @@ class VoiceCatalogEvaluator {
         })
         .where((e) =>
             limitToIds == null || limitToIds!.contains(e['id'] as String))
-        .where((e) =>
-            typeFilter == null || (e['type'] as String? ?? '') == typeFilter)
-        .where((e) => _matchesLanguage(e))
+        .where(scope.matches)
         .toList();
 
     print('[Evaluate] ${candidates.length} entries to evaluate');
@@ -105,13 +102,30 @@ class VoiceCatalogEvaluator {
     var done = 0;
     for (final entry in candidates) {
       final id = entry['id'] as String;
-      print('[Evaluate] [$done/${candidates.length}] Testing $id...');
+      print('[Evaluate] [${done + 1}/${candidates.length}] Testing $id...');
       await _evaluateEntry(entry);
       final note = entry['notes'] as String? ?? '';
-      entry['status'] = note.startsWith('error:') ? 'failed' : 'approved';
+      // 'skipped:' means the architecture has no real builder case (an
+      // ArgumentError from buildAsrRecognizer/buildTtsEngine) — nothing was
+      // actually evaluated, so it must not become 'approved'. Leave it
+      // 'untested': the note's 'skipped:' prefix already makes future
+      // --eval pending runs skip it too (same convention --filter uses),
+      // so it won't be silently re-attempted, but --recheck or a real
+      // fix landing will pick it up correctly instead of it looking
+      // falsely verified.
+      String logStatus;
+      if (note.startsWith('error:')) {
+        entry['status'] = 'failed';
+        logStatus = 'FAIL';
+      } else if (note.startsWith('skipped:')) {
+        entry['status'] = 'untested';
+        logStatus = 'SKIP';
+      } else {
+        entry['status'] = 'approved';
+        logStatus = 'OK';
+      }
       done++;
       await index.save(entries);
-      final logStatus = note.startsWith('error:') ? 'FAIL' : 'OK';
       print('[Evaluate] $logStatus — $id: $note');
     }
 
@@ -159,6 +173,14 @@ class VoiceCatalogEvaluator {
       }
 
       final stopwatch = Stopwatch()..start();
+
+      // Printed right before the native recognizer/TTS engine is built and
+      // run — the riskiest step, where a genuinely incompatible model can
+      // trigger an uncatchable native abort that kills the whole process
+      // before status/notes ever get saved. If that happens, this is the
+      // last line on screen; the id printed in the "Testing" line above
+      // identifies which model to retry with --recheck.
+      print('[Evaluate] Loading model natively...');
 
       if (type == 'asr') {
         await _evaluateAsr(id, arch, fileStructure, modelDir, entry);
@@ -611,13 +633,6 @@ class VoiceCatalogEvaluator {
     return map[name];
   }
 
-  bool _matchesLanguage(Map<String, dynamic> entry) {
-    if (languages.isEmpty) return true;
-    final entryLangs =
-        (entry['languages'] as List<dynamic>? ?? []).cast<String>().toSet();
-    if (entryLangs.isEmpty) return false;
-    return entryLangs.intersection(languages).isNotEmpty;
-  }
 
   void _appendNote(Map<String, dynamic> entry, String note) {
     final existing = entry['notes'] as String? ?? '';

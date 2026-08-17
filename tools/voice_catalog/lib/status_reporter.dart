@@ -1,41 +1,43 @@
 // ignore_for_file: avoid_print
 import 'dart:math';
 
+import 'entry_scope.dart';
+import 'supported_architectures.dart';
+
 /// Prints a four-column status table and entry lists for the voice model catalog.
 ///
-/// Columns: ASR and TTS counts for the language filter vs all entries.
-/// Pass an empty [languages] set to match all entries (no language filter).
+/// Columns: ASR and TTS counts for [scope] vs the same scope with its
+/// language constraint dropped ("All languages"). type/arch always apply to
+/// both columns — only the language dimension distinguishes them.
 class VoiceCatalogStatusReporter {
-  final Set<String> languages;
+  final EntryScope scope;
 
-  VoiceCatalogStatusReporter({required this.languages});
+  VoiceCatalogStatusReporter({required this.scope});
 
   void report(List<Map<String, dynamic>> entries) {
-    final allAsr = _count(entries, typeFilter: 'asr');
-    final allTts = _count(entries, typeFilter: 'tts');
+    final baseScope = scope.withoutLanguage();
+    final allEntries = entries.where(baseScope.matches).toList();
+    final allAsr = _count(allEntries, typeFilter: 'asr');
+    final allTts = _count(allEntries, typeFilter: 'tts');
 
-    if (languages.isEmpty) {
+    if (scope.languages.isEmpty) {
       _printTable('All', allAsr, allTts, allAsr, allTts, showSelected: false);
     } else {
-      final selected = entries.where(_matchesLanguage).toList();
+      final selected = allEntries.where(scope.matches).toList();
       final selAsr = _count(selected, typeFilter: 'asr');
       final selTts = _count(selected, typeFilter: 'tts');
-      final selLabel = '[${(languages.toList()..sort()).join(',')}]';
+      final selLabel = '[${(scope.languages.toList()..sort()).join(',')}]';
       _printTable(selLabel, selAsr, selTts, allAsr, allTts);
     }
   }
 
-  /// Print all entries matching [state] and the language filter.
+  /// Print all entries matching [state] and [scope].
   ///
   /// Valid states: ignored, pending, failed, approved.
   /// When [namesOnly] is true, prints just the id per line for shell piping.
   void list(List<Map<String, dynamic>> entries, String state,
-      {bool namesOnly = false, bool withNotes = false, String? typeFilter}) {
-    final candidates = entries
-        .where(_matchesLanguage)
-        .where((e) =>
-            typeFilter == null || (e['type'] as String? ?? '') == typeFilter)
-        .toList();
+      {bool namesOnly = false, bool withNotes = false}) {
+    final candidates = entries.where(scope.matches).toList();
 
     bool matches(Map<String, dynamic> e) {
       final status = e['status'] as String? ?? '';
@@ -88,6 +90,60 @@ class VoiceCatalogStatusReporter {
       final noteStr = notes.isNotEmpty ? '  $notes' : '';
       print('  [$type] $id$langStr$noteStr');
     }
+  }
+
+  /// Print every distinct catalog architecture: type, whether the runtime
+  /// can actually build it (see [supportedArchitectures]), and an
+  /// approved/total count. Ordered by type then supported first. Always
+  /// covers the whole catalog — a structure audit, not scoped by --type/
+  /// --lang/--arch like other commands.
+  void listArchitectures(List<Map<String, dynamic>> entries) {
+    final byArch = <String, List<Map<String, dynamic>>>{};
+    for (final e in entries) {
+      final arch = e['architecture'] as String? ?? 'unknown';
+      byArch.putIfAbsent(arch, () => []).add(e);
+    }
+
+    final rows = byArch.entries.map((e) {
+      final types = e.value.map((m) => m['type'] as String? ?? '?').toSet();
+      final typeLabel = types.length == 1 ? types.first : 'mixed';
+      final approved = e.value.where((m) => m['status'] == 'approved').length;
+      return (
+        arch: e.key,
+        typeLabel: typeLabel,
+        supported: supportedArchitectures.contains(e.key),
+        approved: approved,
+        total: e.value.length,
+      );
+    }).toList()
+      ..sort((a, b) {
+        final byType = a.typeLabel.compareTo(b.typeLabel);
+        if (byType != 0) return byType;
+        if (a.supported != b.supported) return a.supported ? -1 : 1;
+        return a.arch.compareTo(b.arch);
+      });
+
+    const typeW = 5;
+    const supW = 9;
+    const archW = 30;
+    const countW = 8;
+    String pad(String s, int w) => s.padRight(w);
+    String num(int n, int w) => n.toString().padLeft(w);
+
+    print('=== Architectures ===');
+    print('');
+    print('  ${pad('TYPE', typeW)} ${pad('SUPPORTED', supW)}'
+        ' ${pad('ARCHITECTURE', archW)}'
+        ' ${'APPROVED'.padLeft(countW)} ${'TOTAL'.padLeft(countW)}');
+    print('  ${'─' * (typeW + supW + archW + countW * 2 + 5)}');
+
+    for (final row in rows) {
+      print('  ${pad(row.typeLabel, typeW)}'
+          ' ${pad(row.supported ? 'yes' : 'no', supW)}'
+          ' ${pad(row.arch, archW)}'
+          ' ${num(row.approved, countW)} ${num(row.total, countW)}');
+    }
+    print('');
   }
 
   void _printTable(
@@ -200,14 +256,6 @@ class VoiceCatalogStatusReporter {
         allAsr.recommended, allTts.recommended));
     print(div);
     print('');
-  }
-
-  bool _matchesLanguage(Map<String, dynamic> entry) {
-    if (languages.isEmpty) return true;
-    final entryLangs =
-        (entry['languages'] as List<dynamic>? ?? []).cast<String>().toSet();
-    if (entryLangs.isEmpty) return false;
-    return entryLangs.intersection(languages).isNotEmpty;
   }
 
   _Counts _count(List<Map<String, dynamic>> entries, {String? typeFilter}) {

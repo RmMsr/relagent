@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import '../lib/catalog_index.dart';
 import '../lib/discovery.dart';
 import '../lib/download_service.dart';
+import '../lib/entry_scope.dart';
 import '../lib/evaluator.dart';
 import '../lib/filter.dart';
 import '../lib/status_reporter.dart';
@@ -24,47 +25,26 @@ void main(List<String> rawArgs) async {
   }
 
   final parser = ArgParser()
-    ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help')
-    ..addFlag(
-      'discover',
-      negatable: false,
-      help: 'Fetch new model entries from GitHub releases',
-    )
-    ..addOption(
-      'eval',
-      help: 'Filter + download + smoke-test entries with the given status\n'
-          '(bare --eval defaults to pending)',
-      valueHelp: 'STATUS',
-      allowed: ['pending', 'failed', 'approved'],
-    )
-    ..addFlag(
-      'status',
-      negatable: false,
-      help: 'Print catalog status summary (also shown after --discover/--eval)',
-    )
-    ..addOption(
-      'list',
-      help: 'List entries matching a state (with language filter applied)\n'
-          'States: ignored, pending, failed, approved',
-      valueHelp: 'STATE',
-      defaultsTo: 'approved',
-      allowed: ['ignored', 'pending', 'failed', 'approved'],
-    )
-    ..addFlag(
-      'names-only',
-      negatable: false,
-      help: 'With --list: print only IDs, one per line (for shell piping)',
-    )
-    ..addFlag(
-      'with-notes',
-      negatable: false,
-      help: 'With --names-only: append notes as (note) after each ID',
-    )
     ..addMultiOption(
-      'recheck',
-      help: 'Reset and re-evaluate a specific model by ID\n'
-          '(clears its status and notes, implies eval for those entries)',
-      valueHelp: 'ID',
+      'arch',
+      help: 'Architecture values to include (repeat or comma-separate)\n'
+          'See --list-architectures for valid values\n'
+          '(default: all)',
+      valueHelp: 'ARCH',
+    )
+    ..addOption(
+      'catalog',
+      abbr: 'c',
+      help: 'Path to voice-models.json\n'
+          '(default: auto-detected from project root)',
+      valueHelp: 'FILE',
+    )
+    ..addFlag(
+      'classify',
+      negatable: false,
+      hide: true, // documented under "Phase 2" above
+      help: 'Re-derive names/architecture and exclusion notes (see Phase 2).\n'
+          'Rare to need directly — implicit on --discover and --recheck.',
     )
     ..addFlag(
       'debug',
@@ -72,16 +52,30 @@ void main(List<String> rawArgs) async {
       help: 'Print stack traces and file inspection details during eval',
     )
     ..addFlag(
+      'discover',
+      negatable: false,
+      hide: true, // documented under "Phase 1" above
+      help: 'Fetch new model entries from GitHub releases',
+    )
+    ..addOption(
+      'eval',
+      hide: true, // documented under "Phase 3" above
+      help: 'Download and smoke-test entries with the given status\n'
+          '(bare --eval defaults to pending)',
+      valueHelp: 'STATUS',
+      allowed: ['pending', 'failed', 'approved'],
+    )
+    ..addOption(
+      'fixtures-dir',
+      help: 'Directory with reference WAV clips (en.wav, de.wav, …)\n'
+          '(default: auto-detected from project root)',
+      valueHelp: 'DIR',
+    )
+    ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help')
+    ..addFlag(
       'keep',
       negatable: false,
       help: 'Keep downloaded model files after evaluation (skip auto-delete)',
-    )
-    ..addOption(
-      'type',
-      abbr: 't',
-      help: 'Filter by model type (default: all)',
-      valueHelp: 'TYPE',
-      allowed: ['asr', 'tts'],
     )
     ..addMultiOption(
       'lang',
@@ -92,17 +86,50 @@ void main(List<String> rawArgs) async {
       valueHelp: 'LANG',
     )
     ..addOption(
-      'catalog',
-      abbr: 'c',
-      help: 'Path to voice-models.json\n'
-          '(default: auto-detected from project root)',
-      valueHelp: 'FILE',
+      'list',
+      hide: true, // documented under "Informational" above
+      help: 'List entries matching a state (with language filter applied)\n'
+          'States: ignored, pending, failed, approved',
+      valueHelp: 'STATE',
+      defaultsTo: 'approved',
+      allowed: ['ignored', 'pending', 'failed', 'approved'],
+    )
+    ..addFlag(
+      'list-architectures',
+      negatable: false,
+      hide: true, // documented under "Informational" above
+      help: 'Print catalog architectures: type, runtime-supported,\n'
+          'approved/total. Whole catalog, not scoped.',
+    )
+    ..addFlag(
+      'names-only',
+      negatable: false,
+      help: 'With --list: print only IDs, one per line (for shell piping)',
+    )
+    ..addMultiOption(
+      'recheck',
+      hide: true, // documented under "Phase 3" above
+      help: 'Reset and re-evaluate a specific model by ID\n'
+          '(clears its status and notes, implies eval for those entries)',
+      valueHelp: 'ID',
+    )
+    ..addFlag(
+      'status',
+      negatable: false,
+      hide: true, // documented under "Informational" above
+      help: 'Print catalog status summary (also shown after --discover/--eval)',
     )
     ..addOption(
-      'fixtures-dir',
-      help: 'Directory with reference WAV clips (en.wav, de.wav, …)\n'
-          '(default: auto-detected from project root)',
-      valueHelp: 'DIR',
+      'type',
+      abbr: 't',
+      help: 'Filter by model type (default: all)',
+      valueHelp: 'TYPE',
+      allowed: ['asr', 'tts'],
+    )
+    ..addFlag(
+      'with-notes',
+      negatable: false,
+      help: 'With --names-only: append notes as (note) after each ID',
     );
 
   ArgResults parsed;
@@ -115,6 +142,8 @@ void main(List<String> rawArgs) async {
   }
 
   final doDiscover = parsed['discover'] as bool;
+  final doClassify = parsed['classify'] as bool;
+  final doListArchitectures = parsed['list-architectures'] as bool;
   final doEval = parsed.wasParsed('eval');
   final evalStatus = parsed['eval'] as String? ?? 'pending';
   final doStatus = parsed['status'] as bool;
@@ -131,11 +160,17 @@ void main(List<String> rawArgs) async {
   final debug = parsed['debug'] as bool;
 
   if ((parsed['help'] as bool) ||
-      (!doDiscover && !doEval && !doStatus &&
-          listState == null && recheckIds.isEmpty)) {
+      (!doDiscover && !doClassify && !doListArchitectures &&
+          !doEval && !doStatus && listState == null && recheckIds.isEmpty)) {
     print(_usage(parser));
     exit(0);
   }
+
+  // --list-architectures always covers the whole catalog (see its doc) —
+  // don't print a scope line for a scope it doesn't apply.
+  final scopeApplies =
+      doDiscover || doClassify || doEval || doStatus || listState != null ||
+          recheckIds.isNotEmpty;
 
   // Resolve catalog path.
   var catalogPath = parsed['catalog'] as String? ?? _detectCatalogPath();
@@ -182,6 +217,21 @@ void main(List<String> rawArgs) async {
     languages = codes.contains('all') ? {} : codes;
   }
 
+  // Resolve architecture filter (default: all).
+  final archArgs = parsed['arch'] as List<String>;
+  final architectures = archArgs
+      .expand((s) => s.split(','))
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty && s != 'all')
+      .toSet();
+
+  // Single scope applied consistently across every command below.
+  final scope = EntryScope(
+    type: typeFilter,
+    languages: languages,
+    architectures: architectures,
+  );
+
   final catalogIndex = CatalogIndex(catalogPath);
 
   if (!namesOnly) {
@@ -201,19 +251,25 @@ void main(List<String> rawArgs) async {
   var entries = await catalogIndex.load();
   if (!namesOnly) {
     print('Loaded ${entries.length} existing entries');
+    if (scopeApplies) {
+      print('Scope:');
+      for (final line in scope.describeLines()) {
+        print('  $line');
+      }
+    }
     print('');
   }
 
   // Phase 1: Discover.
   if (doDiscover) {
-    print('--- Phase 1: Discovery ---');
+    print('--- Phase 1: Discover ---');
     final discovery = VoiceCatalogDiscovery(catalogIndex);
-    entries = await discovery.discover(entries);
+    entries = await discovery.discover(entries, scope: scope);
     await catalogIndex.save(entries);
     print('');
   }
 
-  // Recheck: reset specified entries before filter/eval.
+  // Recheck: reset specific entries back to untested before classify/eval.
   if (recheckIds.isNotEmpty) {
     print('--- Recheck: resetting ${recheckIds.length} entries ---');
     for (final entry in entries) {
@@ -228,17 +284,27 @@ void main(List<String> rawArgs) async {
     print('');
   }
 
-  // Phase 2+3: Filter then Evaluate.
-  if (doEval || recheckIds.isNotEmpty) {
-    // Filter step only runs for pending (untested) entries.
-    if (doEval && evalStatus == 'pending') {
-      print('--- Phase 2: Filter ---');
-      final filter = VoiceCatalogFilter();
-      entries = filter.filter(entries);
-      await catalogIndex.save(entries);
-      print('');
-    }
+  // Phase 2: Classify (optional, but always runs after --discover/--recheck).
+  // Re-derives displayName/architecture/origin/sourceUrl and the exclusion
+  // verdict (notes) for every untested entry in scope — free, no network or
+  // download involved. Runs automatically after --discover (the action
+  // where catalog-wide changes are expected) and after --recheck (so a
+  // rechecked entry that should still be excluded doesn't slip past --eval
+  // with a stale/cleared note); available standalone via --classify to pick
+  // up a parser/filter code change without touching the network.
+  if (doClassify || doDiscover || recheckIds.isNotEmpty) {
+    print('--- Phase 2: Classify ---');
+    final discovery = VoiceCatalogDiscovery(catalogIndex);
+    final changed = discovery.classify(entries, scope: scope);
+    final filter = VoiceCatalogFilter();
+    entries = filter.filter(entries, scope: scope);
+    await catalogIndex.save(entries);
+    print('[Classify] Re-derived $changed entries');
+    print('');
+  }
 
+  // Phase 3: Evaluate.
+  if (doEval || recheckIds.isNotEmpty) {
     print('--- Phase 3: Evaluate ---');
     if (fixturesDir == null) {
       stderr.writeln(
@@ -262,23 +328,28 @@ void main(List<String> rawArgs) async {
       keep: keep,
       debug: debug,
       limitToIds: limitToIds,
-      typeFilter: typeFilter,
-      languages: languages,
+      scope: scope,
       evalStatus: evalStatus,
     );
     entries = await evaluator.evaluate(entries);
     print('');
   }
 
-  final reporter = VoiceCatalogStatusReporter(languages: languages);
-  if (!namesOnly && listState == null) reporter.report(entries);
+  final reporter = VoiceCatalogStatusReporter(scope: scope);
+  if (!namesOnly && listState == null && !doListArchitectures) {
+    reporter.report(entries);
+  }
 
   if (listState != null) {
     if (!namesOnly) {
       print('=== List: $listState ===');
       print('');
     }
-    reporter.list(entries, listState, namesOnly: namesOnly, withNotes: withNotes, typeFilter: typeFilter);
+    reporter.list(entries, listState, namesOnly: namesOnly, withNotes: withNotes);
+  }
+
+  if (doListArchitectures) {
+    reporter.listArchitectures(entries);
   }
 
   exit(0);
@@ -293,59 +364,51 @@ Usage: voice-catalog --discover [OPTIONS]
 
 Manage the Relagent voice-models.json catalog.
 
-Phases (enabled with explicit flags):
-  --discover  Fetch new model entries from GitHub releases and add them as
-              untested. Runs before --eval when both flags are set.
+Phase 1
+  --discover  Fetch new entries from GitHub releases. Implies Classify.
 
-  --eval      Download and smoke-test entries with the given status.
-              Omitting the value defaults to --eval pending.
-              pending   Apply filter criteria then test untested entries (default)
-              failed    Re-test previously failed entries (skips filter step)
-              approved  Re-test already-approved entries (skips filter step)
-              Downloads are deleted after each test (use --keep to retain them).
+Phase 2 (optional) — implicit on --discover and --recheck
+  --classify  Re-derive names/architecture/origin/sourceUrl and the
+              exclusion verdict (notes) for untested entries in scope.
+              No network/download. Skips entries already evaluated.
 
-              Filter criteria (pending only):
+              Exclusion criteria:
                 • Size:         ≤ 1 GB download
-                • Architecture: transducer | ctc | onlineNemoCtc |
-                                vitsPiper | kokoro | offlineNemoTransducer
-                • Piper quality: medium or higher (excludes _low / x_low models)
+                • Architecture: transducer | ctc | onlineNemoCtc | vitsPiper |
+                                kokoro | offlineNemoTransducer | pocket | unknown
+                • Piper quality: medium or higher (excludes _low / x_low)
+                • float32 skipped when an int8 sibling id exists
 
-  --status    Print a two-column summary table (selected language filter vs all)
-              showing discovered, ignored, pending, failed, approved
-              and recommended counts. Also printed at the end of every run.
+Phase 3
+  --eval      Download and smoke-test entries by status.
+              pending|failed|approved (default: pending)
+  --recheck   Reset entries to untested by ID. Implies Classify + Eval
+              for just those IDs.
 
-  --list      List entries matching a state (language filter applied).
-              Combine with --status to see the table and the list together.
-              Use --names-only to print just IDs for shell piping.
+Informational
+  --status              Summary table: scope vs. all languages.
+  --list                List entries by state: ignored|pending|failed|approved
+  --list-architectures  Architecture, type, runtime-supported, approved/
+                         total. Whole catalog, not scoped.
 
 Options:
 ${parser.usage}
 
 Examples:
-  voice-catalog --status                Show catalog status for English (default)
-  voice-catalog --status --lang en,de   Show status for English + German filter
-  voice-catalog --status --lang all     Show status without language filter
-  voice-catalog --list <ignored|pending|failed|approved>
-  voice-catalog --list ignored          List ignored entries (English filter)
-  voice-catalog --list pending          List untested candidates
-  voice-catalog --list approved         List approved models
-  voice-catalog --list ignored --lang all    List all ignored entries
-  voice-catalog --list pending --type asr   List untested ASR models only
-  voice-catalog --list approved --type tts  List approved TTS models only
-  voice-catalog --list pending --names-only           IDs only, for piping
-  voice-catalog --list failed --names-only --with-notes  IDs with notes, for review
-  voice-catalog --list pending --names-only | grep kokoro
-  voice-catalog --discover              Add new models from GitHub releases
-  voice-catalog --discover              Creates voice-models.json if missing
-  voice-catalog --eval                  Filter + test all untested models
+  voice-catalog --discover              Add new entries from GitHub releases
+  voice-catalog --eval                  Test all untested, non-excluded models
   voice-catalog --eval failed           Re-test all failed models
   voice-catalog --eval approved         Re-test all previously approved models
-  voice-catalog --discover --eval       Full pipeline: discover, filter, test
   voice-catalog --eval --keep           Test without deleting downloads
   voice-catalog --eval --lang en,de     Test English and German models
-  voice-catalog --recheck kokoro-en-v0_19        Re-test a specific model
-  voice-catalog --recheck <id> --debug           Re-test with full error details
-  voice-catalog --catalog /path/voice-models.json --status
+  voice-catalog --recheck <id>          Re-classify + re-test one model
+  voice-catalog --status                Catalog status for English (default)
+  voice-catalog --status --lang all     Catalog status, all languages
+  voice-catalog --list ignored          List ignored entries
+  voice-catalog --list pending          List untested candidates
+  voice-catalog --list failed           List failed entries
+  voice-catalog --list approved         List approved models
+  voice-catalog --list pending --names-only | grep kokoro
 ''';
 
 /// Walk up to find `apps/assets/voice-models.json`.

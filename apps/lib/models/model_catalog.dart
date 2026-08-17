@@ -160,19 +160,28 @@ class ModelCatalog {
         .toList();
   }
 
+  /// A wildcard sentinel for models supporting too many languages to
+  /// enumerate (e.g. Omnilingual ASR's 1600) — matches any requested
+  /// language code in [byLanguage]/[byTypeAndLanguage], and is excluded
+  /// from [availableLanguages] since it isn't a real code a user picks.
+  static const _multiLanguageSentinel = 'multi';
+
   /// All unique language codes in the catalog.
   static Set<String> get availableLanguages {
     final languages = <String>{};
     for (final entry in _entries) {
       languages.addAll(entry.languages);
     }
+    languages.remove(_multiLanguageSentinel);
     return languages;
   }
 
   /// Get entries matching a language code, recommended entries first.
   static List<CatalogEntry> byLanguage(String languageCode) {
     return _entries
-        .where((e) => e.languages.contains(languageCode))
+        .where((e) =>
+            e.languages.contains(languageCode) ||
+            e.languages.contains(_multiLanguageSentinel))
         .toList()
       ..sort(_recommendedFirst);
   }
@@ -189,7 +198,10 @@ class ModelCatalog {
     String languageCode,
   ) {
     return _entries
-        .where((e) => e.type == type && e.languages.contains(languageCode))
+        .where((e) =>
+            e.type == type &&
+            (e.languages.contains(languageCode) ||
+                e.languages.contains(_multiLanguageSentinel)))
         .toList()
       ..sort(_recommendedFirst);
   }

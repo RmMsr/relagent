@@ -83,13 +83,22 @@ void main() {
         final enModels = ModelCatalog.byLanguage('en');
         expect(enModels, isNotEmpty);
         for (final model in enModels) {
-          expect(model.languages, contains('en'));
+          expect(model.languages, anyOf(contains('en'), contains('multi')));
         }
       });
 
-      test('returns empty for unsupported language', () {
+      test('returns only the multi-language wildcard for an unsupported code', () {
         final models = ModelCatalog.byLanguage('xx');
-        expect(models, isEmpty);
+        expect(models.map((e) => e.id), ['omnilingual-asr-300m-ctc-int8']);
+      });
+
+      test('"multi" entry matches any language code', () {
+        for (final code in ['en', 'de', 'fr', 'xx']) {
+          expect(
+            ModelCatalog.byLanguage(code).map((e) => e.id),
+            contains('omnilingual-asr-300m-ctc-int8'),
+          );
+        }
       });
     });
 
@@ -99,7 +108,7 @@ void main() {
         expect(models, isNotEmpty);
         for (final model in models) {
           expect(model.type, ModelType.asr);
-          expect(model.languages, contains('en'));
+          expect(model.languages, anyOf(contains('en'), contains('multi')));
         }
       });
 
@@ -110,6 +119,11 @@ void main() {
           expect(model.type, ModelType.tts);
           expect(model.languages, contains('de'));
         }
+      });
+
+      test('excludes the multi-language ASR entry from TTS results', () {
+        final models = ModelCatalog.byTypeAndLanguage(ModelType.tts, 'xx');
+        expect(models, isEmpty);
       });
     });
 
@@ -132,6 +146,10 @@ void main() {
       test('contains expected languages', () {
         final languages = ModelCatalog.availableLanguages;
         expect(languages, containsAll(['en', 'de', 'fr', 'ru', 'sv']));
+      });
+
+      test('excludes the "multi" wildcard sentinel', () {
+        expect(ModelCatalog.availableLanguages, isNot(contains('multi')));
       });
     });
 
@@ -258,8 +276,14 @@ void main() {
     });
 
     group('recommended flag', () {
-      test('all approved seed entries are recommended', () {
+      test('all approved seed entries are recommended, except the '
+          'multi-language wildcard entry', () {
         for (final entry in ModelCatalog.entries) {
+          if (entry.id == 'omnilingual-asr-300m-ctc-int8') {
+            expect(entry.recommended, isFalse, reason: '${entry.id} is the '
+                'deliberate non-recommended fixture entry');
+            continue;
+          }
           expect(
             entry.recommended,
             isTrue,

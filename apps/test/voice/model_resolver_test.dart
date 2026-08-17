@@ -170,24 +170,22 @@ void main() {
   // --- CTC architecture (task 10.3) ---
 
   group('ASR CTC architecture (task 10.3)', () {
-    test('no CTC model in current catalog — skipped', () {
-      // The omnilingual CTC model was removed from the catalog as incompatible.
-      // This test documents the gap: if a CTC ASR model is added to the catalog
-      // in the future, add a resolveAsrMetadata test here that verifies
-      // architecture == ModelArchitecture.ctc and fileStructure has 'encoder'.
-      final ctcModels = ModelCatalog.byType(ModelType.asr)
-          .where((e) => e.architecture == ModelArchitecture.ctc)
-          .toList();
-
-      // When a CTC model is re-added, this assertion should be updated.
-      expect(
-        ctcModels,
-        isEmpty,
-        reason: 'No CTC ASR model in catalog; update this test when one is added',
+    test('resolves metadata for a downloaded CTC model', () async {
+      final settings = Settings.defaults().copyWith(
+        selectedAsrModelId: 'omnilingual-asr-300m-ctc-int8',
       );
-    },
-        skip:
-            'No CTC model in catalog — remove skip when a CTC model is available');
+      final downloadState = const ModelDownloadState(
+        downloadedModels: {'omnilingual-asr-300m-ctc-int8'},
+      );
+
+      final result = await resolveAsrMetadata(settings, downloadState);
+      expect(result, isNotNull);
+      expect(result!.modelId, 'omnilingual-asr-300m-ctc-int8');
+      expect(result.architecture, ModelArchitecture.ctc);
+
+      final entry = ModelCatalog.findById('omnilingual-asr-300m-ctc-int8');
+      expect(entry!.fileStructure, containsPair('encoder', 'model.int8.onnx'));
+    });
   });
 
   // --- speaker count helper ---
