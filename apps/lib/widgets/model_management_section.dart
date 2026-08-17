@@ -372,6 +372,8 @@ class _ModelEntryCard extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      color: isSelected ? theme.colorScheme.primaryContainer : null,
+      elevation: isSelected ? 4 : null,
       child: InkWell(
         onTap: isDownloaded ? () => _selectModel(ref) : null,
         borderRadius: BorderRadius.circular(12),
@@ -404,9 +406,11 @@ class _ModelEntryCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 2),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 2,
                 children: [
-                  Expanded(child: Text(entry.id, style: muted)),
+                  Text(entry.id, style: muted),
                   Text(architectureLabel(entry.architecture), style: muted),
                 ],
               ),
@@ -557,6 +561,8 @@ class _ImportedModelCard extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      color: isSelected ? theme.colorScheme.primaryContainer : null,
+      elevation: isSelected ? 4 : null,
       child: InkWell(
         onTap: () => _selectModel(ref),
         borderRadius: BorderRadius.circular(12),
@@ -588,9 +594,11 @@ class _ImportedModelCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 2),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 2,
                 children: [
-                  Expanded(child: Text(entry.id, style: muted)),
+                  Text(entry.id, style: muted),
                   Text(architectureLabel(entry.architecture), style: muted),
                 ],
               ),
@@ -642,10 +650,17 @@ class _ImportedModelCard extends ConsumerWidget {
   }
 
   Future<void> _editMetadata(BuildContext context, WidgetRef ref) async {
+    final detected = await ref
+        .read(importedModelServiceProvider)
+        .detectArchitectureForModel(entry.type, entry.id);
+    if (!context.mounted) return;
+
     final updated = await showImportModelSheet(
       context,
       suggestedName: entry.displayName,
-      detectedArchitecture: entry.architecture,
+      detectedArchitecture: detected.detectedArchitecture,
+      isAmbiguousShape: detected.isAmbiguousShape,
+      initialArchitecture: entry.architecture,
       initialType: entry.type,
       initialLanguages: entry.languages,
     );
@@ -774,6 +789,7 @@ class _ImportModelActionState extends ConsumerState<_ImportModelAction> {
       context,
       suggestedName: suggestedName,
       detectedArchitecture: peek.detectedArchitecture,
+      isAmbiguousShape: peek.isAmbiguousShape,
       initialType: initialType,
     );
 

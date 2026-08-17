@@ -13,10 +13,12 @@ import '/voice/model_architecture_detector.dart';
 class ArchivePeekResult {
   final List<String> entries;
   final ModelArchitecture? detectedArchitecture;
+  final bool isAmbiguousShape;
 
   const ArchivePeekResult({
     required this.entries,
     required this.detectedArchitecture,
+    required this.isAmbiguousShape,
   });
 }
 
@@ -33,8 +35,11 @@ class ImportedModelService {
   Future<ArchivePeekResult> peekArchive(File archive) async {
     final bytes = await archive.readAsBytes();
     final entries = await compute(_listArchiveEntries, bytes);
-    final detected = detectArchitecture(entries);
-    return ArchivePeekResult(entries: entries, detectedArchitecture: detected);
+    return ArchivePeekResult(
+      entries: entries,
+      detectedArchitecture: detectArchitecture(entries),
+      isAmbiguousShape: isAmbiguousTransducerShape(entries),
+    );
   }
 
   /// Extract [archive] to the support directory and register the model.
@@ -62,6 +67,33 @@ class ImportedModelService {
     );
 
     await ImportedModelRegistry.add(entry);
+  }
+
+  /// Re-run architecture detection against an already-imported model's files
+  /// on disk. Used by the edit sheet so a bad original guess (or a manual
+  /// mis-pick at import time) doesn't get shown back as "auto-detected".
+  Future<ArchivePeekResult> detectArchitectureForModel(
+    ModelType type,
+    String id,
+  ) async {
+    final dir = await _modelDir(type, id);
+    if (!await dir.exists()) {
+      return const ArchivePeekResult(
+        entries: [],
+        detectedArchitecture: null,
+        isAmbiguousShape: false,
+      );
+    }
+    final entries = await dir
+        .list(recursive: true)
+        .where((e) => e is File)
+        .map((e) => p.relative(e.path, from: dir.path))
+        .toList();
+    return ArchivePeekResult(
+      entries: entries,
+      detectedArchitecture: detectArchitecture(entries),
+      isAmbiguousShape: isAmbiguousTransducerShape(entries),
+    );
   }
 
   /// Delete an imported model's files and manifest entry.
