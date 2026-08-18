@@ -14,6 +14,12 @@ class Logger {
       ? LogLevel.warning
       : LogLevel.debug;
 
+  /// Whether debug-level logging is active (i.e. built with
+  /// `--dart-define=debug_logs_enabled=true`). Used to gate diagnostic-only
+  /// work (not just log lines) that shouldn't run in normal builds, such as
+  /// dumping raw audio to disk — see [dumpDebugWav] in `utils/files.dart`.
+  static bool get debugLogsEnabled => _minLevel == LogLevel.debug;
+
   static void debug(String message) {
     _log(LogLevel.debug, message);
   }

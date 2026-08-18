@@ -1,0 +1,6 @@
+venv/
+models/
+out/
+test_audio/
+*.pt
+*.onnx

@@ -25,6 +25,9 @@ class NativeVoiceService extends VoiceService {
   final MicRouter _micRouter;
   MicPreference _micPreference = const MicPreference.auto();
   StreamSubscription<void>? _micEventsSub;
+  // Set by configureAudioSessionForRecording(), read by startRecording() to
+  // tell VadAsr which route it's about to record on.
+  MicSelectionResult? _lastMicSelection;
 
   NativeVoiceService({MicRouter? micRouter})
     : _micRouter = micRouter ?? MicRouter();
@@ -43,6 +46,11 @@ class NativeVoiceService extends VoiceService {
 
   StreamSubscription<dynamic>? _interruptionSub;
   StreamSubscription<dynamic>? _deviceChangedSub;
+  // audio_session's devicesChangedEventStream and MicRouter's own
+  // AudioDeviceCallback both fire for the same underlying Bluetooth
+  // connect/disconnect, each forwarding into _deviceChangedController below.
+  // Debounce so one physical event triggers one reconfiguration, not two.
+  Timer? _deviceChangeDebounce;
 
   @override
   bool get isAsrAvailable => true;
@@ -81,8 +89,9 @@ class NativeVoiceService extends VoiceService {
     }
 
     if (_asr == null) {
-      final isOffline =
-          asrMetadata?.architecture == ModelArchitecture.offlineNemoTransducer;
+      final isOffline = asrMetadata?.architecture ==
+              ModelArchitecture.offlineNemoTransducer ||
+          asrMetadata?.architecture == ModelArchitecture.whisper;
       if (isOffline) {
         Logger.debug('NativeVoiceService: Using VAD-based offline ASR');
         _asr = VadAsr(
@@ -111,7 +120,10 @@ class NativeVoiceService extends VoiceService {
       }
     }
     _asr!.init();
-    await _asr!.start();
+    await _asr!.start(
+      isBluetoothRoute:
+          _lastMicSelection?.device?.category == MicDeviceCategory.bluetooth,
+    );
   }
 
   @override
@@ -237,7 +249,7 @@ class NativeVoiceService extends VoiceService {
       // Establish the mic route and wait until Android reports it active, so
       // the recorder opens on the intended device (MicRouter bounds the wait).
       // Best effort: whatever Android reports is what we record on.
-      await _micRouter.ensureReady(_micPreference);
+      _lastMicSelection = await _micRouter.ensureReady(_micPreference);
     } catch (e) {
       Logger.debug(
         'NativeVoiceService: Failed to configure audio session for recording: $e',
@@ -306,7 +318,7 @@ class NativeVoiceService extends VoiceService {
         Logger.debug('NativeVoiceService: Audio devices changed');
         Logger.debug('  Devices added: ${event.devicesAdded}');
         Logger.debug('  Devices removed: ${event.devicesRemoved}');
-        _deviceChangedController.add(null);
+        _scheduleDeviceChanged();
       });
 
       // MicRouter reports device-topology changes so the UI can refresh the
@@ -314,7 +326,7 @@ class NativeVoiceService extends VoiceService {
       // diagnostics only; it never drives behavior here.
       _micEventsSub ??= _micRouter.deviceChanges.listen((_) {
         Logger.debug('NativeVoiceService: MicRouter reported devicesChanged');
-        _deviceChangedController.add(null);
+        _scheduleDeviceChanged();
       });
     } catch (e) {
       Logger.debug('NativeVoiceService: Failed to configure audio session: $e');
@@ -415,6 +427,13 @@ class NativeVoiceService extends VoiceService {
     });
   }
 
+  void _scheduleDeviceChanged() {
+    _deviceChangeDebounce?.cancel();
+    _deviceChangeDebounce = Timer(const Duration(milliseconds: 250), () {
+      _deviceChangedController.add(null);
+    });
+  }
+
   @override
   void dispose() {
     _asr?.dispose();
@@ -423,6 +442,7 @@ class NativeVoiceService extends VoiceService {
     _interruptionSub?.cancel();
     _deviceChangedSub?.cancel();
     _micEventsSub?.cancel();
+    _deviceChangeDebounce?.cancel();
     _interruptionController.close();
     _deviceChangedController.close();
   }

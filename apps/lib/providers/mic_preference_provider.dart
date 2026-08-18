@@ -19,9 +19,11 @@ final micPreferenceProvider =
 class MicPreferenceNotifier extends Notifier<MicPreference> {
   @override
   MicPreference build() {
+    Logger.debug('MicPreferenceNotifier: build() running');
     final prefs = ref.watch(sharedPreferencesProvider);
     var preference = const MicPreference.auto();
     final raw = prefs.getString(_micPreferenceKey);
+    Logger.debug('MicPreferenceNotifier: build() stored raw = $raw');
     if (raw != null) {
       try {
         preference = MicPreference.fromJson(
@@ -32,10 +34,17 @@ class MicPreferenceNotifier extends Notifier<MicPreference> {
       }
     }
     ref.read(voiceServiceProvider).setInputDevicePreference(preference);
+    Logger.debug(
+      'MicPreferenceNotifier: build() pushed preference '
+      '${preference.toJson()}',
+    );
     return preference;
   }
 
   Future<void> set(MicPreference preference) async {
+    Logger.debug(
+      'MicPreferenceNotifier: set() called with ${preference.toJson()}',
+    );
     state = preference;
     ref.read(voiceServiceProvider).setInputDevicePreference(preference);
     final prefs = ref.read(sharedPreferencesProvider);
@@ -44,6 +53,10 @@ class MicPreferenceNotifier extends Notifier<MicPreference> {
     } else {
       await prefs.setString(_micPreferenceKey, jsonEncode(preference.toJson()));
     }
+    Logger.debug(
+      'MicPreferenceNotifier: set() persisted raw = '
+      '${prefs.getString(_micPreferenceKey)}',
+    );
   }
 }
 

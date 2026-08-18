@@ -157,6 +157,8 @@ Assuming you have a working LM Studio server, look for the Google open-weights m
 
 Some alternatives that should work well are: `gpt-oss`, `nemotron-3`, and `olmo3`.
 
+If a model you want to use is only published as `safetensors` weights, see [Converting a model from Hugging Face to GGUF](convert-llm.md).
+
 ## Monitoring
 
 For traces run a gen_ai compatible OpenTelemetry destination like Phoenix:

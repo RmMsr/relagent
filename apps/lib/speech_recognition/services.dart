@@ -16,7 +16,11 @@ import '../../utils/logger.dart';
 abstract class AsrService {
   AsrModelMetadata? get modelMetadata;
   void init();
-  Future<void> start();
+
+  /// [isBluetoothRoute] lets implementations that need it (currently only
+  /// [VadAsr]) adapt to Bluetooth SCO's lower audio quality; streaming
+  /// architectures ignore it.
+  Future<void> start({bool isBluetoothRoute = false});
   Future<void> stop();
   Future<void> pause();
   Future<void> resume();
@@ -86,7 +90,7 @@ class ASR implements AsrService {
   }
 
   @override
-  Future<void> start() async {
+  Future<void> start({bool isBluetoothRoute = false}) async {
     if (!_isInitialized) {
       developer.Timeline.startSync('ASR_Initialization');
       try {
@@ -133,7 +137,16 @@ class ASR implements AsrService {
           // Bluetooth SCO; leave audioManagerMode at its modeNormal default
           // and disable record's own Bluetooth management so it doesn't race
           // MicRouter's route with its own legacy startBluetoothSco() calls.
-          androidConfig: const AndroidRecordConfig(manageBluetooth: false),
+          // audioSource is voiceCommunication for its echo-cancellation/
+          // noise-suppression benefit — confirmed NOT the cause of
+          // device-switching getting stuck (reverted to defaultSource and
+          // retested; switching was still broken), so no reason to give up
+          // the AEC/NS benefit. The switching bug itself is tracked in
+          // openspec/changes/mic-preferred-device-routing/.
+          androidConfig: const AndroidRecordConfig(
+            manageBluetooth: false,
+            audioSource: AndroidAudioSource.voiceCommunication,
+          ),
           encoder: encoder,
           sampleRate: 16000,
           numChannels: 1,

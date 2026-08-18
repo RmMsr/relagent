@@ -40,6 +40,33 @@ ModelArchitecture? detectArchitecture(List<String> entryNames) {
         : ModelArchitecture.transducer;
   }
 
+  // Whisper: sherpa-onnx's own export-onnx.py names encoder/decoder/tokens
+  // with a shared "{model-name}-" filename prefix instead of the bare names
+  // every other architecture here uses, so this can't reuse hasEncoder/
+  // hasDecoder/hasTokens above (those require startsWith/exact-match on the
+  // bare form). Deliberately narrow — exactly one *encoder*.onnx, exactly one
+  // *decoder*.onnx sharing a prefix, no joiner, and a "<prefix>tokens.txt" —
+  // rather than loosening the general checks globally, so an unrelated
+  // archive with a stray "*decoder*.onnx" can't accidentally match. This
+  // still correctly matches the bare "encoder.onnx"/"decoder.onnx"/
+  // "tokens.txt" case too (empty shared prefix).
+  final onnxEncoderFiles =
+      names.where((n) => n.contains('encoder') && n.endsWith('.onnx')).toList();
+  final onnxDecoderFiles =
+      names.where((n) => n.contains('decoder') && n.endsWith('.onnx')).toList();
+  final onnxJoinerFiles =
+      names.where((n) => n.contains('joiner') && n.endsWith('.onnx'));
+  if (onnxEncoderFiles.length == 1 &&
+      onnxDecoderFiles.length == 1 &&
+      onnxJoinerFiles.isEmpty) {
+    final encoderName = onnxEncoderFiles.single;
+    final prefix = encoderName.substring(0, encoderName.indexOf('encoder'));
+    if (onnxDecoderFiles.single.startsWith(prefix) &&
+        names.contains('${prefix}tokens.txt')) {
+      return ModelArchitecture.whisper;
+    }
+  }
+
   // Piper VITS: single model file + espeak data (TTS)
   if (hasModel && hasEspeak) return ModelArchitecture.vitsPiper;
 

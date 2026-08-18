@@ -105,6 +105,7 @@ class _ImportModelSheetState extends State<_ImportModelSheet> {
     ModelArchitecture.ctc,
     ModelArchitecture.onlineNemoCtc,
     ModelArchitecture.offlineNemoTransducer,
+    ModelArchitecture.whisper,
   };
 
   Set<ModelArchitecture> get _allowedArchitectures =>
@@ -314,6 +315,8 @@ String architectureLabel(ModelArchitecture a) {
       return 'NeMo Transducer (chunked)';
     case ModelArchitecture.pocket:
       return 'Pocket (TTS)';
+    case ModelArchitecture.whisper:
+      return 'Whisper (chunked)';
   }
 }
 
@@ -336,6 +339,8 @@ String architectureFamilyLabel(ModelArchitecture a) {
       return 'NeMo Transducer';
     case ModelArchitecture.pocket:
       return 'Pocket';
+    case ModelArchitecture.whisper:
+      return 'Whisper';
   }
 }
 
@@ -349,6 +354,7 @@ String architectureFamilyLabel(ModelArchitecture a) {
     case ModelArchitecture.onlineNemoCtc:
       return ('Live:', 'text appears continuously as you speak.');
     case ModelArchitecture.offlineNemoTransducer:
+    case ModelArchitecture.whisper:
       return ('Chunked:', 'waits for a pause, then transcribes a few words at once.');
     case ModelArchitecture.vitsPiper:
     case ModelArchitecture.kokoro:

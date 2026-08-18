@@ -43,6 +43,9 @@ Future<AsrModelMetadata?> resolveAsrMetadata(
       fileStructure: catalogEntry.fileStructure,
       loader: loader,
       modelId: catalogEntry.id,
+      language: catalogEntry.languages.isNotEmpty
+          ? catalogEntry.languages.first
+          : null,
     );
   }
 
@@ -61,6 +64,9 @@ Future<AsrModelMetadata?> resolveAsrMetadata(
     fileStructure: fileStructure,
     loader: loader,
     modelId: importedEntry.id,
+    language: importedEntry.languages.isNotEmpty
+        ? importedEntry.languages.first
+        : null,
   );
 }
 
@@ -207,7 +213,9 @@ Future<Map<String, String>> _buildImportedAsrFileStructure(
       } else {
         structure.putIfAbsent('model', () => rel);
       }
-    } else if (name == 'tokens.txt') {
+    } else if (name == 'tokens.txt' || name.endsWith('-tokens.txt')) {
+      // sherpa-onnx's whisper export names this "<model-name>-tokens.txt"
+      // rather than the bare "tokens.txt" every other architecture uses.
       structure['tokens'] = rel;
     }
   }

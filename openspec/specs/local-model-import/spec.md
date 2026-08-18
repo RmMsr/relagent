@@ -48,6 +48,11 @@ The system SHALL inspect the file names within a selected archive and attempt to
 - **WHEN** the archive contains `voices.bin`
 - **THEN** the detected architecture SHALL be `kokoro`
 
+#### Scenario: Whisper detected
+- **WHEN** the archive contains exactly one encoder `.onnx` file and exactly one decoder `.onnx` file sharing a common filename prefix, no joiner file, and a tokens file matching `<prefix>tokens.txt` (the naming sherpa-onnx's own whisper export script produces, e.g. `nb-whisper-base-encoder.onnx` / `nb-whisper-base-decoder.onnx` / `nb-whisper-base-tokens.txt`)
+- **THEN** the detected architecture SHALL be `whisper`
+- **AND** this detection SHALL NOT require the tokens file to be named exactly `tokens.txt`
+
 #### Scenario: Detection fails
 - **WHEN** no known file pattern is matched
 - **THEN** the architecture field SHALL be left blank and marked as required in the metadata form

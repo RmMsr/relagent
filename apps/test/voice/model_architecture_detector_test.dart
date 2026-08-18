@@ -70,6 +70,76 @@ void main() {
       // isAmbiguousTransducerShape below.
       expect(detectArchitecture(entries), ModelArchitecture.offlineNemoTransducer);
     });
+
+    test('detects whisper from sherpa-onnx export-onnx.py prefixed filenames', () {
+      final entries = [
+        'model/nb-whisper-base-encoder.onnx',
+        'model/nb-whisper-base-decoder.onnx',
+        'model/nb-whisper-base-tokens.txt',
+      ];
+      expect(detectArchitecture(entries), ModelArchitecture.whisper);
+    });
+
+    test('detects whisper from int8-quantized prefixed filenames', () {
+      final entries = [
+        'model/nb-whisper-base-encoder.int8.onnx',
+        'model/nb-whisper-base-decoder.int8.fp16emb.onnx',
+        'model/nb-whisper-base-tokens.txt',
+      ];
+      expect(detectArchitecture(entries), ModelArchitecture.whisper);
+    });
+
+    test('detects whisper from bare (unprefixed) filenames', () {
+      final entries = [
+        'model/encoder.onnx',
+        'model/decoder.onnx',
+        'model/tokens.txt',
+      ];
+      expect(detectArchitecture(entries), ModelArchitecture.whisper);
+    });
+
+    test('does not detect whisper when a joiner file is present', () {
+      // No other branch matches this shape either (prefixed names aren't
+      // recognized by the bare-name transducer/CTC checks), so this
+      // correctly falls through to unrecognized rather than misdetecting.
+      final entries = [
+        'model/nb-whisper-base-encoder.onnx',
+        'model/nb-whisper-base-decoder.onnx',
+        'model/nb-whisper-base-joiner.onnx',
+        'model/nb-whisper-base-tokens.txt',
+      ];
+      expect(detectArchitecture(entries), isNull);
+    });
+
+    test('falls back to ctc (not whisper) when the tokens file does not '
+        'match the encoder/decoder prefix', () {
+      // A bare "tokens.txt" alongside prefixed encoder/decoder files still
+      // satisfies the pre-existing hasModel+hasTokens CTC check, since
+      // neither onnx file starts with the literal "encoder"/"decoder" the
+      // CTC/transducer checks look for.
+      final entries = [
+        'model/nb-whisper-base-encoder.onnx',
+        'model/nb-whisper-base-decoder.onnx',
+        'model/tokens.txt',
+      ];
+      expect(detectArchitecture(entries), ModelArchitecture.ctc);
+    });
+
+    test('still detects a legit transducer shape unaffected by the whisper '
+        'branch (regression)', () {
+      final entries = [
+        'model/encoder-epoch-99-avg-1.int8.onnx',
+        'model/decoder-epoch-99-avg-1.int8.onnx',
+        'model/joiner-epoch-99-avg-1.int8.onnx',
+        'model/tokens.txt',
+      ];
+      expect(detectArchitecture(entries), ModelArchitecture.transducer);
+    });
+
+    test('still detects ctc unaffected by the whisper branch (regression)', () {
+      final entries = ['ctc/model.onnx', 'ctc/tokens.txt'];
+      expect(detectArchitecture(entries), ModelArchitecture.ctc);
+    });
   });
 
   group('isAmbiguousTransducerShape', () {

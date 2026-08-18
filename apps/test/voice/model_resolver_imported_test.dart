@@ -81,6 +81,40 @@ void main() {
     await File(p.join(dir.path, '.complete')).writeAsString('done');
   }
 
+  test('resolveAsrMetadata resolves the sherpa-onnx whisper export\'s '
+      'prefixed tokens filename (not just bare "tokens.txt")', () async {
+    const id = 'imported-resolver-whisper01';
+    await ImportedModelRegistry.add(ImportedModelEntry(
+      id: id,
+      displayName: 'My Whisper',
+      type: ModelType.asr,
+      architecture: ModelArchitecture.whisper,
+      languages: ['no'],
+      importedAt: DateTime(2026),
+    ));
+    final dir = Directory(
+      p.join(tmpDir.path, 'imported_models', 'asr', id),
+    );
+    await dir.create(recursive: true);
+    await File(p.join(dir.path, 'nb-whisper-base-encoder.onnx')).writeAsBytes([]);
+    await File(p.join(dir.path, 'nb-whisper-base-decoder.onnx')).writeAsBytes([]);
+    await File(p.join(dir.path, 'nb-whisper-base-tokens.txt')).writeAsString('');
+    await File(p.join(dir.path, '.complete')).writeAsString('done');
+
+    final settings = Settings.defaults().copyWith(selectedAsrModelId: id);
+    final result = await resolveAsrMetadata(settings, const ModelDownloadState());
+
+    expect(result, isNotNull);
+    expect(result!.architecture, ModelArchitecture.whisper);
+    expect(
+      result.fileStructure['tokens'],
+      'nb-whisper-base-tokens.txt',
+      reason: 'the prefixed tokens filename must resolve, not be left empty',
+    );
+    expect(result.fileStructure['encoder'], 'nb-whisper-base-encoder.onnx');
+    expect(result.fileStructure['decoder'], 'nb-whisper-base-decoder.onnx');
+  });
+
   test('resolveAsrMetadata falls back to imported model when catalog miss', () async {
     const id = 'imported-resolver01';
     await ImportedModelRegistry.add(ImportedModelEntry(

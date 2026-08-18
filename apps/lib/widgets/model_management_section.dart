@@ -356,7 +356,8 @@ class _ModelEntryCard extends ConsumerWidget {
   String? _modeLabel() {
     if (entry.type == ModelType.tts) return null;
     if (entry.supportsStreaming) return 'mode: live';
-    if (entry.architecture == ModelArchitecture.offlineNemoTransducer) {
+    if (entry.architecture == ModelArchitecture.offlineNemoTransducer ||
+        entry.architecture == ModelArchitecture.whisper) {
       return 'mode: chunked';
     }
     return null;

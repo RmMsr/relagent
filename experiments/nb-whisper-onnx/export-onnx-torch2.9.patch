@@ -1,0 +1,64 @@
+--- a/export-onnx.py	2026-08-17 13:12:30.302638908 +0200
++++ b/export-onnx.py	2026-08-17 13:12:30.303614907 +0200
+@@ -39,19 +39,14 @@
+         "--model",
+         type=str,
+         required=True,
+-        # fmt: off
+-        choices=[
+-            "tiny", "tiny.en", "base", "base.en",
+-            "small", "small.en", "medium", "medium.en",
+-            "large-v1", "large-v2",
+-            "large", "large-v3", "turbo", # these three have feature dim 128
+-            "distil-medium.en", "distil-small.en", "distil-large-v2",
+-            "distil-large-v3",
+-            "distil-large-v3.5",
+-            # for fine-tuned models from icefall
+-            "medium-aishell",
+-            ],
+-        # fmt: on
++        help=(
++            "An official OpenAI whisper name (tiny, base, small, medium, "
++            "large-v3, turbo, ...), OR any name for which a local "
++            "'<name>.pt' file exists in the OpenAI whisper.load_model() "
++            "checkpoint format (dims + model_state_dict) — see "
++            "convert_state_dict.py in this experiment for how to produce "
++            "one from a HuggingFace transformers checkpoint."
++        ),
+     )
+     return parser.parse_args()
+ 
+@@ -407,6 +402,9 @@
+             """
+             )
+         return whisper.load_model(filename)
++    elif Path(f"./{name}.pt").is_file():
++        # A HF checkpoint converted to OpenAI format by convert_state_dict.py
++        return whisper.load_model(f"./{name}.pt")
+     else:
+         return whisper.load_model(name)
+ 
+@@ -489,6 +487,14 @@
+         mel,
+         encoder_filename,
+         opset_version=opset_version,
++        # torch >=2.9 defaults to the torch.export-based ("dynamo") ONNX
++        # exporter, which doesn't propagate dynamic_axes correctly through
++        # this script's custom KV-cache decoder wrapper — it exports without
++        # error but the decoder throws an onnxruntime Reshape error on the
++        # first real inference call. Force the legacy exporter this script
++        # was written against. See README.md "Exporter gotcha".
++        dynamo=False,
++        external_data=False,
+         input_names=["mel"],
+         output_names=["n_layer_cross_k", "n_layer_cross_v"],
+         dynamic_axes={
+@@ -606,6 +612,8 @@
+         ),
+         decoder_filename,
+         opset_version=opset_version,
++        dynamo=False,
++        external_data=False,
+         input_names=[
+             "tokens",
+             "in_n_layer_self_k_cache",

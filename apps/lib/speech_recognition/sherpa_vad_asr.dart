@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
+import '/models/model_catalog.dart';
 import '/speech_recognition/services.dart';
 import '/speech_recognition/asr_metadata.dart';
 import '/speech_recognition/utils.dart';
@@ -45,6 +46,18 @@ class VadAsr implements AsrService {
   static const int _windowSize = 512;
   static const int _sampleRate = 16000;
 
+  // Whichever route the current VAD instance was tuned for. The mic can
+  // switch between built-in and Bluetooth SCO from one recording to the
+  // next (headset connects/disconnects) without this VadAsr instance being
+  // recreated, so start() rebuilds the VAD whenever this no longer matches.
+  bool _isBluetoothRoute = false;
+
+  // One-pole high-pass filter state (~80Hz cutoff at 16kHz), carried across
+  // chunks. Only applied on Bluetooth SCO routes — see _highPassFilter().
+  double _hpPrevIn = 0.0;
+  double _hpPrevOut = 0.0;
+  static const double _hpAlpha = 0.9695;
+
   VadAsr({
     required this.textRecognized,
     required this.textFinished,
@@ -79,15 +92,28 @@ class VadAsr implements AsrService {
   }
 
   @override
-  Future<void> start() async {
-    if (!_isInitialized) {
+  Future<void> start({bool isBluetoothRoute = false}) async {
+    final routeChanged = _isInitialized && isBluetoothRoute != _isBluetoothRoute;
+    _isBluetoothRoute = isBluetoothRoute;
+    _hpPrevIn = 0.0;
+    _hpPrevOut = 0.0;
+
+    if (!_isInitialized || routeChanged) {
       developer.Timeline.startSync('VadAsr_Initialization');
       try {
-        sherpa_onnx.initBindings();
-        _recognizer = await _buildOfflineRecognizer();
+        if (!_isInitialized) {
+          sherpa_onnx.initBindings();
+          _recognizer = await _buildOfflineRecognizer();
+        }
+        // VAD sensitivity depends on route (see _buildVad) — rebuild it
+        // whenever Bluetooth connects/disconnects between recordings.
+        _vad?.free();
         _vad = await _buildVad();
         _isInitialized = true;
-        Logger.debug('[VadAsr] Initialized recognizer and VAD');
+        Logger.debug(
+          '[VadAsr] Initialized recognizer and VAD '
+          '(bluetooth: $_isBluetoothRoute)',
+        );
       } finally {
         developer.Timeline.finishSync();
       }
@@ -107,11 +133,27 @@ class VadAsr implements AsrService {
       Logger.debug('[VadAsr] No supported audio encoder found');
       return;
     }
+    // convertBytesToFloat32 always assumes raw little-endian PCM16 bytes.
+    // If the picked encoder is anything else (e.g. the aacLc fallback),
+    // that assumption is silently wrong and every sample is garbage — this
+    // line is the fastest way to confirm/rule that out from a device log.
+    Logger.debug('[VadAsr] Using audio encoder: $encoder');
+    Logger.debug(
+      '[VadAsr] Using audio source: ${AndroidAudioSource.voiceCommunication}',
+    );
 
     final config = RecordConfig(
       // See services.dart: MicRouter owns Android routing; keep record's
-      // own audio-mode/Bluetooth management out of the way.
-      androidConfig: const AndroidRecordConfig(manageBluetooth: false),
+      // own audio-mode/Bluetooth management out of the way. audioSource is
+      // voiceCommunication for its echo-cancellation/noise-suppression
+      // benefit — confirmed NOT the cause of device-switching getting stuck
+      // (reverted to defaultSource and retested; switching was still
+      // broken), so no reason to give up the AEC/NS benefit. The switching
+      // bug itself is tracked in openspec/changes/mic-preferred-device-routing/.
+      androidConfig: const AndroidRecordConfig(
+        manageBluetooth: false,
+        audioSource: AndroidAudioSource.voiceCommunication,
+      ),
       encoder: encoder,
       sampleRate: _sampleRate,
       numChannels: 1,
@@ -139,7 +181,7 @@ class VadAsr implements AsrService {
   }
 
   void _processChunk(Float32List samples) {
-    _pending.addAll(samples);
+    _pending.addAll(_isBluetoothRoute ? _highPassFilter(samples) : samples);
 
     while (_pending.length >= _windowSize) {
       final window = Float32List.fromList(_pending.sublist(0, _windowSize));
@@ -158,6 +200,18 @@ class VadAsr implements AsrService {
   void _recognizeSegment(Float32List samples) {
     developer.Timeline.startSync('VadAsr_Recognize');
     try {
+      // Debug builds only (see dumpDebugWav) — lets a real VAD segment be
+      // pulled off the device and replayed through
+      // experiments/nb-whisper-onnx/sanity_check.py to check whether a
+      // quality problem is in the recorded audio itself or elsewhere.
+      unawaited(
+        dumpDebugWav(
+          'segment_${DateTime.now().millisecondsSinceEpoch}.wav',
+          samples,
+          _sampleRate,
+        ),
+      );
+
       final stream = _recognizer!.createStream();
       stream.acceptWaveform(samples: samples, sampleRate: _sampleRate);
       _recognizer!.decode(stream);
@@ -209,35 +263,75 @@ class VadAsr implements AsrService {
     final files = modelMetadata.fileStructure;
     final loader = modelMetadata.loader;
     final id = modelMetadata.modelId;
+    final architecture = modelMetadata.architecture;
 
-    Logger.debug('[VadAsr] Building offline recognizer for $id');
+    Logger.debug('[VadAsr] Building offline recognizer ($architecture) for $id');
 
-    final config = sherpa_onnx.OfflineRecognizerConfig(
-      model: sherpa_onnx.OfflineModelConfig(
-        transducer: sherpa_onnx.OfflineTransducerModelConfig(
-          encoder: await loader.loadModelFile(id, files['encoder']!),
-          decoder: await loader.loadModelFile(id, files['decoder']!),
-          joiner: await loader.loadModelFile(id, files['joiner']!),
-        ),
-        tokens: await loader.loadModelFile(id, files['tokens']!),
-        modelType: 'nemo_transducer',
-        numThreads: 2,
-        debug: false,
-      ),
+    final sherpa_onnx.OfflineModelConfig modelConfig;
+    switch (architecture) {
+      case ModelArchitecture.whisper:
+        final language = modelMetadata.language;
+        if (language == null || language.isEmpty) {
+          // Never fall back to sherpa-onnx's auto-detect by passing an empty
+          // language: on marginal audio it can lock onto the wrong language
+          // and produce near-useless output — a real failure mode seen with
+          // other multilingual models (Omnilingual ASR, Parakeet).
+          throw StateError(
+            'Whisper model "$id" has no forced language configured. '
+            'Set at least one language on the model before using it for '
+            'recognition — auto-detection is not supported.',
+          );
+        }
+        modelConfig = sherpa_onnx.OfflineModelConfig(
+          whisper: sherpa_onnx.OfflineWhisperModelConfig(
+            encoder: await loader.loadModelFile(id, files['encoder']!),
+            decoder: await loader.loadModelFile(id, files['decoder']!),
+            language: language,
+            task: 'transcribe',
+          ),
+          tokens: await loader.loadModelFile(id, files['tokens']!),
+          modelType: 'whisper',
+          numThreads: 2,
+          debug: false,
+        );
+
+      default:
+        // offlineNemoTransducer and any other encoder+decoder+joiner offline
+        // architecture routed here today.
+        modelConfig = sherpa_onnx.OfflineModelConfig(
+          transducer: sherpa_onnx.OfflineTransducerModelConfig(
+            encoder: await loader.loadModelFile(id, files['encoder']!),
+            decoder: await loader.loadModelFile(id, files['decoder']!),
+            joiner: await loader.loadModelFile(id, files['joiner']!),
+          ),
+          tokens: await loader.loadModelFile(id, files['tokens']!),
+          modelType: 'nemo_transducer',
+          numThreads: 2,
+          debug: false,
+        );
+    }
+
+    return sherpa_onnx.OfflineRecognizer(
+      sherpa_onnx.OfflineRecognizerConfig(model: modelConfig),
     );
-    return sherpa_onnx.OfflineRecognizer(config);
   }
 
   Future<sherpa_onnx.VoiceActivityDetector> _buildVad() async {
     final sileroVadPath = await copyAssetFileToCache('silero_vad.onnx');
     Logger.debug('[VadAsr] Silero VAD path: $sileroVadPath');
 
+    // Bluetooth SCO's higher noise floor and compression artifacts trigger
+    // more false-positive segments (empty/garbled transcriptions observed
+    // in practice) than the built-in mic at the same sensitivity. Raising
+    // the threshold and minimum speech duration filters out short noise
+    // blips; raising minimum silence duration avoids cutting mid-word on
+    // brief SCO dropouts/pauses.
     final config = sherpa_onnx.VadModelConfig(
       sileroVad: sherpa_onnx.SileroVadModelConfig(
         model: sileroVadPath,
-        threshold: 0.5,
-        minSilenceDuration: 0.5,
-        minSpeechDuration: 0.25,
+        threshold: _isBluetoothRoute ? 0.6 : 0.5,
+        minSilenceDuration: _isBluetoothRoute ? 0.8 : 0.5,
+        minSpeechDuration: _isBluetoothRoute ? 0.5 : 0.25,
         windowSize: _windowSize,
         maxSpeechDuration: 30.0,
       ),
@@ -249,6 +343,22 @@ class VadAsr implements AsrService {
       config: config,
       bufferSizeInSeconds: 30.0,
     );
+  }
+
+  /// One-pole high-pass filter (~80Hz cutoff at 16kHz) to strip low-frequency
+  /// hum/noise that Bluetooth SCO's compression tends to introduce, before
+  /// audio reaches the VAD or recognizer. State carries across calls within
+  /// a recording; start() resets it for a fresh session.
+  Float32List _highPassFilter(Float32List samples) {
+    final out = Float32List(samples.length);
+    for (var i = 0; i < samples.length; i++) {
+      final x = samples[i];
+      final y = _hpAlpha * (_hpPrevOut + x - _hpPrevIn);
+      out[i] = y;
+      _hpPrevIn = x;
+      _hpPrevOut = y;
+    }
+    return out;
   }
 
   Future<AudioEncoder?> _pickEncoder() async {

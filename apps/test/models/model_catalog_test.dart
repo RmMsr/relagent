@@ -275,6 +275,34 @@ void main() {
       });
     });
 
+    group('whisper architecture (whisper-asr-compatibility)', () {
+      test('whisper does not support streaming', () {
+        // Regression test for the streaming-classification allow-list:
+        // supportsStreaming must stay false for whisper (offline/chunked,
+        // 30s decode window, no partial results) even though it's a real,
+        // usable ASR architecture — it should never be silently added to
+        // the allow-list by a future edit without deliberate intent.
+        final entry = CatalogEntry.fromJson({
+          'id': 'test-whisper-entry',
+          'displayName': 'Norwegian - Whisper',
+          'type': 'asr',
+          'architecture': 'whisper',
+          'languages': ['no'],
+          'downloadUrl': 'https://example.com/nb-whisper-base.tar.gz',
+          'downloadSizeMb': 105,
+          'fileStructure': {
+            'encoder': 'nb-whisper-base-encoder.int8.onnx',
+            'decoder': 'nb-whisper-base-decoder.int8.fp16emb.onnx',
+            'tokens': 'nb-whisper-base-tokens.txt',
+          },
+          'origin': 'NbAiLab',
+          'releaseDate': '2026-08',
+        });
+        expect(entry.architecture, ModelArchitecture.whisper);
+        expect(entry.supportsStreaming, isFalse);
+      });
+    });
+
     group('recommended flag', () {
       test('all approved seed entries are recommended, except the '
           'multi-language wildcard entry', () {

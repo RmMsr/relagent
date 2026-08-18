@@ -20,6 +20,14 @@ enum ModelArchitecture {
 
   /// Pocket TTS: lmFlow + lmMain + encoder + decoder + textConditioner + vocabJson + tokenScoresJson
   pocket,
+
+  /// Whisper: encoder + decoder (no joiner) + tokens, as produced by
+  /// sherpa-onnx's scripts/whisper/export-onnx.py, which names all three
+  /// files with a shared "{model-name}-" prefix (e.g. "nb-whisper-base-
+  /// encoder.onnx", "nb-whisper-base-tokens.txt") rather than the bare
+  /// "encoder.onnx"/"tokens.txt" every other architecture here uses.
+  /// Offline only — 30-second decode window, no streaming/partial results.
+  whisper,
 }
 
 /// Type of voice model.
