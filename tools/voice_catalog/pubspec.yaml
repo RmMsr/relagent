@@ -13,5 +13,8 @@ dependencies:
   sherpa_voice:
     path: ../../dart_packages/sherpa_voice
 
+dev_dependencies:
+  test: ^1.25.0
+
 executables:
   voice-catalog: voice_catalog

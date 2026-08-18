@@ -5,8 +5,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
+import 'package:sherpa_voice/asr_config.dart';
 
-import '/models/model_catalog.dart';
 import '/speech_recognition/services.dart';
 import '/speech_recognition/asr_metadata.dart';
 import '/speech_recognition/utils.dart';
@@ -260,59 +260,21 @@ class VadAsr implements AsrService {
   }
 
   Future<sherpa_onnx.OfflineRecognizer> _buildOfflineRecognizer() async {
-    final files = modelMetadata.fileStructure;
-    final loader = modelMetadata.loader;
-    final id = modelMetadata.modelId;
     final architecture = modelMetadata.architecture;
-
-    Logger.debug('[VadAsr] Building offline recognizer ($architecture) for $id');
-
-    final sherpa_onnx.OfflineModelConfig modelConfig;
-    switch (architecture) {
-      case ModelArchitecture.whisper:
-        final language = modelMetadata.language;
-        if (language == null || language.isEmpty) {
-          // Never fall back to sherpa-onnx's auto-detect by passing an empty
-          // language: on marginal audio it can lock onto the wrong language
-          // and produce near-useless output — a real failure mode seen with
-          // other multilingual models (Omnilingual ASR, Parakeet).
-          throw StateError(
-            'Whisper model "$id" has no forced language configured. '
-            'Set at least one language on the model before using it for '
-            'recognition — auto-detection is not supported.',
-          );
-        }
-        modelConfig = sherpa_onnx.OfflineModelConfig(
-          whisper: sherpa_onnx.OfflineWhisperModelConfig(
-            encoder: await loader.loadModelFile(id, files['encoder']!),
-            decoder: await loader.loadModelFile(id, files['decoder']!),
-            language: language,
-            task: 'transcribe',
-          ),
-          tokens: await loader.loadModelFile(id, files['tokens']!),
-          modelType: 'whisper',
-          numThreads: 2,
-          debug: false,
-        );
-
-      default:
-        // offlineNemoTransducer and any other encoder+decoder+joiner offline
-        // architecture routed here today.
-        modelConfig = sherpa_onnx.OfflineModelConfig(
-          transducer: sherpa_onnx.OfflineTransducerModelConfig(
-            encoder: await loader.loadModelFile(id, files['encoder']!),
-            decoder: await loader.loadModelFile(id, files['decoder']!),
-            joiner: await loader.loadModelFile(id, files['joiner']!),
-          ),
-          tokens: await loader.loadModelFile(id, files['tokens']!),
-          modelType: 'nemo_transducer',
-          numThreads: 2,
-          debug: false,
-        );
-    }
-
-    return sherpa_onnx.OfflineRecognizer(
-      sherpa_onnx.OfflineRecognizerConfig(model: modelConfig),
+    Logger.debug(
+      '[VadAsr] Building offline recognizer ($architecture) for '
+      '${modelMetadata.modelId}',
+    );
+    // Never fall back to sherpa-onnx's Whisper auto-detect by passing an
+    // empty language: on marginal audio it can lock onto the wrong language
+    // and produce near-useless output — a real failure mode seen with other
+    // multilingual models (Omnilingual ASR, Parakeet). See buildOfflineAsrRecognizer.
+    return buildOfflineAsrRecognizer(
+      architecture,
+      modelMetadata.fileStructure,
+      modelMetadata.loader,
+      modelMetadata.modelId,
+      language: modelMetadata.language,
     );
   }
 

@@ -158,7 +158,7 @@ class VoiceCatalogEvaluator {
       stdout.writeln();
 
       // Inspect directory and populate fileStructure.
-      final fileStructure = await _inspectDirectory(modelDir);
+      final fileStructure = await inspectDirectory(modelDir);
       entry['fileStructure'] = fileStructure;
 
       // Auto-detect languages when none are known yet.
@@ -230,6 +230,45 @@ class VoiceCatalogEvaluator {
       stderr.writeln('[Debug] files: $files');
     }
 
+    final langs = (entry['languages'] as List<dynamic>? ?? []).cast<String>();
+    final primaryLang = langs.isNotEmpty ? langs.first : 'en';
+    final wavPath = _fixturePath(primaryLang);
+    final wavData = await _readWavSamples(wavPath);
+
+    // Production picks the backend the same way (see isOfflineAsr /
+    // voice_service_native.dart): offline architectures like Whisper have no
+    // OnlineRecognizer config at all, so they must go through
+    // OfflineRecognizer instead — fed one pre-chunked segment here, VAD
+    // segments in the real app (VadAsr).
+    if (architecture.isOfflineAsr) {
+      final sherpa_onnx.OfflineRecognizer recognizer;
+      try {
+        recognizer = await buildOfflineAsrRecognizer(
+          architecture,
+          files,
+          loader,
+          id,
+          language: primaryLang,
+        );
+      } on ArgumentError catch (e) {
+        _appendNote(entry, 'skipped: ${e.message}');
+        if (debug) stderr.writeln('[Debug] ArgumentError: ${e.message}');
+        return;
+      }
+
+      try {
+        final stream = recognizer.createStream();
+        stream.acceptWaveform(samples: wavData, sampleRate: 16000);
+        recognizer.decode(stream);
+        final result = recognizer.getResult(stream).text;
+        stream.free();
+        if (result.isEmpty) _appendNote(entry, 'note: empty ASR output');
+      } finally {
+        recognizer.free();
+      }
+      return;
+    }
+
     final sherpa_onnx.OnlineRecognizer recognizer;
     try {
       recognizer = await buildAsrRecognizer(architecture, files, loader, id);
@@ -238,11 +277,6 @@ class VoiceCatalogEvaluator {
       if (debug) stderr.writeln('[Debug] ArgumentError: ${e.message}');
       return;
     }
-
-    final langs = (entry['languages'] as List<dynamic>? ?? []).cast<String>();
-    final primaryLang = langs.isNotEmpty ? langs.first : 'en';
-    final wavPath = _fixturePath(primaryLang);
-    final wavData = await _readWavSamples(wavPath);
 
     try {
       final stream = recognizer.createStream();
@@ -318,7 +352,7 @@ class VoiceCatalogEvaluator {
     }
   }
 
-  /// Infer TTS architecture from the file structure detected by [_inspectDirectory].
+  /// Infer TTS architecture from the file structure detected by [inspectDirectory].
   ///
   /// Returns null when the structure doesn't match any known pattern.
   ModelArchitecture? _detectTtsArchitecture(Map<String, dynamic> files) {
@@ -332,7 +366,7 @@ class VoiceCatalogEvaluator {
     return null;
   }
 
-  /// Infer ASR architecture from the file structure detected by [_inspectDirectory].
+  /// Infer ASR architecture from the file structure detected by [inspectDirectory].
   ///
   /// Returns null when the structure doesn't match any known pattern.
   ModelArchitecture? _detectAsrArchitecture(Map<String, dynamic> files) {
@@ -347,7 +381,13 @@ class VoiceCatalogEvaluator {
     return null;
   }
 
-  Future<Map<String, dynamic>> _inspectDirectory(String modelDir) async {
+  /// Detect a downloaded model's file layout, mapping logical names (e.g.
+  /// 'encoder', 'tokens') to paths relative to [modelDir].
+  ///
+  /// Static and side-effect-free (a pure function of the filesystem) so it
+  /// can be unit-tested directly against a temp directory — see
+  /// evaluator_test.dart.
+  static Future<Map<String, dynamic>> inspectDirectory(String modelDir) async {
     final dir = Directory(modelDir);
     if (!await dir.exists()) return {};
 
@@ -379,7 +419,12 @@ class VoiceCatalogEvaluator {
         // Piper VITS and similar models use an arbitrary filename (e.g.
         // da_DK-talesyntese-medium.onnx). Use as 'model' fallback.
         structure.putIfAbsent('model', () => rel);
-      } else if (name == 'tokens.txt') {
+      } else if (name.endsWith('tokens.txt')) {
+        // Whisper's export-onnx.py prefixes every filename with the model
+        // name (e.g. "nb-whisper-base-tokens.txt") instead of the bare
+        // "tokens.txt" every other architecture uses — endsWith catches
+        // both, matching the contains() checks already used for encoder/
+        // decoder/joiner above.
         structure['tokens'] = rel;
       } else if (name == 'lang_list.txt' ||
           name == 'language_list.txt' ||

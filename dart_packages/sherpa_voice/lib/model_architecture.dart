@@ -32,3 +32,15 @@ enum ModelArchitecture {
 
 /// Type of voice model.
 enum ModelType { asr, tts }
+
+extension ModelArchitectureCapabilities on ModelArchitecture {
+  /// Whether this architecture only has an offline (non-streaming) sherpa-onnx
+  /// recognizer — needs [OfflineRecognizer] fed VAD-chunked segments (see
+  /// buildOfflineAsrRecognizer in asr_config.dart) rather than the live
+  /// [OnlineRecognizer] path (buildAsrRecognizer). Single source of truth for
+  /// this split — production ASR backend selection and the voice-catalog
+  /// evaluator both key off this.
+  bool get isOfflineAsr =>
+      this == ModelArchitecture.whisper ||
+      this == ModelArchitecture.offlineNemoTransducer;
+}

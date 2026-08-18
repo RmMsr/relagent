@@ -89,9 +89,7 @@ class NativeVoiceService extends VoiceService {
     }
 
     if (_asr == null) {
-      final isOffline = asrMetadata?.architecture ==
-              ModelArchitecture.offlineNemoTransducer ||
-          asrMetadata?.architecture == ModelArchitecture.whisper;
+      final isOffline = asrMetadata?.architecture.isOfflineAsr ?? false;
       if (isOffline) {
         Logger.debug('NativeVoiceService: Using VAD-based offline ASR');
         _asr = VadAsr(

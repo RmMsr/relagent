@@ -777,6 +777,38 @@ class VoiceCatalogDiscovery {
   }
 
   _ParsedFilename _parseNemoTransducer(String base) {
+    // NeMo's cache-aware streaming FastConformer/Parakeet transducer export
+    // (encoder inputs: audio_signal, length, cache_last_channel,
+    // cache_last_time, cache_last_channel_len — confirmed by inspecting
+    // sherpa-onnx-nemo-streaming-fast-conformer-transducer-en-80ms-int8's
+    // encoder.int8.onnx directly) has no matching sherpa-onnx Dart config:
+    // OnlineTransducerModelConfig is shaped for live Zipformer (no cache
+    // tensors at all) and OfflineTransducerModelConfig is shaped for the
+    // *non*-cache-aware NeMo transducer export (plain Parakeet-TDT etc, no
+    // persistent state across calls). Attempting either is an uncatchable
+    // ONNX Runtime abort (SIGABRT), not a recoverable Dart exception — see
+    // evaluator.dart's own warning about native loading being the risky step.
+    // k2-fsa always names this export "streaming" plus a "-<n>ms" chunk-
+    // latency suffix, exactly like its CTC sibling a few lines up (which
+    // sherpa-onnx *does* support, via onlineNemoCtc). Route it to a
+    // catalog-only label instead of offlineNemoTransducer so
+    // VoiceCatalogFilter excludes it up front rather than crashing the eval
+    // run. Explicitly excludes "non-streaming" — e.g. nemo-parakeet-unified
+    // ships both a plain "-non-streaming" export (genuinely offline, no
+    // cache tensors) and "-streaming-<n>ms" exports side by side, and a bare
+    // contains('streaming') would wrongly catch "non-streaming" too.
+    if (base.contains('streaming') &&
+        !base.contains('non-streaming') &&
+        !base.contains('nonstreaming')) {
+      return _ParsedFilename(
+        type: 'asr',
+        architecture: 'nemoCacheAwareStreamingTransducer',
+        languages: _extractLanguagesFromFilename(base),
+        origin: 'NVIDIA NeMo / k2-fsa',
+        sourceUrl: 'https://github.com/NVIDIA-NeMo/Speech',
+      );
+    }
+
     // Hardcoded language lists for models whose filenames carry no language
     // signal. Verified against https://k2-fsa.github.io/sherpa/onnx/
     // pretrained_models/offline-transducer/nemo-transducer-models.html
@@ -922,6 +954,7 @@ class VoiceCatalogDiscovery {
       'nemotronStreaming': 'Nemotron Streaming', 'whisper': 'Whisper',
       'moonshine': 'Moonshine', 'wenetCtc': 'WeNet CTC',
       'zipformerOfflineTransducer': 'Zipformer (offline)',
+      'nemoCacheAwareStreamingTransducer': 'NeMo Cache-Aware Streaming Transducer',
       'zipformerStreamingMobile': 'Zipformer Streaming (mobile)',
       'omnilingualCtc': 'Omnilingual CTC',
       'funasrNano': 'FunASR Nano',
