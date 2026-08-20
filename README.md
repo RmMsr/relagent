@@ -117,7 +117,7 @@ Those are some very relevant topics that we would love to spend time on:
 
 Several aspects are on purpose out of scope at the moment:
 
-- The mobile and desktop **apps are not yet published in all appstores**. Follow the instructions to build them yourself.
+- The android app is available in app stores. For the other mobile and desktop platform follow the instructions to build them yourself.
 - Only **English has full language support**. Other languages can be used, but LLMs will often fall back to English.
 - **Dependency on OpenAI compatible endpoint** when not using the bundled image. You can choose from many self-hosting options to run your own inference server.
 - **Choosing an objectively good LLM** is hard and arguable impossible. Instead of promoting a specific one, we try to be compatible with the open and less biased ethical models, but ultimately leave the choice to the user.
