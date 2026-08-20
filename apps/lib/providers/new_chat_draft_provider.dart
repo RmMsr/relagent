@@ -153,4 +153,14 @@ class NewChatDraftNotifier extends Notifier<NewChatDraftState> {
   void clearError() {
     state = state.copyWith(error: null);
   }
+
+  /// Discards the current draft — the pending user message, any in-flight
+  /// "sending" indicator, and any error — so starting a new chat always
+  /// shows a genuinely blank composer, even if the previous draft was still
+  /// waiting on its first response (no session/assistant reply yet, so
+  /// there was nothing for switching `displayedSessionProvider` away to
+  /// clear).
+  void reset() {
+    state = NewChatDraftState.initial();
+  }
 }

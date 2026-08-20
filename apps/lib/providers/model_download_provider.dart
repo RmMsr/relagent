@@ -106,14 +106,21 @@ class ModelDownloadNotifier extends Notifier<ModelDownloadState> {
   }
 
   Future<void> _refreshDownloadedModels({bool initialScan = false}) async {
+    // The list of downloaded models only needs a directory listing plus a
+    // marker-file check per model, so it resolves quickly. Total storage
+    // used requires a recursive walk over every file in every downloaded
+    // model's directory, which can take a while once several large models
+    // are on disk — that must not hold up showing the model list itself.
     final downloaded = await _service.listDownloadedModels();
-    final storage = await _service.totalStorageUsed();
     if (!ref.mounted) return;
     state = state.copyWith(
       downloadedModels: downloaded,
-      totalStorageBytes: storage,
       isScanning: initialScan ? false : null,
     );
+
+    final storage = await _service.totalStorageUsed();
+    if (!ref.mounted) return;
+    state = state.copyWith(totalStorageBytes: storage);
   }
 
   /// Start downloading a model. Multiple downloads can run concurrently.

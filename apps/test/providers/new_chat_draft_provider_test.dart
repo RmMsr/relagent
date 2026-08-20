@@ -198,5 +198,48 @@ void main() {
 
       expect(requestCount.length, 1);
     });
+
+    test(
+        'reset() clears a pending draft even while its first send is still '
+        'in flight (no session/assistant reply yet, so there is nothing '
+        'for switching displayedSessionProvider to clear)',
+        () async {
+      final started = Completer<void>();
+      final release = Completer<void>();
+      final mockClient = MockClient((request) async {
+        started.complete();
+        await release.future;
+        return http.Response(
+          jsonEncode({
+            'session_id': 'new-session',
+            'message': {
+              'message_id': 'm-response',
+              'role': 'assistant',
+              'content': 'hi',
+              'final': true,
+            },
+          }),
+          200,
+        );
+      });
+
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(newChatDraftProvider.notifier);
+
+      final send = notifier.sendMessage('hello', client: mockClient);
+      await started.future;
+      expect(container.read(newChatDraftProvider).pendingUserMessage, isNotNull);
+
+      notifier.reset();
+
+      final draft = container.read(newChatDraftProvider);
+      expect(draft.pendingUserMessage, isNull);
+      expect(draft.isLoading, isFalse);
+      expect(draft.error, isNull);
+
+      release.complete();
+      await send;
+    });
   });
 }

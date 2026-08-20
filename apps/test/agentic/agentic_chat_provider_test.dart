@@ -9,6 +9,7 @@ import 'package:relagent/agentic/models.dart';
 import 'package:relagent/models/settings.dart';
 import 'package:relagent/providers/agentic_chat_provider.dart';
 import 'package:relagent/providers/settings_provider.dart';
+import 'package:relagent/providers/tts_provider.dart';
 
 /// Minimal settings stub — avoids SharedPreferences, modelDownloadProvider,
 /// and path_provider so these tests run as pure unit tests. Session
@@ -24,6 +25,26 @@ class _StubSettingsNotifier extends SettingsNotifier {
 
   @override
   Future<String?> getEngineApiKey({String? url}) async => null;
+
+  /// Lets a test flip voice mode mid-flight, simulating the user turning on
+  /// auto-playback while a request is still in the air.
+  void setVoiceModeForTest(VoiceMode mode) {
+    state = state.copyWith(voiceMode: mode);
+  }
+}
+
+/// Records enqueue() calls instead of touching real TTS/audio backends,
+/// which aren't available in a plain ProviderContainer unit test.
+class _RecordingTtsNotifier extends TtsNotifier {
+  final List<String> enqueuedMessageIds = [];
+
+  @override
+  TtsState build() => TtsState.initial();
+
+  @override
+  Future<void> enqueue(String text, String messageId) async {
+    enqueuedMessageIds.add(messageId);
+  }
 }
 
 AgenticMessage _systemMessageWithApprovals(List<ApprovalData> approvals) {
@@ -819,6 +840,64 @@ void main() {
             'always-reconcile-on-redisplay design',
       );
       freshWatch.close();
+    });
+  });
+
+  group('AgenticChatNotifier — auto-playback re-check on response arrival', () {
+    test(
+        'turning on auto-playback while a request is in flight still plays '
+        'the response that arrives afterward',
+        () async {
+      final settingsNotifier = _StubSettingsNotifier();
+      final fakeTts = _RecordingTtsNotifier();
+      final responseGate = Completer<void>();
+
+      final mockClient = MockClient((request) async {
+        // Held open so the test can flip voice mode before the response
+        // lands, mirroring the user toggling continuous playback while
+        // still waiting for the engine to answer.
+        await responseGate.future;
+        return http.Response(
+          jsonEncode({
+            'message': {
+              'role': 'assistant',
+              'content': 'hi there',
+              'message_id': 'resp-1',
+              'final': true,
+            },
+          }),
+          200,
+        );
+      });
+
+      final container = ProviderContainer(
+        overrides: [
+          settingsProvider.overrideWith(() => settingsNotifier),
+          ttsProvider.overrideWith(() => fakeTts),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier =
+          container.read(agenticChatProvider('auto-play-session').notifier);
+
+      // Voice mode starts silent (no auto-playback) when the message is sent.
+      final sendFuture = notifier.sendMessage('hello', client: mockClient);
+
+      // The user turns on continuous playback while the request is still
+      // in flight.
+      settingsNotifier.setVoiceModeForTest(VoiceMode.reading);
+
+      responseGate.complete();
+      await sendFuture;
+
+      expect(
+        fakeTts.enqueuedMessageIds,
+        isNotEmpty,
+        reason: 'auto-playback must be re-checked against current settings '
+            'when the response arrives, not the stale settings captured '
+            'when the request was sent',
+      );
     });
   });
 }

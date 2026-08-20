@@ -360,7 +360,11 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
           : response.text;
       Logger.debug('AgenticChat: Received response [id=${response.messageId}]: $preview');
 
-      if (settings.isAutoPlayback && response.role == AgenticRole.assistant) {
+      // Re-read settings rather than reusing the snapshot captured before
+      // the request: auto-playback may have been turned on while the
+      // response was still in flight, and that must still apply to it.
+      if (ref.read(settingsProvider).isAutoPlayback &&
+          response.role == AgenticRole.assistant) {
         ref.read(ttsProvider.notifier).enqueue(response.text, response.localId);
       }
 

@@ -176,6 +176,10 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
             tooltip: 'New Session',
             onPressed: () {
               ref.read(displayedSessionProvider.notifier).show(null);
+              // Switching the displayed session away is a no-op when a
+              // session hasn't been created yet (still drafting the first
+              // message) — reset the draft directly so it's always cleared.
+              ref.read(newChatDraftProvider.notifier).reset();
               ref.read(ttsProvider.notifier).onChatCleared();
               _showSnackBar('New session started');
             },

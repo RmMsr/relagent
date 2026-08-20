@@ -27,6 +27,31 @@ set -eu
 TARGET_BRANCH="main"
 SQUASH=true
 
+print_help() {
+    cat <<EOF
+Usage: $0 [OPTIONS]
+
+Completes the worktree workflow started by start-worktree.sh. Run this
+from within a worktree directory created by start-worktree.sh.
+
+Workflow:
+  1. Use start-worktree.sh to create a worktree from main (or other branch)
+  2. Work on changes in the worktree directory
+  3. Run apply-worktree.sh from within the worktree to:
+     - Commit pending changes with AI-generated message
+     - Squash all commits not in local main (unless --no-squash)
+     - Switch to main branch in source directory
+     - Fast-forward merge the worktree branch
+     - Remove the worktree
+     - Delete the branch
+
+Options:
+  --target-branch BRANCH_NAME  Branch to merge into (default: main)
+  --no-squash                  Keep individual commits instead of squashing
+  -h, --help                   Show this help message and exit
+EOF
+}
+
 # Parse command line arguments
 while [ $# -gt 0 ]; do
     case $1 in
@@ -37,6 +62,10 @@ while [ $# -gt 0 ]; do
         --no-squash)
             SQUASH=false
             shift
+            ;;
+        -h|--help)
+            print_help
+            exit 0
             ;;
         *)
             echo "Unknown option: $1"

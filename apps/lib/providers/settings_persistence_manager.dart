@@ -9,6 +9,15 @@ const _settingsKey = 'user_settings';
 class SettingsPersistenceManager {
   final SharedPreferences _prefs;
 
+  /// Chains saveSettings() calls so they run one at a time. Callers can
+  /// trigger a save from independent places (an explicit user edit, the
+  /// post-scan model-selection cleanup) around the same time; without this,
+  /// two concurrent writes can interleave between one call's setString and
+  /// its own read-back verification, making that verification see the
+  /// *other* call's value and fail spuriously — or worse, persist whichever
+  /// write happened to land last regardless of call order.
+  Future<void> _saveQueue = Future.value();
+
   SettingsPersistenceManager(this._prefs);
 
   Settings loadSettings() {
@@ -26,7 +35,13 @@ class SettingsPersistenceManager {
     }
   }
 
-  Future<bool> saveSettings(Settings settings) async {
+  Future<bool> saveSettings(Settings settings) {
+    final result = _saveQueue.then((_) => _doSaveSettings(settings));
+    _saveQueue = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  Future<bool> _doSaveSettings(Settings settings) async {
     try {
       final jsonString = jsonEncode(settings.toJson());
       final success = await _prefs.setString(_settingsKey, jsonString);

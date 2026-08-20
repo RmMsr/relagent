@@ -5,6 +5,7 @@ import 'package:relagent/agentic/models.dart';
 import 'package:relagent/agentic/widgets.dart';
 import 'package:relagent/providers/voice_service_provider.dart';
 import 'package:relagent/voice/voice_service.dart';
+import 'package:relagent/widgets/message_markdown_actions.dart';
 
 class _FakeVoiceCapabilities implements VoiceCapabilities {
   @override
@@ -487,6 +488,70 @@ void main() {
 
       await tester.tap(find.widgetWithIcon(IconButton, Icons.send));
       expect(submitted, 'queued recovered');
+    });
+  });
+
+  group('Message bubble copy button', () {
+    testWidgets('user message bubble has no copy button', (tester) async {
+      await tester.pumpWidget(_wrap(AgenticChatHistory(
+        messages: [_settledUserMsg()],
+      )));
+      await tester.pump();
+
+      expect(find.byType(MessageCopyButton), findsNothing);
+    });
+
+    testWidgets('assistant message bubble still has a copy button', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_wrap(AgenticChatHistory(
+        messages: [
+          AgenticMessage(
+            messageId: 'a1',
+            localId: 'a1',
+            text: 'hi there',
+            role: AgenticRole.assistant,
+            isFinal: true,
+          ),
+        ],
+      )));
+      await tester.pump();
+
+      expect(find.byType(MessageCopyButton), findsOneWidget);
+    });
+  });
+
+  group('Agent stats row — long answering model name', () {
+    testWidgets(
+        'does not overflow the message bubble when the model name is long',
+        (tester) async {
+      final message = AgenticMessage(
+        messageId: 'm1',
+        localId: 'l1',
+        text: 'Hello there',
+        role: AgenticRole.assistant,
+        stats: const AgentStats(
+          answeringModelName:
+              'openrouter/anthropic/claude-3.7-sonnet-thinking-extended-context-preview',
+          inputTokens: 120,
+          outputTokens: 45,
+        ),
+        isFinal: true,
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          SizedBox(
+            width: 360, // narrow phone-width bubble
+            child: AgenticChatHistory(messages: [message]),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.insights));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
     });
   });
 }

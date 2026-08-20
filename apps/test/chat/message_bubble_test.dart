@@ -6,6 +6,7 @@ import 'package:relagent/chat/models.dart';
 import 'package:relagent/chat/widgets.dart';
 import 'package:relagent/providers/tts_provider.dart';
 import 'package:relagent/theme/app_colors.dart';
+import 'package:relagent/widgets/message_markdown_actions.dart';
 
 Widget _wrap(Widget child) => ProviderScope(
   child: MaterialApp(theme: AppTheme.light(), home: Scaffold(body: child)),
@@ -68,6 +69,26 @@ void main() {
     final border = deco.border as Border?;
     expect(border?.left.width, 4.0);
     expect(border?.left.color, RelagentColors.errorBorder);
+  });
+
+  testWidgets('user message bubble has no copy button', (tester) async {
+    await tester.pumpWidget(
+      _wrap(ChatMessageBubble(message: _msg(ChatRole.user, 'hello'))),
+    );
+    await tester.pump();
+
+    expect(find.byType(MessageCopyButton), findsNothing);
+  });
+
+  testWidgets('assistant message bubble still has a copy button', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(ChatMessageBubble(message: _msg(ChatRole.assistant, 'hi'))),
+    );
+    await tester.pump();
+
+    expect(find.byType(MessageCopyButton), findsOneWidget);
   });
 
   testWidgets('idle assistant message shows a single speak button', (

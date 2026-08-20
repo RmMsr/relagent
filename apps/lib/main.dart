@@ -54,11 +54,41 @@ void main() async {
   );
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // ThemeMode.system relies on Theme/MediaQuery's own InheritedWidget
+  // propagation to rebuild every themed descendant when the OS brightness
+  // flips live. On the Linux desktop embedder that propagation is not
+  // reliably complete — some widgets pick up the new theme, others are left
+  // rendering with colors from the old one, mismatched, until restart.
+  // Explicitly rebuilding the whole app root here is a cheap safety net
+  // that doesn't depend on that propagation reaching every descendant.
+  @override
+  void didChangePlatformBrightness() {
+    super.didChangePlatformBrightness();
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Initialize background service provider to start listening to AudioCoordinator
     // This ensures the service syncs with audio state changes
     ref.read<BackgroundServiceState>(backgroundServiceProvider);

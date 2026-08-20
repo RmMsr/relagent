@@ -509,6 +509,13 @@ class ChatMessageBubble extends StatelessWidget {
                       selectionControls: MaterialTextSelectionControls(),
                       child: GptMarkdown(
                         message.text,
+                        // Flutter's Table RenderObject caches its row
+                        // decoration painters and doesn't always repaint
+                        // them on a live theme/brightness change, leaving
+                        // markdown table headers stuck on stale colors.
+                        // Keying on brightness forces a full remount when
+                        // it changes, avoiding that stale-paint cache.
+                        key: ValueKey(theme.brightness),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.primary,
                         ),
@@ -522,7 +529,7 @@ class ChatMessageBubble extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (onRetry != null) ...[
+                          if (onRetry != null)
                             IconButton.outlined(
                               icon: const Icon(Icons.refresh, size: 18),
                               iconSize: 18,
@@ -534,9 +541,6 @@ class ChatMessageBubble extends StatelessWidget {
                               tooltip: 'Retry',
                               onPressed: () => onRetry!(message.text),
                             ),
-                            const SizedBox(width: 8),
-                          ],
-                          MessageCopyButton(text: message.text),
                         ],
                       ),
                     ),
@@ -602,6 +606,9 @@ class ChatMessageBubble extends StatelessWidget {
     if (paragraphs.isEmpty) {
       return GptMarkdown(
         message.text,
+        // See the brightness key note in the ChatRole.user branch above —
+        // works around a Flutter Table repaint-cache bug.
+        key: ValueKey(theme.brightness),
         style: theme.textTheme.bodyMedium,
         onLinkTap: linkTapHandler(context),
       );
@@ -627,6 +634,9 @@ class ChatMessageBubble extends StatelessWidget {
                 : null,
             child: GptMarkdown(
               paragraphs[i],
+              // See the brightness key note above. Combined with the
+              // paragraph index so siblings in this loop don't collide.
+              key: ValueKey((i, theme.brightness)),
               style: theme.textTheme.bodyMedium,
               onLinkTap: linkTapHandler(context),
             ),

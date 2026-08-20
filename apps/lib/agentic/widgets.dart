@@ -557,11 +557,6 @@ class _AgenticMessageBubble extends StatelessWidget {
                     const MessageTtsState(),
               ),
             ),
-          if (isUser && !isError)
-            Padding(
-              padding: const EdgeInsets.only(top: 4, right: 4),
-              child: MessageCopyButton(text: message.text),
-            ),
           if (!isUser && !isError)
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 4),
@@ -624,7 +619,16 @@ class _AgenticMessageBubble extends StatelessWidget {
   ) {
     final paragraphs = splitRawParagraphs(message.text);
     if (paragraphs.isEmpty) {
-      return GptMarkdown(message.text, onLinkTap: linkTapHandler(context));
+      // Flutter's Table RenderObject caches its row decoration painters
+      // and doesn't always repaint them on a live theme/brightness change,
+      // leaving markdown table headers stuck on stale colors. Keying on
+      // brightness forces a full remount when it changes, avoiding that
+      // stale-paint cache.
+      return GptMarkdown(
+        message.text,
+        key: ValueKey(theme.brightness),
+        onLinkTap: linkTapHandler(context),
+      );
     }
 
     final activeIndex = ttsMessageState.hasPlaybackFocus
@@ -645,7 +649,13 @@ class _AgenticMessageBubble extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   )
                 : null,
-            child: GptMarkdown(paragraphs[i], onLinkTap: linkTapHandler(context)),
+            child: GptMarkdown(
+              paragraphs[i],
+              // See the brightness key note above. Combined with the
+              // paragraph index so siblings in this loop don't collide.
+              key: ValueKey((i, theme.brightness)),
+              onLinkTap: linkTapHandler(context),
+            ),
           ),
       ],
     );
@@ -872,7 +882,13 @@ class _StatsContent extends StatelessWidget {
                         color: iconColor,
                       ),
                       const SizedBox(width: 4),
-                      Text('Agent: ${stats.agentName!}', style: textStyle),
+                      Flexible(
+                        child: Text(
+                          'Agent: ${stats.agentName!}',
+                          style: textStyle,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 if (stats.answeringModelName != null)
@@ -881,9 +897,12 @@ class _StatsContent extends StatelessWidget {
                     children: [
                       Icon(Icons.memory, size: iconSize, color: iconColor),
                       const SizedBox(width: 4),
-                      Text(
-                        'Model: ${stats.answeringModelName!}',
-                        style: textStyle,
+                      Flexible(
+                        child: Text(
+                          'Model: ${stats.answeringModelName!}',
+                          style: textStyle,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),

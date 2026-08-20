@@ -230,8 +230,11 @@ class ChatNotifier extends Notifier<ChatState> {
           : response.text;
       Logger.debug('ChatProvider: Received message [${response.id}]: $preview');
 
-      // Auto-queue the assistant response for TTS playback if in auto-playback mode
-      if (settings.isAutoPlayback) {
+      // Auto-queue the assistant response for TTS playback if in auto-playback
+      // mode. Re-read settings rather than reusing the snapshot captured
+      // before the request: auto-playback may have been turned on while the
+      // response was still in flight, and that must still apply to it.
+      if (ref.read(settingsProvider).isAutoPlayback) {
         ref.read(ttsProvider.notifier).enqueue(response.text, response.id);
       }
     } catch (e) {
@@ -437,8 +440,11 @@ class ChatNotifier extends Notifier<ChatState> {
         'ChatProvider: Retry successful, received message [${response.id}]: $preview',
       );
 
-      // Auto-queue the assistant response for TTS playback if in auto-playback mode
-      if (settings.isAutoPlayback) {
+      // Auto-queue the assistant response for TTS playback if in auto-playback
+      // mode. Re-read settings rather than reusing the snapshot captured
+      // before the request: auto-playback may have been turned on while the
+      // response was still in flight, and that must still apply to it.
+      if (ref.read(settingsProvider).isAutoPlayback) {
         ref.read(ttsProvider.notifier).enqueue(response.text, response.id);
       }
     } catch (e) {

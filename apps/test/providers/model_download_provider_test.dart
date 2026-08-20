@@ -92,6 +92,19 @@ class _ControlledModelDownloadService extends ModelDownloadService {
   }
 }
 
+/// Never resolves totalStorageUsed() until the test signals it via
+/// [storageGate] — mirrors the recursive per-file disk walk taking much
+/// longer than the directory listing that lists which models are present.
+class _SlowStorageModelDownloadService extends ModelDownloadService {
+  final Completer<void> storageGate = Completer<void>();
+
+  @override
+  Future<int> totalStorageUsed() async {
+    await storageGate.future;
+    return super.totalStorageUsed();
+  }
+}
+
 /// Records every enable/disable call instead of touching a real platform
 /// channel — WakelockPlus has no default test implementation.
 class _FakeWakelockPlatform extends WakelockPlusPlatformInterface {
@@ -227,5 +240,36 @@ void main() {
     fake.gates['zipformer-fr-kroko']!.complete();
     await future2;
     expect(fakeWakelock.calls, [true, false]);
+  });
+
+  test('the initial scan stops blocking the model list before the slower '
+      'total-storage walk finishes', () async {
+    final fake = _SlowStorageModelDownloadService();
+    final entry = ModelCatalog.findById('zipformer-en-kroko')!;
+    final dir = Directory(await fake.getModelPath(entry));
+    await dir.create(recursive: true);
+    await File('${dir.path}/.complete').writeAsString('done');
+
+    final container = ProviderContainer(
+      overrides: [modelDownloadServiceProvider.overrideWithValue(fake)],
+    );
+    addTearDown(container.dispose);
+
+    // Reading the provider triggers build(), which kicks off the initial
+    // scan in the background. Give the directory-listing half a moment to
+    // finish while totalStorageUsed() stays gated.
+    container.read(modelDownloadProvider);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final scanned = container.read(modelDownloadProvider);
+    expect(scanned.isScanning, isFalse);
+    expect(scanned.isDownloaded('zipformer-en-kroko'), isTrue);
+    expect(scanned.totalStorageBytes, 0);
+
+    fake.storageGate.complete();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final settled = container.read(modelDownloadProvider);
+    expect(settled.totalStorageBytes, greaterThan(0));
   });
 }

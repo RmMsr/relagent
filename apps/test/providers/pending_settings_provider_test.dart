@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:relagent/providers/model_download_provider.dart';
 import 'package:relagent/providers/pending_settings_provider.dart';
 import 'package:relagent/providers/settings_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,6 +20,20 @@ void main() {
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
       ],
     );
+
+    // settingsProvider's build() kicks off the initial downloaded-models
+    // scan and clears any stale model selection once it settles. Let that
+    // background step finish before each test, so it doesn't race with a
+    // test's own settings changes — a real user wouldn't be editing
+    // settings in the sub-millisecond window before that startup scan
+    // completes either.
+    for (
+      var i = 0;
+      i < 200 && container.read(modelDownloadProvider).isScanning;
+      i++
+    ) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
   });
 
   tearDown(() {
