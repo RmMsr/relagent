@@ -12,7 +12,10 @@ Future<void> copyMessageText(BuildContext context, String text) async {
   await Clipboard.setData(ClipboardData(text: text));
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Copied to clipboard'), duration: Duration(seconds: 2)),
+    const SnackBar(
+      content: Text('Copied to clipboard'),
+      duration: Duration(seconds: 2),
+    ),
   );
 }
 

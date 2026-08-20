@@ -72,19 +72,21 @@ Future<sherpa_onnx.OfflineTtsModelConfig> _buildModelConfig(
           lmMain: await loader.loadModelFile(modelId, files['lmMain']!),
           encoder: await loader.loadModelFile(modelId, files['encoder']!),
           decoder: await loader.loadModelFile(modelId, files['decoder']!),
-          textConditioner:
-              await loader.loadModelFile(modelId, files['textConditioner']!),
+          textConditioner: await loader.loadModelFile(
+            modelId,
+            files['textConditioner']!,
+          ),
           vocabJson: await loader.loadModelFile(modelId, files['vocabJson']!),
-          tokenScoresJson:
-              await loader.loadModelFile(modelId, files['tokenScoresJson']!),
+          tokenScoresJson: await loader.loadModelFile(
+            modelId,
+            files['tokenScoresJson']!,
+          ),
         ),
         numThreads: 2,
         debug: false,
       );
 
     default:
-      throw ArgumentError(
-        'Unsupported TTS architecture: $architecture',
-      );
+      throw ArgumentError('Unsupported TTS architecture: $architecture');
   }
 }

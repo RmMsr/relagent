@@ -433,11 +433,13 @@ class Settings {
         final raw = json['engineUrlHistory'] as List<dynamic>?;
         if (raw == null || raw.isEmpty) return const <EngineUrlEntry>[];
         if (raw.first is String) {
-          return raw.cast<String>()
+          return raw
+              .cast<String>()
               .map((url) => EngineUrlEntry(url: url))
               .toList();
         }
-        return raw.cast<Map<String, dynamic>>()
+        return raw
+            .cast<Map<String, dynamic>>()
             .map((e) => EngineUrlEntry.fromJson(e))
             .toList();
       }(),

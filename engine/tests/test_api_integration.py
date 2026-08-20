@@ -219,9 +219,7 @@ class TestNewApprovalEndpoints:
         assert resp.json()["detail"]["error"] == "no_in_flight_cycle"
 
     def test_stop_unknown_session_returns_404(self, client: TestClient):
-        resp = client.post(
-            "/api/v1/sessions/00000000-0000-0000-0000-000000000001/stop"
-        )
+        resp = client.post("/api/v1/sessions/00000000-0000-0000-0000-000000000001/stop")
         assert resp.status_code == 404
 
 

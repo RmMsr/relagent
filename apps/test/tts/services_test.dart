@@ -43,8 +43,7 @@ const _testModel = ResolvedTtsModel(
 
 void main() {
   group('TtsService', () {
-    test(
-        'a null resolvedTtsModel does not permanently stick the service as '
+    test('a null resolvedTtsModel does not permanently stick the service as '
         'initialized — a later call after it resolves succeeds without '
         'needing an explicit reinitializeWithModel', () async {
       final voiceService = _TrackingVoiceService();
@@ -73,8 +72,7 @@ void main() {
       expect(voiceService.initialized, isTrue);
     });
 
-    test('a resolved model initializes normally on the first call',
-        () async {
+    test('a resolved model initializes normally on the first call', () async {
       final voiceService = _TrackingVoiceService();
       final service = TtsService(voiceService)..resolvedTtsModel = _testModel;
 

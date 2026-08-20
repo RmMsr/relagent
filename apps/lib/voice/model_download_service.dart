@@ -112,8 +112,7 @@ class ModelDownloadService {
     try {
       final tempDir = await getTemporaryDirectory();
       final tempFile = File(p.join(tempDir.path, '${entry.id}.tar.bz2'));
-      var existingBytes =
-          await tempFile.exists() ? await tempFile.length() : 0;
+      var existingBytes = await tempFile.exists() ? await tempFile.length() : 0;
 
       var response = await client.send(_buildRequest(entry, existingBytes));
 
@@ -121,9 +120,7 @@ class ModelDownloadService {
         // The server ignored our Range request (or the partial file no
         // longer matches what it would serve) — drop it and start over
         // instead of appending onto or corrupting the archive.
-        Logger.info(
-          'Resume not honored for ${entry.id}; restarting download',
-        );
+        Logger.info('Resume not honored for ${entry.id}; restarting download');
         if (await tempFile.exists()) await tempFile.delete();
         existingBytes = 0;
         response = await client.send(_buildRequest(entry, existingBytes));

@@ -120,10 +120,7 @@ void main() {
     // Picker closed, preference pinned and pushed to the voice service.
     expect(find.byType(MicPickerSheet), findsNothing);
     expect(voiceService.lastPreference?.isAuto, false);
-    expect(
-      voiceService.lastPreference?.category,
-      MicDeviceCategory.builtin,
-    );
+    expect(voiceService.lastPreference?.category, MicDeviceCategory.builtin);
   });
 
   testWidgets('picker marks the current selection', (tester) async {
@@ -153,45 +150,47 @@ void main() {
   });
 
   group('continuous recording surfaces show the active device', () {
-    testWidgets('continuous listening indicator keeps its live icon and badges it', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: RecordingStateIndicator(
-              recordingState: RecordingState(isRecording: true),
-              voiceMode: VoiceMode.listening,
-              micCategory: MicDeviceCategory.bluetooth,
+    testWidgets(
+      'continuous listening indicator keeps its live icon and badges it',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: RecordingStateIndicator(
+                recordingState: RecordingState(isRecording: true),
+                voiceMode: VoiceMode.listening,
+                micCategory: MicDeviceCategory.bluetooth,
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
-      expect(find.byIcon(Icons.bluetooth), findsOneWidget);
-    });
+        expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
+        expect(find.byIcon(Icons.bluetooth), findsOneWidget);
+      },
+    );
 
-    testWidgets('continuous listening indicator is unbadged for the built-in mic', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: RecordingStateIndicator(
-              recordingState: RecordingState(isRecording: true),
-              voiceMode: VoiceMode.listening,
-              micCategory: MicDeviceCategory.builtin,
+    testWidgets(
+      'continuous listening indicator is unbadged for the built-in mic',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: RecordingStateIndicator(
+                recordingState: RecordingState(isRecording: true),
+                voiceMode: VoiceMode.listening,
+                micCategory: MicDeviceCategory.builtin,
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
-      expect(find.byIcon(Icons.bluetooth), findsNothing);
-    });
+        expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
+        expect(find.byIcon(Icons.bluetooth), findsNothing);
+      },
+    );
 
     Future<void> pumpSelector(WidgetTester tester) async {
       SharedPreferences.setMockInitialValues({
@@ -205,9 +204,7 @@ void main() {
             sharedPreferencesProvider.overrideWithValue(prefs),
             voiceServiceProvider.overrideWithValue(voiceService),
           ],
-          child: const MaterialApp(
-            home: Scaffold(body: VoiceModeSelector()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: VoiceModeSelector())),
         ),
       );
       await tester.pumpAndSettle();
@@ -222,17 +219,20 @@ void main() {
       expect(find.byIcon(Icons.bluetooth), findsOneWidget);
     });
 
-    testWidgets('continuous recording toggle is unbadged where selection is unsupported', (
+    testWidgets(
+      'continuous recording toggle is unbadged where selection is unsupported',
+      (tester) async {
+        voiceService.inputSelectionAvailable = false;
+        await pumpSelector(tester);
+
+        expect(find.byIcon(Icons.mic), findsOneWidget);
+        expect(find.byIcon(Icons.bluetooth), findsNothing);
+      },
+    );
+
+    testWidgets('the playback toggle never carries a mic badge', (
       tester,
     ) async {
-      voiceService.inputSelectionAvailable = false;
-      await pumpSelector(tester);
-
-      expect(find.byIcon(Icons.mic), findsOneWidget);
-      expect(find.byIcon(Icons.bluetooth), findsNothing);
-    });
-
-    testWidgets('the playback toggle never carries a mic badge', (tester) async {
       await pumpSelector(tester);
 
       // Playback is off in this state, so its icon is volume_off; the single

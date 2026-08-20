@@ -95,7 +95,9 @@ class AudioTestFixture {
         // Override AudioPlayer provider with mock
         audioPlayerProvider.overrideWithValue(mockAudioPlayer),
         // Stub model download service so no async filesystem I/O outlives tests
-        modelDownloadServiceProvider.overrideWithValue(_NoOpModelDownloadService()),
+        modelDownloadServiceProvider.overrideWithValue(
+          _NoOpModelDownloadService(),
+        ),
         if (voiceService != null)
           voiceServiceProvider.overrideWithValue(voiceService),
       ],

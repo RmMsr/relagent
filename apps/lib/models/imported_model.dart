@@ -43,11 +43,11 @@ class ImportedModelEntry {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'displayName': displayName,
-        'type': type.name,
-        'architecture': architecture.name,
-        'languages': languages,
-        'importedAt': importedAt.toIso8601String(),
-      };
+    'id': id,
+    'displayName': displayName,
+    'type': type.name,
+    'architecture': architecture.name,
+    'languages': languages,
+    'importedAt': importedAt.toIso8601String(),
+  };
 }

@@ -133,9 +133,7 @@ class _TrackingVoiceService extends VoiceService {
   @override
   Future<void> showErrorNotification(String title, String message) async {}
   @override
-  void setupNotificationActionHandler(
-    Future<void> Function(String) handler,
-  ) {}
+  void setupNotificationActionHandler(Future<void> Function(String) handler) {}
 
   @override
   void dispose() => _deviceChangedController.close();
@@ -170,14 +168,17 @@ void main() {
   });
 
   group('Audio session routing', () {
-    test('requestRecording() calls configureAudioSessionForRecording', () async {
-      final coordinator = container.read(audioCoordinatorProvider.notifier);
+    test(
+      'requestRecording() calls configureAudioSessionForRecording',
+      () async {
+        final coordinator = container.read(audioCoordinatorProvider.notifier);
 
-      await coordinator.requestRecording();
+        await coordinator.requestRecording();
 
-      expect(trackingService.configureForRecordingCallCount, 1);
-      expect(trackingService.configureForPlaybackCallCount, 0);
-    });
+        expect(trackingService.configureForRecordingCallCount, 1);
+        expect(trackingService.configureForPlaybackCallCount, 0);
+      },
+    );
 
     test('requestPlayback() calls configureAudioSessionForPlayback', () async {
       final coordinator = container.read(audioCoordinatorProvider.notifier);
@@ -213,10 +214,7 @@ void main() {
         trackingService.simulateDeviceChange();
         await Future<void>.delayed(Duration.zero);
 
-        expect(
-          trackingService.configureForRecordingCallCount,
-          countBefore + 1,
-        );
+        expect(trackingService.configureForRecordingCallCount, countBefore + 1);
       },
     );
 
@@ -231,10 +229,7 @@ void main() {
         trackingService.simulateDeviceChange();
         await Future<void>.delayed(Duration.zero);
 
-        expect(
-          trackingService.configureForPlaybackCallCount,
-          countBefore + 1,
-        );
+        expect(trackingService.configureForPlaybackCallCount, countBefore + 1);
       },
     );
 

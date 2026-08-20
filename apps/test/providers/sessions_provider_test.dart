@@ -96,24 +96,31 @@ void main() {
       expect(container.read(sessionsProvider).sessions.length, 1);
     });
 
-    test('no-ops if the timestamp is not strictly newer than what is shown',
-        () {
-      final container = _makeContainer();
-      addTearDown(container.dispose);
-      final notifier = container.read(sessionsProvider.notifier);
+    test(
+      'no-ops if the timestamp is not strictly newer than what is shown',
+      () {
+        final container = _makeContainer();
+        addTearDown(container.dispose);
+        final notifier = container.read(sessionsProvider.notifier);
 
-      final current = DateTime.utc(2025, 6, 1);
-      notifier.addSession(_session('a', current));
+        final current = DateTime.utc(2025, 6, 1);
+        notifier.addSession(_session('a', current));
 
-      notifier.bumpActivity('a', DateTime.utc(2020, 1, 1));
+        notifier.bumpActivity('a', DateTime.utc(2020, 1, 1));
 
-      final info = container.read(sessionsProvider).sessions.first.sessionInfo;
-      expect(
-        info.updatedAt,
-        current,
-        reason: 'an out-of-order/older event must not regress an '
-            'already-newer displayed timestamp',
-      );
-    });
+        final info = container
+            .read(sessionsProvider)
+            .sessions
+            .first
+            .sessionInfo;
+        expect(
+          info.updatedAt,
+          current,
+          reason:
+              'an out-of-order/older event must not regress an '
+              'already-newer displayed timestamp',
+        );
+      },
+    );
   });
 }

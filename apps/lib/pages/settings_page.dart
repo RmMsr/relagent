@@ -16,6 +16,7 @@ import '/providers/voice_service_provider.dart';
 import '/services/api_health_check.dart';
 import '/utils/settings_navigation.dart';
 import '/voice/model_resolver.dart';
+import '/widgets/error_copy_button.dart';
 import '/widgets/import_model_sheet.dart' show architectureLabel;
 import '/widgets/settings_apply_bar.dart';
 
@@ -357,151 +358,206 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   Widget _buildChatHealthPanel() {
     final result = _healthCheckResult!;
     final pending = ref.read(pendingSettingsProvider);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: result.isSuccess
-            ? Colors.green.withValues(alpha: 0.1)
-            : Colors.red.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: result.isSuccess ? Colors.green : Colors.red),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final body =
+        '{"messages": [{"role": "user", "content": "test"}], '
+        '"model": "${pending.simpleChatModel}", '
+        '"max_completion_tokens": 100}';
+    final url = '${pending.simpleChatBaseUrl}/chat/completions';
+    final usesBasicAuth = ref.read(settingsProvider).authType == AuthType.basic;
+
+    return Stack(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: result.isSuccess
+                ? Colors.green.withValues(alpha: 0.1)
+                : Colors.red.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: result.isSuccess ? Colors.green : Colors.red,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                result.isSuccess ? Icons.check_circle : Icons.error,
-                color: result.isSuccess ? Colors.green : Colors.red,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  result.message,
-                  style: TextStyle(
+              Row(
+                children: [
+                  Icon(
+                    result.isSuccess ? Icons.check_circle : Icons.error,
                     color: result.isSuccess ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      result.message,
+                      style: TextStyle(
+                        color: result.isSuccess ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              Text(
+                'Request Details:',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              _buildDebugInfo('Method', 'POST'),
+              _buildDebugInfo('URL', url),
+              _buildDebugInfo('Body', body),
+              if (result.httpStatusCode != null)
+                _buildDebugInfo('Status', 'HTTP ${result.httpStatusCode}'),
+              if (usesBasicAuth)
+                _buildDebugInfo(
+                  'Auth',
+                  'Basic ${_usernameController.text.isNotEmpty ? _usernameController.text : "(no username)"}',
+                ),
+              if (result.requiresAuth) ...[
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                _buildDebugInfo(
+                  'Detected Auth Type',
+                  result.detectedAuthType?.name.toUpperCase() ?? 'Unknown',
+                ),
+                if (result.realm != null)
+                  _buildDebugInfo('Realm', result.realm!),
+                if (result.loginUrl != null)
+                  _buildDebugInfo('Login URL', result.loginUrl!),
+              ],
+              if (!result.isSuccess) const SizedBox(height: 16),
             ],
           ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          Text(
-            'Request Details:',
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          _buildDebugInfo('Method', 'POST'),
-          _buildDebugInfo(
-            'URL',
-            '${pending.simpleChatBaseUrl}/chat/completions',
-          ),
-          _buildDebugInfo(
-            'Body',
-            '{"messages": [{"role": "user", "content": "test"}], '
-                '"model": "${pending.simpleChatModel}", '
-                '"max_completion_tokens": 100}',
-          ),
-          if (result.httpStatusCode != null)
-            _buildDebugInfo('Status', 'HTTP ${result.httpStatusCode}'),
-          if (ref.read(settingsProvider).authType == AuthType.basic)
-            _buildDebugInfo(
-              'Auth',
-              'Basic ${_usernameController.text.isNotEmpty ? _usernameController.text : "(no username)"}',
+        ),
+        if (!result.isSuccess)
+          Positioned(
+            right: 4,
+            bottom: 4,
+            child: ErrorCopyButton(
+              text: [
+                result.message,
+                'Method: POST',
+                'URL: $url',
+                'Body: $body',
+                if (result.httpStatusCode != null)
+                  'Status: HTTP ${result.httpStatusCode}',
+                if (usesBasicAuth)
+                  'Auth: Basic ${_usernameController.text.isNotEmpty ? _usernameController.text : "(no username)"}',
+                if (result.requiresAuth) ...[
+                  'Detected Auth Type: ${result.detectedAuthType?.name.toUpperCase() ?? "Unknown"}',
+                  if (result.realm != null) 'Realm: ${result.realm}',
+                  if (result.loginUrl != null) 'Login URL: ${result.loginUrl}',
+                ],
+              ].join('\n'),
             ),
-          if (result.requiresAuth) ...[
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
-            _buildDebugInfo(
-              'Detected Auth Type',
-              result.detectedAuthType?.name.toUpperCase() ?? 'Unknown',
-            ),
-            if (result.realm != null) _buildDebugInfo('Realm', result.realm!),
-            if (result.loginUrl != null)
-              _buildDebugInfo('Login URL', result.loginUrl!),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 
   Widget _buildEngineHealthPanel() {
     final result = _engineHealthCheckResult!;
     final pending = ref.read(pendingSettingsProvider);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: result.isSuccess
-            ? Colors.green.withValues(alpha: 0.1)
-            : Colors.red.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: result.isSuccess ? Colors.green : Colors.red),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final url = '${pending.engineBaseUrl}/api/v1/status';
+
+    return Stack(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: result.isSuccess
+                ? Colors.green.withValues(alpha: 0.1)
+                : Colors.red.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: result.isSuccess ? Colors.green : Colors.red,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                result.isSuccess ? Icons.check_circle : Icons.error,
-                color: result.isSuccess ? Colors.green : Colors.red,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  result.message,
-                  style: TextStyle(
+              Row(
+                children: [
+                  Icon(
+                    result.isSuccess ? Icons.check_circle : Icons.error,
                     color: result.isSuccess ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      result.message,
+                      style: TextStyle(
+                        color: result.isSuccess ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              Text(
+                'Request Details:',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              _buildDebugInfo('Method', 'GET'),
+              _buildDebugInfo('URL', url),
+              if (result.httpStatusCode != null)
+                _buildDebugInfo('Status', 'HTTP ${result.httpStatusCode}'),
+              if (result.engineName != null)
+                _buildDebugInfo('Engine', result.engineName!),
+              if (result.engineVersion != null)
+                _buildDebugInfo('Version', result.engineVersion!),
+              if (result.requiresAuth && result.detectedAuthType != null) ...[
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                _buildDebugInfo(
+                  'Detected Auth Type',
+                  result.detectedAuthType!.name.toUpperCase(),
+                ),
+              ],
+              if (!result.isSuccess) const SizedBox(height: 16),
             ],
           ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          Text(
-            'Request Details:',
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          _buildDebugInfo('Method', 'GET'),
-          _buildDebugInfo(
-            'URL',
-            '${pending.engineBaseUrl}/api/v1/status',
-          ),
-          if (result.httpStatusCode != null)
-            _buildDebugInfo('Status', 'HTTP ${result.httpStatusCode}'),
-          if (result.engineName != null)
-            _buildDebugInfo('Engine', result.engineName!),
-          if (result.engineVersion != null)
-            _buildDebugInfo('Version', result.engineVersion!),
-          if (result.requiresAuth && result.detectedAuthType != null) ...[
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
-            _buildDebugInfo(
-              'Detected Auth Type',
-              result.detectedAuthType!.name.toUpperCase(),
+        ),
+        if (!result.isSuccess)
+          Positioned(
+            right: 4,
+            bottom: 4,
+            child: ErrorCopyButton(
+              text: [
+                result.message,
+                'Method: GET',
+                'URL: $url',
+                if (result.httpStatusCode != null)
+                  'Status: HTTP ${result.httpStatusCode}',
+                if (result.engineName != null) 'Engine: ${result.engineName}',
+                if (result.engineVersion != null)
+                  'Version: ${result.engineVersion}',
+                if (result.requiresAuth && result.detectedAuthType != null)
+                  'Detected Auth Type: ${result.detectedAuthType!.name.toUpperCase()}',
+              ].join('\n'),
             ),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 
   Future<void> _apply() async {
-    if (_formKey.currentState != null && !_formKey.currentState!.validate()) return;
+    if (_formKey.currentState != null && !_formKey.currentState!.validate())
+      return;
 
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final settings = ref.read(settingsProvider);
@@ -693,8 +749,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
 
   Widget _modelSubtitle(BuildContext context, String? id) {
     final muted = Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        );
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
     if (id == null) {
       return const Text('None');
     }
@@ -1063,7 +1119,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                             final option = options.elementAt(index);
                             return ListTile(
                               title: Text(
-                                option.url.isEmpty ? '(same origin)' : option.url,
+                                option.url.isEmpty
+                                    ? '(same origin)'
+                                    : option.url,
                                 style: option.url.isEmpty
                                     ? const TextStyle(
                                         fontStyle: FontStyle.italic,
@@ -1189,10 +1247,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.mic),
               title: const Text('Speech Recognition'),
-              subtitle: _modelSubtitle(
-                context,
-                settings.selectedAsrModelId,
-              ),
+              subtitle: _modelSubtitle(context, settings.selectedAsrModelId),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/voice-models', extra: 0),
             ),
@@ -1200,10 +1255,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.record_voice_over),
               title: const Text('Text-to-Speech'),
-              subtitle: _modelSubtitle(
-                context,
-                settings.selectedTtsModelId,
-              ),
+              subtitle: _modelSubtitle(context, settings.selectedTtsModelId),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/voice-models', extra: 1),
             ),
@@ -1246,82 +1298,85 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
           ],
         ),
       // Features tab
-      if (hasFeatures) ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          if (voiceCapabilities.isBackgroundListeningAvailable) ...[
-            SwitchListTile(
-              title: Row(
-                children: [
-                  const Text('Continuous Voice'),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Experimental',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+      if (hasFeatures)
+        ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            if (voiceCapabilities.isBackgroundListeningAvailable) ...[
+              SwitchListTile(
+                title: Row(
+                  children: [
+                    const Text('Continuous Voice'),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Experimental',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                subtitle: const Text(
+                  'Enables continuous recording and auto-playback modes',
+                ),
+                value: settings.continuousVoiceEnabled,
+                onChanged: (value) {
+                  ref
+                      .read(settingsProvider.notifier)
+                      .updateContinuousVoiceEnabled(value);
+                },
               ),
-              subtitle: const Text(
-                'Enables continuous recording and auto-playback modes',
-              ),
-              value: settings.continuousVoiceEnabled,
-              onChanged: (value) {
-                ref
-                    .read(settingsProvider.notifier)
-                    .updateContinuousVoiceEnabled(value);
-              },
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'This feature is experimental and may be unreliable. '
-                'Background service currently implemented on Android only.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-            if (settings.continuousVoiceEnabled) ...[
-              const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: DropdownButtonFormField<BackgroundListeningDuration>(
-                  initialValue: settings.backgroundListeningDuration,
-                  decoration: const InputDecoration(
-                    labelText: 'Background Listening Duration',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: BackgroundListeningDuration.values.map((duration) {
-                    return DropdownMenuItem(
-                      value: duration,
-                      child: Text(duration.displayName),
-                    );
-                  }).toList(),
-                  onChanged: (newValue) {
-                    if (newValue != null) {
-                      ref
-                          .read(settingsProvider.notifier)
-                          .updateBackgroundListeningDuration(newValue);
-                    }
-                  },
+                child: Text(
+                  'This feature is experimental and may be unreliable. '
+                  'Background service currently implemented on Android only.',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
+              if (settings.continuousVoiceEnabled) ...[
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButtonFormField<BackgroundListeningDuration>(
+                    initialValue: settings.backgroundListeningDuration,
+                    decoration: const InputDecoration(
+                      labelText: 'Background Listening Duration',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: BackgroundListeningDuration.values.map((duration) {
+                      return DropdownMenuItem(
+                        value: duration,
+                        child: Text(duration.displayName),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      if (newValue != null) {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .updateBackgroundListeningDuration(newValue);
+                      }
+                    },
+                  ),
+                ),
+              ],
             ],
           ],
-        ],
-      ),
-    ];  // end tabViews
+        ),
+    ]; // end tabViews
 
     final tabController = _ensureTabController(tabs.length);
     final tabBar = TabBar(controller: tabController, tabs: tabs);

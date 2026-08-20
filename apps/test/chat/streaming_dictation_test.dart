@@ -22,11 +22,16 @@ class _NoVoice with VoiceCapabilities {
 
 Widget _wrap(Widget child) => ProviderScope(
   overrides: [voiceCapabilitiesProvider.overrideWithValue(_NoVoice())],
-  child: MaterialApp(theme: AppTheme.light(), home: Scaffold(body: child)),
+  child: MaterialApp(
+    theme: AppTheme.light(),
+    home: Scaffold(body: child),
+  ),
 );
 
-String _fieldText(WidgetTester tester) =>
-    tester.widget<EditableText>(find.byType(EditableText).first).controller.text;
+String _fieldText(WidgetTester tester) => tester
+    .widget<EditableText>(find.byType(EditableText).first)
+    .controller
+    .text;
 
 /// Drives two growing partials of a single utterance with a simulated IME
 /// echo in between, and asserts the second partial REPLACES the first rather
@@ -39,8 +44,9 @@ Future<void> _runPartialsReplaceScenario(
   Finder inputFinder,
   RecordingTarget target,
 ) async {
-  final controller =
-      tester.widget<EditableText>(find.byType(EditableText).first).controller;
+  final controller = tester
+      .widget<EditableText>(find.byType(EditableText).first)
+      .controller;
 
   target.onRecordingStarted();
   await tester.pump();

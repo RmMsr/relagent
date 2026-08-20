@@ -293,9 +293,7 @@ class ChatService:
     def _publish_messages_appended(self, session_id: UUID) -> None:
         if self.event_store is None:
             return
-        self.event_store.publish(
-            SessionMessagesAppendedEvent(session_id=session_id)
-        )
+        self.event_store.publish(SessionMessagesAppendedEvent(session_id=session_id))
 
     def _resolve_pending_approvals(
         self, context: ChatContext, session_id: UUID
@@ -418,9 +416,7 @@ class ChatService:
                         approval.granted = False
 
         self._settle_cycle(context)
-        self.persistence_repository.save_context(
-            session_id=session_id, context=context
-        )
+        self.persistence_repository.save_context(session_id=session_id, context=context)
         self._publish_messages_appended(session_id=session_id)
         return context
 

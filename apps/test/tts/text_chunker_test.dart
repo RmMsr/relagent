@@ -5,14 +5,17 @@ import 'package:relagent/tts/text_normalizer.dart' show clausePauseMarker;
 void main() {
   group('splitRawParagraphs', () {
     test('splits on blank lines and trims/drops empties', () {
-      expect(
-        splitRawParagraphs('Para one.\n\nPara two.\n\n\nPara three.'),
-        ['Para one.', 'Para two.', 'Para three.'],
-      );
+      expect(splitRawParagraphs('Para one.\n\nPara two.\n\n\nPara three.'), [
+        'Para one.',
+        'Para two.',
+        'Para three.',
+      ]);
     });
 
     test('a single block with no blank line stays one paragraph', () {
-      expect(splitRawParagraphs('- one\n- two\n- three'), ['- one\n- two\n- three']);
+      expect(splitRawParagraphs('- one\n- two\n- three'), [
+        '- one\n- two\n- three',
+      ]);
     });
   });
 
@@ -29,45 +32,51 @@ void main() {
       final chunks = splitIntoSpeechChunks(
         'Para one.\n\nPara two.\n\nPara three.',
       );
-      expect(chunks.map((c) => c.text), ['Para one.', 'Para two.', 'Para three.']);
+      expect(chunks.map((c) => c.text), [
+        'Para one.',
+        'Para two.',
+        'Para three.',
+      ]);
       expect(chunks.map((c) => c.sourceParagraphIndex), [0, 1, 2]);
-      expect(
-        chunks.map((c) => c.pauseAfter),
-        [ChunkPause.paragraph, ChunkPause.paragraph, ChunkPause.none],
-      );
+      expect(chunks.map((c) => c.pauseAfter), [
+        ChunkPause.paragraph,
+        ChunkPause.paragraph,
+        ChunkPause.none,
+      ]);
+    });
+
+    test('a heading gets the longer pause on both sides (before it, and '
+        'after it before the following body text)', () {
+      final chunks = splitIntoSpeechChunks('Intro.\n\n# Heading\n\nBody.');
+      expect(chunks.map((c) => c.text), ['Intro.', 'Heading', 'Body.']);
+      expect(chunks.map((c) => c.pauseAfter), [
+        ChunkPause.heading,
+        ChunkPause.heading,
+        ChunkPause.none,
+      ]);
     });
 
     test(
-        'a heading gets the longer pause on both sides (before it, and '
-        'after it before the following body text)', () {
-      final chunks = splitIntoSpeechChunks(
-        'Intro.\n\n# Heading\n\nBody.',
-      );
-      expect(chunks.map((c) => c.text), ['Intro.', 'Heading', 'Body.']);
-      expect(
-        chunks.map((c) => c.pauseAfter),
-        [ChunkPause.heading, ChunkPause.heading, ChunkPause.none],
-      );
-    });
-
-    test('an oversized paragraph falls back to grouped sentences, sharing '
-        'the source paragraph index and deferring the pause to the last sub-chunk',
-        () {
-      final chunks = splitIntoSpeechChunks(
-        'One two three. Four five six. Seven eight nine.\n\nNext.',
-        maxChunkLength: 30,
-      );
-      expect(chunks.map((c) => c.text), [
-        'One two three. Four five six.',
-        'Seven eight nine.',
-        'Next.',
-      ]);
-      expect(chunks.map((c) => c.sourceParagraphIndex), [0, 0, 1]);
-      expect(
-        chunks.map((c) => c.pauseAfter),
-        [ChunkPause.none, ChunkPause.paragraph, ChunkPause.none],
-      );
-    });
+      'an oversized paragraph falls back to grouped sentences, sharing '
+      'the source paragraph index and deferring the pause to the last sub-chunk',
+      () {
+        final chunks = splitIntoSpeechChunks(
+          'One two three. Four five six. Seven eight nine.\n\nNext.',
+          maxChunkLength: 30,
+        );
+        expect(chunks.map((c) => c.text), [
+          'One two three. Four five six.',
+          'Seven eight nine.',
+          'Next.',
+        ]);
+        expect(chunks.map((c) => c.sourceParagraphIndex), [0, 0, 1]);
+        expect(chunks.map((c) => c.pauseAfter), [
+          ChunkPause.none,
+          ChunkPause.paragraph,
+          ChunkPause.none,
+        ]);
+      },
+    );
 
     test('a paragraph that normalizes to nothing is dropped, preserving '
         'the source index of the paragraph that follows it', () {
@@ -105,41 +114,33 @@ void main() {
         'Options,',
         'A, B, or C. Next sentence.',
       ]);
-      expect(
-        chunks.map((c) => c.sourceParagraphIndex),
-        [0, 0],
-      );
-      expect(
-        chunks.map((c) => c.pauseAfter),
-        [ChunkPause.clause, ChunkPause.none],
-      );
+      expect(chunks.map((c) => c.sourceParagraphIndex), [0, 0]);
+      expect(chunks.map((c) => c.pauseAfter), [
+        ChunkPause.clause,
+        ChunkPause.none,
+      ]);
     });
 
     test('list items each get a clause pause, and the last item gets the '
         'paragraph pause instead', () {
-      final chunks = splitIntoSpeechChunks(
-        '- one\n- two\n- three\n\nAfter.',
-      );
+      final chunks = splitIntoSpeechChunks('- one\n- two\n- three\n\nAfter.');
       expect(chunks.map((c) => c.text), ['one', 'two', 'three', 'After.']);
       expect(chunks.map((c) => c.sourceParagraphIndex), [0, 0, 0, 1]);
-      expect(
-        chunks.map((c) => c.pauseAfter),
-        [
-          ChunkPause.clause,
-          ChunkPause.clause,
-          ChunkPause.paragraph,
-          ChunkPause.none,
-        ],
-      );
+      expect(chunks.map((c) => c.pauseAfter), [
+        ChunkPause.clause,
+        ChunkPause.clause,
+        ChunkPause.paragraph,
+        ChunkPause.none,
+      ]);
     });
 
     test('numbered list items also get a clause pause between them', () {
       final chunks = splitIntoSpeechChunks('1. first\n2. second');
       expect(chunks.map((c) => c.text), ['1. first', '2. second']);
-      expect(
-        chunks.map((c) => c.pauseAfter),
-        [ChunkPause.clause, ChunkPause.none],
-      );
+      expect(chunks.map((c) => c.pauseAfter), [
+        ChunkPause.clause,
+        ChunkPause.none,
+      ]);
     });
 
     test('a trailing colon at the end of a paragraph does not produce an '

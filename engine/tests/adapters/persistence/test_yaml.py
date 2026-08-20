@@ -132,7 +132,9 @@ class TestFinalFieldReadTimeDefault:
         assert loaded.messages[0].final is False
         assert loaded.messages[1].final is False
 
-    def test_round_trip_preserves_final_true(self, yaml_adapter: YamlPersistenceAdapter):
+    def test_round_trip_preserves_final_true(
+        self, yaml_adapter: YamlPersistenceAdapter
+    ):
         session = SessionInfo()
         context = ChatContext(
             messages=[

@@ -49,7 +49,10 @@ class _EmptyModelDownloadService extends ModelDownloadService {
   @override
   Future<int> totalStorageUsed() async => 0;
   @override
-  Future<void> downloadModel(CatalogEntry entry, {void Function(DownloadProgress)? onProgress}) async {}
+  Future<void> downloadModel(
+    CatalogEntry entry, {
+    void Function(DownloadProgress)? onProgress,
+  }) async {}
   @override
   void cancelDownload(String modelId) {}
   @override
@@ -64,14 +67,16 @@ void main() {
     tmpDir = await Directory.systemTemp.createTemp('settings_provider_test_');
     PathProviderPlatform.instance = _FakePathProvider(tmpDir.path);
     await ImportedModelRegistry.init();
-    await ImportedModelRegistry.add(ImportedModelEntry(
-      id: 'imported-restart01',
-      displayName: 'My Imported ASR',
-      type: ModelType.asr,
-      architecture: ModelArchitecture.transducer,
-      languages: ['en'],
-      importedAt: DateTime(2026),
-    ));
+    await ImportedModelRegistry.add(
+      ImportedModelEntry(
+        id: 'imported-restart01',
+        displayName: 'My Imported ASR',
+        type: ModelType.asr,
+        architecture: ModelArchitecture.transducer,
+        languages: ['en'],
+        importedAt: DateTime(2026),
+      ),
+    );
 
     SharedPreferences.setMockInitialValues({
       'user_settings':
@@ -82,7 +87,9 @@ void main() {
     container = ProviderContainer(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-        modelDownloadServiceProvider.overrideWithValue(_EmptyModelDownloadService()),
+        modelDownloadServiceProvider.overrideWithValue(
+          _EmptyModelDownloadService(),
+        ),
       ],
     );
   });
@@ -97,7 +104,10 @@ void main() {
     () async {
       // Reading the settings immediately after "restart" should restore the
       // previously selected imported model id.
-      expect(container.read(settingsProvider).selectedAsrModelId, 'imported-restart01');
+      expect(
+        container.read(settingsProvider).selectedAsrModelId,
+        'imported-restart01',
+      );
 
       // Let the initial model-download filesystem scan complete, which is
       // what triggers SettingsNotifier's stale-selection validation.
@@ -108,7 +118,8 @@ void main() {
       expect(
         container.read(settingsProvider).selectedAsrModelId,
         'imported-restart01',
-        reason: 'Imported models are not tracked in ModelDownloadState.downloadedModels, '
+        reason:
+            'Imported models are not tracked in ModelDownloadState.downloadedModels, '
             'so validation must not clear their selection.',
       );
     },

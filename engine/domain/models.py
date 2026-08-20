@@ -159,7 +159,9 @@ class UserMessage(BaseModel):
 
     model_config = ConfigDict(use_enum_values=True)
 
-    message_id: UUID = Field(default_factory=uuid4, description="Unique message identity")
+    message_id: UUID = Field(
+        default_factory=uuid4, description="Unique message identity"
+    )
     role: Literal["user"] = "user"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     content: str
@@ -174,7 +176,9 @@ class AssistantMessage(BaseModel):
 
     model_config = ConfigDict(use_enum_values=True)
 
-    message_id: UUID = Field(default_factory=uuid4, description="Unique message identity")
+    message_id: UUID = Field(
+        default_factory=uuid4, description="Unique message identity"
+    )
     role: Literal["assistant"] = "assistant"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     content: str
@@ -195,7 +199,9 @@ class SystemAction(BaseModel):
 
     model_config = ConfigDict(use_enum_values=True)
 
-    message_id: UUID = Field(default_factory=uuid4, description="Unique message identity")
+    message_id: UUID = Field(
+        default_factory=uuid4, description="Unique message identity"
+    )
     role: Literal["system"] = "system"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     approvals: list[Approval] = Field(
@@ -210,6 +216,7 @@ class SystemAction(BaseModel):
         default=False,
         description="True once the surrounding cycle has settled",
     )
+
 
 ChatMessage = UserMessage | AssistantMessage | SystemAction
 

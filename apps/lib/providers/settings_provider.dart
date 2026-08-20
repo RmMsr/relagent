@@ -90,9 +90,7 @@ class SettingsNotifier extends Notifier<Settings> {
     if (urlChanged) {
       await _credentialsManager.clearCredentials(state.simpleChatBaseUrl);
       await _credentialsManager.clearChatApiKey(state.simpleChatBaseUrl);
-      Future.microtask(
-        () => ref.read(chatProvider.notifier).clearChat(),
-      );
+      Future.microtask(() => ref.read(chatProvider.notifier).clearChat());
     }
 
     state = state.copyWith(
@@ -274,7 +272,9 @@ class SettingsNotifier extends Notifier<Settings> {
   }
 
   Future<String?> getEnginePassword({String? url}) async {
-    return await _credentialsManager.getEnginePassword(url ?? state.engineBaseUrl);
+    return await _credentialsManager.getEnginePassword(
+      url ?? state.engineBaseUrl,
+    );
   }
 
   Future<void> clearEngineCredentials() async {
@@ -292,7 +292,9 @@ class SettingsNotifier extends Notifier<Settings> {
   Future<String?> getEngineApiKey({String? url}) async {
     final targetUrl = url ?? state.engineBaseUrl;
     final key = await _credentialsManager.getEngineApiKey(targetUrl);
-    if (key == null && targetUrl == state.engineBaseUrl && state.engineHasApiKey) {
+    if (key == null &&
+        targetUrl == state.engineBaseUrl &&
+        state.engineHasApiKey) {
       state = state.copyWith(engineHasApiKey: false);
       await _persistenceManager.saveSettings(state);
     }

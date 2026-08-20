@@ -144,7 +144,10 @@ class RecordingNotifier extends Notifier<RecordingState> {
     });
 
     // Restart ASR when selected model finishes downloading (startup race fix)
-    ref.listen<ModelDownloadState>(modelDownloadProvider, (previous, next) async {
+    ref.listen<ModelDownloadState>(modelDownloadProvider, (
+      previous,
+      next,
+    ) async {
       final selectedId = ref.read(settingsProvider).selectedAsrModelId;
       if (selectedId != null &&
           !(previous?.isDownloaded(selectedId) ?? false) &&
@@ -188,7 +191,8 @@ class RecordingNotifier extends Notifier<RecordingState> {
     final isContinuous =
         newMode == VoiceMode.listening || newMode == VoiceMode.conversation;
 
-    if (!wasContinuous && isContinuous &&
+    if (!wasContinuous &&
+        isContinuous &&
         !ref.read(settingsProvider).continuousVoiceEnabled) {
       Logger.debug(
         'RecordingProvider: Continuous voice disabled, ignoring mode change',
@@ -468,10 +472,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
       _resetAudioLevelTracking();
 
       await _startASRWithInit();
-      state = state.copyWith(
-        isRecording: true,
-        error: null,
-      );
+      state = state.copyWith(isRecording: true, error: null);
       if (state.isContinuous) {
         _startHealthMonitoring();
         _startDurationTimer();
@@ -518,14 +519,10 @@ class RecordingNotifier extends Notifier<RecordingState> {
     final asrMetadata = await resolveAsrMetadata(settings, downloadState);
 
     if (asrMetadata == null) {
-      throw Exception(
-        'No ASR model selected. Download one in Settings.',
-      );
+      throw Exception('No ASR model selected. Download one in Settings.');
     }
 
-    Logger.debug(
-      'RecordingProvider: Using ASR model: ${asrMetadata.modelId}',
-    );
+    Logger.debug('RecordingProvider: Using ASR model: ${asrMetadata.modelId}');
 
     await _voiceService.startRecording(
       asrMetadata: asrMetadata,

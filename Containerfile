@@ -12,6 +12,8 @@ RUN flutter precache --web
 
 ADD dart_packages/sherpa_voice/pubspec.yaml /dart_packages/sherpa_voice/
 ADD dart_packages/sherpa_voice/lib /dart_packages/sherpa_voice/lib
+ADD dart_packages/agentic_client/pubspec.yaml /dart_packages/agentic_client/
+ADD dart_packages/agentic_client/lib /dart_packages/agentic_client/lib
 
 WORKDIR /app
 

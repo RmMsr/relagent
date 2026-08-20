@@ -21,35 +21,30 @@ class VoiceInitOverlay extends ConsumerStatefulWidget {
 class _VoiceInitOverlayState extends ConsumerState<VoiceInitOverlay> {
   @override
   Widget build(BuildContext context) {
-    ref.listen<String?>(
-      ttsProvider.select((s) => s.initError),
-      (previous, error) {
-        if (error != null && error != previous) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Voice model failed to load: $error'),
-              duration: const Duration(seconds: 6),
-              action: SnackBarAction(
-                label: 'Dismiss',
-                onPressed: () =>
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar(),
-              ),
+    ref.listen<String?>(ttsProvider.select((s) => s.initError), (
+      previous,
+      error,
+    ) {
+      if (error != null && error != previous) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Voice model failed to load: $error'),
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'Dismiss',
+              onPressed: () =>
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar(),
             ),
-          );
-        }
-      },
-    );
+          ),
+        );
+      }
+    });
 
     final isInitializing = ref.watch(
       recordingProvider.select((s) => s.isInitializing),
     );
 
-    return Stack(
-      children: [
-        widget.child,
-        if (isInitializing) _buildOverlay(),
-      ],
-    );
+    return Stack(children: [widget.child, if (isInitializing) _buildOverlay()]);
   }
 
   Widget _buildOverlay() {

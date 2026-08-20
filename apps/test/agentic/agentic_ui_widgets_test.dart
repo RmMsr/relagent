@@ -20,12 +20,12 @@ class _FakeVoiceCapabilities implements VoiceCapabilities {
 }
 
 AgenticMessage _settledUserMsg() => AgenticMessage(
-      messageId: 'seed-user',
-      localId: 'seed-user',
-      text: 'seed',
-      role: AgenticRole.user,
-      isFinal: true,
-    );
+  messageId: 'seed-user',
+  localId: 'seed-user',
+  text: 'seed',
+  role: AgenticRole.user,
+  isFinal: true,
+);
 
 Widget _wrapWithProviders(Widget child) {
   return ProviderScope(
@@ -36,18 +36,15 @@ Widget _wrapWithProviders(Widget child) {
   );
 }
 
-ApprovalData _pending(String id) => ApprovalData(
-      id: id,
-      type: ApprovalType.outgoingData,
-      purpose: 'p',
-    );
+ApprovalData _pending(String id) =>
+    ApprovalData(id: id, type: ApprovalType.outgoingData, purpose: 'p');
 
 ApprovalData _granted(String id) => ApprovalData(
-      id: id,
-      type: ApprovalType.outgoingData,
-      purpose: 'p',
-      resolution: ApprovalResolution.granted,
-    );
+  id: id,
+  type: ApprovalType.outgoingData,
+  purpose: 'p',
+  resolution: ApprovalResolution.granted,
+);
 
 AgenticMessage _systemAction({
   required List<ApprovalData> approvals,
@@ -69,8 +66,7 @@ Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
   group('ApprovalCard — Continue without button', () {
-    testWidgets('renders "Continue without" instead of "Skip"',
-        (tester) async {
+    testWidgets('renders "Continue without" instead of "Skip"', (tester) async {
       await tester.pumpWidget(
         _wrap(
           ApprovalCard(
@@ -85,8 +81,9 @@ void main() {
       expect(find.text('Grant'), findsOneWidget);
     });
 
-    testWidgets('Continue without invokes onDecline with the approval id',
-        (tester) async {
+    testWidgets('Continue without invokes onDecline with the approval id', (
+      tester,
+    ) async {
       String? declinedId;
       await tester.pumpWidget(
         _wrap(
@@ -108,8 +105,9 @@ void main() {
   group('ApprovalGroup — cycle-level Stop bar visibility', () {
     final stopBarFinder = find.byKey(const Key('approval-group-stop-bar'));
 
-    testWidgets('shows Stop bar when SystemAction is in-flight (final=false)',
-        (tester) async {
+    testWidgets('shows Stop bar when SystemAction is in-flight (final=false)', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrap(
           ApprovalGroup(
@@ -123,8 +121,9 @@ void main() {
       expect(stopBarFinder, findsOneWidget);
     });
 
-    testWidgets('hides Stop bar when SystemAction is settled (final=true)',
-        (tester) async {
+    testWidgets('hides Stop bar when SystemAction is settled (final=true)', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrap(
           ApprovalGroup(
@@ -138,8 +137,7 @@ void main() {
       expect(stopBarFinder, findsNothing);
     });
 
-    testWidgets('hides Stop bar when group is not actionable',
-        (tester) async {
+    testWidgets('hides Stop bar when group is not actionable', (tester) async {
       await tester.pumpWidget(
         _wrap(
           ApprovalGroup(
@@ -172,8 +170,9 @@ void main() {
       expect(stopBarFinder, findsNothing);
     });
 
-    testWidgets('hides Stop bar when no onStop handler is wired',
-        (tester) async {
+    testWidgets('hides Stop bar when no onStop handler is wired', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrap(
           ApprovalGroup(
@@ -204,8 +203,9 @@ void main() {
       expect(stopCalls, 1);
     });
 
-    testWidgets('Stop bar uses the "Stop and ask something else" label',
-        (tester) async {
+    testWidgets('Stop bar uses the "Stop and ask something else" label', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrap(
           ApprovalGroup(
@@ -221,40 +221,39 @@ void main() {
     });
 
     testWidgets(
-        'shows Continue button when stuck (in-flight, all decided, no run)',
-        (tester) async {
-      var continueCalls = 0;
-      await tester.pumpWidget(
-        _wrap(
-          ApprovalGroup(
-            message: _systemAction(
-              approvals: [_granted('a1')],
-              isFinal: false,
+      'shows Continue button when stuck (in-flight, all decided, no run)',
+      (tester) async {
+        var continueCalls = 0;
+        await tester.pumpWidget(
+          _wrap(
+            ApprovalGroup(
+              message: _systemAction(
+                approvals: [_granted('a1')],
+                isFinal: false,
+              ),
+              sessionSensitivity: SensitivityLevel.openInformation,
+              onContinue: () => continueCalls++,
             ),
-            sessionSensitivity: SensitivityLevel.openInformation,
-            onContinue: () => continueCalls++,
           ),
-        ),
-      );
+        );
 
-      final btn = find.byKey(const Key('approval-group-continue-button'));
-      expect(btn, findsOneWidget);
-      expect(find.text('Continue'), findsOneWidget);
+        final btn = find.byKey(const Key('approval-group-continue-button'));
+        expect(btn, findsOneWidget);
+        expect(find.text('Continue'), findsOneWidget);
 
-      await tester.tap(btn);
-      await tester.pump();
-      expect(continueCalls, 1);
-    });
+        await tester.tap(btn);
+        await tester.pump();
+        expect(continueCalls, 1);
+      },
+    );
 
-    testWidgets('hides Continue button while an agent run is in flight',
-        (tester) async {
+    testWidgets('hides Continue button while an agent run is in flight', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrap(
           ApprovalGroup(
-            message: _systemAction(
-              approvals: [_granted('a1')],
-              isFinal: false,
-            ),
+            message: _systemAction(approvals: [_granted('a1')], isFinal: false),
             sessionSensitivity: SensitivityLevel.openInformation,
             isAgentRunInFlight: true,
             onContinue: () {},
@@ -262,12 +261,15 @@ void main() {
         ),
       );
 
-      expect(find.byKey(const Key('approval-group-continue-button')),
-          findsNothing);
+      expect(
+        find.byKey(const Key('approval-group-continue-button')),
+        findsNothing,
+      );
     });
 
-    testWidgets('hides Continue button while any approval is undecided',
-        (tester) async {
+    testWidgets('hides Continue button while any approval is undecided', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrap(
           ApprovalGroup(
@@ -281,29 +283,34 @@ void main() {
         ),
       );
 
-      expect(find.byKey(const Key('approval-group-continue-button')),
-          findsNothing);
+      expect(
+        find.byKey(const Key('approval-group-continue-button')),
+        findsNothing,
+      );
     });
 
-    testWidgets('hides Continue button on a settled SystemAction',
-        (tester) async {
+    testWidgets('hides Continue button on a settled SystemAction', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrap(
           ApprovalGroup(
-            message:
-                _systemAction(approvals: [_granted('a1')], isFinal: true),
+            message: _systemAction(approvals: [_granted('a1')], isFinal: true),
             sessionSensitivity: SensitivityLevel.openInformation,
             onContinue: () {},
           ),
         ),
       );
 
-      expect(find.byKey(const Key('approval-group-continue-button')),
-          findsNothing);
+      expect(
+        find.byKey(const Key('approval-group-continue-button')),
+        findsNothing,
+      );
     });
 
-    testWidgets('hides Stop bar once any approval has been decided',
-        (tester) async {
+    testWidgets('hides Stop bar once any approval has been decided', (
+      tester,
+    ) async {
       // Mixed group: one decided (granted), one still pending. By the user's
       // rule the Stop control should disappear as soon as any decision lands.
       await tester.pumpWidget(
@@ -324,12 +331,11 @@ void main() {
   });
 
   group('QueuedMessageBubble', () {
-    testWidgets('renders the queued label, edit pencil, and the text',
-        (tester) async {
+    testWidgets('renders the queued label, edit pencil, and the text', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _wrap(
-          QueuedMessageBubble(text: 'retry it', onEdit: () {}),
-        ),
+        _wrap(QueuedMessageBubble(text: 'retry it', onEdit: () {})),
       );
 
       expect(find.byKey(const Key('queued-message-label')), findsOneWidget);
@@ -340,9 +346,7 @@ void main() {
 
     testWidgets('omits edit pencil when onEdit is null', (tester) async {
       await tester.pumpWidget(
-        _wrap(
-          const QueuedMessageBubble(text: 'no-edit'),
-        ),
+        _wrap(const QueuedMessageBubble(text: 'no-edit')),
       );
 
       expect(find.byKey(const Key('queued-message-edit')), findsNothing);
@@ -352,9 +356,7 @@ void main() {
     testWidgets('edit pencil tap invokes onEdit', (tester) async {
       var edits = 0;
       await tester.pumpWidget(
-        _wrap(
-          QueuedMessageBubble(text: 'q', onEdit: () => edits++),
-        ),
+        _wrap(QueuedMessageBubble(text: 'q', onEdit: () => edits++)),
       );
 
       await tester.tap(find.byKey(const Key('queued-message-edit')));
@@ -365,9 +367,9 @@ void main() {
   });
 
   group('AgenticChatHistory — queued bubble integration', () {
-    testWidgets(
-        'renders the queued bubble at the trailing position when set',
-        (tester) async {
+    testWidgets('renders the queued bubble at the trailing position when set', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrap(
           SingleChildScrollView(
@@ -383,28 +385,30 @@ void main() {
       expect(find.text('queued text'), findsOneWidget);
     });
 
-    testWidgets('does not render the queued bubble when queuedMessage is null',
-        (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          SingleChildScrollView(
-            child: AgenticChatHistory(
-              messages: [
-                AgenticMessage(
-                  messageId: 'm',
-                  localId: 'm',
-                  text: 'hello',
-                  role: AgenticRole.user,
-                  isFinal: true,
-                ),
-              ],
+    testWidgets(
+      'does not render the queued bubble when queuedMessage is null',
+      (tester) async {
+        await tester.pumpWidget(
+          _wrap(
+            SingleChildScrollView(
+              child: AgenticChatHistory(
+                messages: [
+                  AgenticMessage(
+                    messageId: 'm',
+                    localId: 'm',
+                    text: 'hello',
+                    role: AgenticRole.user,
+                    isFinal: true,
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.byType(QueuedMessageBubble), findsNothing);
-    });
+        expect(find.byType(QueuedMessageBubble), findsNothing);
+      },
+    );
 
     testWidgets('forwards onEditQueued to the queued bubble', (tester) async {
       var edits = 0;
@@ -493,9 +497,9 @@ void main() {
 
   group('Message bubble copy button', () {
     testWidgets('user message bubble has no copy button', (tester) async {
-      await tester.pumpWidget(_wrap(AgenticChatHistory(
-        messages: [_settledUserMsg()],
-      )));
+      await tester.pumpWidget(
+        _wrap(AgenticChatHistory(messages: [_settledUserMsg()])),
+      );
       await tester.pump();
 
       expect(find.byType(MessageCopyButton), findsNothing);
@@ -504,17 +508,21 @@ void main() {
     testWidgets('assistant message bubble still has a copy button', (
       tester,
     ) async {
-      await tester.pumpWidget(_wrap(AgenticChatHistory(
-        messages: [
-          AgenticMessage(
-            messageId: 'a1',
-            localId: 'a1',
-            text: 'hi there',
-            role: AgenticRole.assistant,
-            isFinal: true,
+      await tester.pumpWidget(
+        _wrap(
+          AgenticChatHistory(
+            messages: [
+              AgenticMessage(
+                messageId: 'a1',
+                localId: 'a1',
+                text: 'hi there',
+                role: AgenticRole.assistant,
+                isFinal: true,
+              ),
+            ],
           ),
-        ],
-      )));
+        ),
+      );
       await tester.pump();
 
       expect(find.byType(MessageCopyButton), findsOneWidget);
@@ -523,35 +531,36 @@ void main() {
 
   group('Agent stats row — long answering model name', () {
     testWidgets(
-        'does not overflow the message bubble when the model name is long',
-        (tester) async {
-      final message = AgenticMessage(
-        messageId: 'm1',
-        localId: 'l1',
-        text: 'Hello there',
-        role: AgenticRole.assistant,
-        stats: const AgentStats(
-          answeringModelName:
-              'openrouter/anthropic/claude-3.7-sonnet-thinking-extended-context-preview',
-          inputTokens: 120,
-          outputTokens: 45,
-        ),
-        isFinal: true,
-      );
-
-      await tester.pumpWidget(
-        _wrap(
-          SizedBox(
-            width: 360, // narrow phone-width bubble
-            child: AgenticChatHistory(messages: [message]),
+      'does not overflow the message bubble when the model name is long',
+      (tester) async {
+        final message = AgenticMessage(
+          messageId: 'm1',
+          localId: 'l1',
+          text: 'Hello there',
+          role: AgenticRole.assistant,
+          stats: const AgentStats(
+            answeringModelName:
+                'openrouter/anthropic/claude-3.7-sonnet-thinking-extended-context-preview',
+            inputTokens: 120,
+            outputTokens: 45,
           ),
-        ),
-      );
+          isFinal: true,
+        );
 
-      await tester.tap(find.byIcon(Icons.insights));
-      await tester.pump();
+        await tester.pumpWidget(
+          _wrap(
+            SizedBox(
+              width: 360, // narrow phone-width bubble
+              child: AgenticChatHistory(messages: [message]),
+            ),
+          ),
+        );
 
-      expect(tester.takeException(), isNull);
-    });
+        await tester.tap(find.byIcon(Icons.insights));
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

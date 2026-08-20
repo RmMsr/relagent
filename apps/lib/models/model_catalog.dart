@@ -89,7 +89,8 @@ class CatalogEntry {
     );
 
     // Derived from architecture per spec: live architectures support streaming.
-    final supportsStreaming = architecture == ModelArchitecture.transducer ||
+    final supportsStreaming =
+        architecture == ModelArchitecture.transducer ||
         architecture == ModelArchitecture.ctc ||
         architecture == ModelArchitecture.onlineNemoCtc;
 
@@ -179,9 +180,11 @@ class ModelCatalog {
   /// Get entries matching a language code, recommended entries first.
   static List<CatalogEntry> byLanguage(String languageCode) {
     return _entries
-        .where((e) =>
-            e.languages.contains(languageCode) ||
-            e.languages.contains(_multiLanguageSentinel))
+        .where(
+          (e) =>
+              e.languages.contains(languageCode) ||
+              e.languages.contains(_multiLanguageSentinel),
+        )
         .toList()
       ..sort(_recommendedFirst);
   }
@@ -198,10 +201,12 @@ class ModelCatalog {
     String languageCode,
   ) {
     return _entries
-        .where((e) =>
-            e.type == type &&
-            (e.languages.contains(languageCode) ||
-                e.languages.contains(_multiLanguageSentinel)))
+        .where(
+          (e) =>
+              e.type == type &&
+              (e.languages.contains(languageCode) ||
+                  e.languages.contains(_multiLanguageSentinel)),
+        )
         .toList()
       ..sort(_recommendedFirst);
   }
@@ -221,4 +226,3 @@ class ModelCatalog {
     return a.id.compareTo(b.id);
   }
 }
-

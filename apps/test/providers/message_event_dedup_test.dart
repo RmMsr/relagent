@@ -74,7 +74,10 @@ void main() {
       addTearDown(container.dispose);
 
       // Materialize the instance first — matches a displayed session.
-      final subscription = container.listen(agenticChatProvider('s1'), (_, _) {});
+      final subscription = container.listen(
+        agenticChatProvider('s1'),
+        (_, _) {},
+      );
       addTearDown(subscription.close);
 
       final sseNotifier = container.read(sseProvider.notifier);
@@ -83,79 +86,90 @@ void main() {
       expect(tracker.refreshCount, 1);
     });
 
-    test('does not create a new instance for a session with no live instance',
-        () async {
-      final container = await _makeContainer();
-      addTearDown(container.dispose);
+    test(
+      'does not create a new instance for a session with no live instance',
+      () async {
+        final container = await _makeContainer();
+        addTearDown(container.dispose);
 
-      final sseNotifier = container.read(sseProvider.notifier);
-      await sseNotifier.handleEventForTest(_appendedEvent('never-watched'));
+        final sseNotifier = container.read(sseProvider.notifier);
+        await sseNotifier.handleEventForTest(_appendedEvent('never-watched'));
 
-      expect(
-        container.exists(agenticChatProvider('never-watched')),
-        isFalse,
-        reason: 'the SSE handler itself must not be a reason instances get '
-            'created — that would defeat the memory bound the disposal '
-            'policy relies on',
-      );
-    });
-
-    test('bumps the sessions list activity for a session with no live instance',
-        () async {
-      final container = await _makeContainer();
-      addTearDown(container.dispose);
-
-      final oldTime = DateTime.utc(2020, 1, 1);
-      container.read(sessionsProvider.notifier).addSession(
-            SessionInfo(
-              sessionId: 'bg-session',
-              title: 'Background',
-              createdAt: oldTime,
-              updatedAt: oldTime,
-            ),
-          );
-
-      final newTime = DateTime.utc(2025, 6, 1);
-      final sseNotifier = container.read(sseProvider.notifier);
-      await sseNotifier.handleEventForTest(
-        _appendedEvent('bg-session', createdAt: newTime),
-      );
-
-      final sessions = container.read(sessionsProvider).sessions;
-      expect(sessions.first.sessionInfo.sessionId, 'bg-session');
-      expect(sessions.first.sessionInfo.updatedAt, newTime);
-      expect(
-        container.exists(agenticChatProvider('bg-session')),
-        isFalse,
-        reason: 'a lightweight activity bump must not materialize the full '
-            'chat-state instance',
-      );
-    });
+        expect(
+          container.exists(agenticChatProvider('never-watched')),
+          isFalse,
+          reason:
+              'the SSE handler itself must not be a reason instances get '
+              'created — that would defeat the memory bound the disposal '
+              'policy relies on',
+        );
+      },
+    );
 
     test(
-        'an older/out-of-order created_at does not regress an already-newer timestamp',
-        () async {
-      final container = await _makeContainer();
-      addTearDown(container.dispose);
+      'bumps the sessions list activity for a session with no live instance',
+      () async {
+        final container = await _makeContainer();
+        addTearDown(container.dispose);
 
-      final newTime = DateTime.utc(2025, 6, 1);
-      container.read(sessionsProvider.notifier).addSession(
-            SessionInfo(
-              sessionId: 'bg-session',
-              title: 'Background',
-              createdAt: newTime,
-              updatedAt: newTime,
-            ),
-          );
+        final oldTime = DateTime.utc(2020, 1, 1);
+        container
+            .read(sessionsProvider.notifier)
+            .addSession(
+              SessionInfo(
+                sessionId: 'bg-session',
+                title: 'Background',
+                createdAt: oldTime,
+                updatedAt: oldTime,
+              ),
+            );
 
-      final olderTime = DateTime.utc(2020, 1, 1);
-      final sseNotifier = container.read(sseProvider.notifier);
-      await sseNotifier.handleEventForTest(
-        _appendedEvent('bg-session', createdAt: olderTime),
-      );
+        final newTime = DateTime.utc(2025, 6, 1);
+        final sseNotifier = container.read(sseProvider.notifier);
+        await sseNotifier.handleEventForTest(
+          _appendedEvent('bg-session', createdAt: newTime),
+        );
 
-      final sessions = container.read(sessionsProvider).sessions;
-      expect(sessions.first.sessionInfo.updatedAt, newTime);
-    });
+        final sessions = container.read(sessionsProvider).sessions;
+        expect(sessions.first.sessionInfo.sessionId, 'bg-session');
+        expect(sessions.first.sessionInfo.updatedAt, newTime);
+        expect(
+          container.exists(agenticChatProvider('bg-session')),
+          isFalse,
+          reason:
+              'a lightweight activity bump must not materialize the full '
+              'chat-state instance',
+        );
+      },
+    );
+
+    test(
+      'an older/out-of-order created_at does not regress an already-newer timestamp',
+      () async {
+        final container = await _makeContainer();
+        addTearDown(container.dispose);
+
+        final newTime = DateTime.utc(2025, 6, 1);
+        container
+            .read(sessionsProvider.notifier)
+            .addSession(
+              SessionInfo(
+                sessionId: 'bg-session',
+                title: 'Background',
+                createdAt: newTime,
+                updatedAt: newTime,
+              ),
+            );
+
+        final olderTime = DateTime.utc(2020, 1, 1);
+        final sseNotifier = container.read(sseProvider.notifier);
+        await sseNotifier.handleEventForTest(
+          _appendedEvent('bg-session', createdAt: olderTime),
+        );
+
+        final sessions = container.read(sessionsProvider).sessions;
+        expect(sessions.first.sessionInfo.updatedAt, newTime);
+      },
+    );
   });
 }

@@ -26,7 +26,8 @@ class ChatCommand extends Command<int> {
     argParser.addOption('token', help: 'Engine auth token.');
     argParser.addFlag(
       'purge-session',
-      help: 'Delete the session from the engine when the chat ends. '
+      help:
+          'Delete the session from the engine when the chat ends. '
           'Defaults to the "always purge session" setting from `relagent '
           'config` when not passed.',
       defaultsTo: false,
@@ -133,11 +134,8 @@ class ChatCommand extends Command<int> {
               stdout.writeln('* $notification');
               liveInput?.showAfterPrint();
             },
-            decideApproval: (approval) => _promptApproval(
-              liveInput,
-              approval,
-              interactive: interactive,
-            ),
+            decideApproval: (approval) =>
+                _promptApproval(liveInput, approval, interactive: interactive),
           );
           sessionId = response.sessionId ?? sessionId;
 

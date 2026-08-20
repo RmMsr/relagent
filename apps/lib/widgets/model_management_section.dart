@@ -110,66 +110,72 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
           ),
-          actions: [
-            _ImportModelAction(tabController: _tabController),
-          ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Speech Recognition'),
-            Tab(text: 'Text-to-Speech'),
+          actions: [_ImportModelAction(tabController: _tabController)],
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'Speech Recognition'),
+              Tab(text: 'Text-to-Speech'),
+            ],
+          ),
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Filter by name, language…',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                      ),
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  FilterChip(
+                    label: const Text('Downloaded'),
+                    selected: _downloadedOnly,
+                    onSelected: (v) => setState(() => _downloadedOnly = v),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _ModelList(
+                    type: ModelType.asr,
+                    filterQuery: _searchQuery,
+                    downloadedOnly: _downloadedOnly,
+                  ),
+                  _ModelList(
+                    type: ModelType.tts,
+                    filterQuery: _searchQuery,
+                    downloadedOnly: _downloadedOnly,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
+        bottomNavigationBar: SettingsApplyBar(onApply: _apply),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Filter by name, language…',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _searchQuery = '');
-                              },
-                            )
-                          : null,
-                      isDense: true,
-                      border: const OutlineInputBorder(),
-                    ),
-                    onChanged: (v) => setState(() => _searchQuery = v),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                FilterChip(
-                  label: const Text('Downloaded'),
-                  selected: _downloadedOnly,
-                  onSelected: (v) => setState(() => _downloadedOnly = v),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _ModelList(type: ModelType.asr, filterQuery: _searchQuery, downloadedOnly: _downloadedOnly),
-                _ModelList(type: ModelType.tts, filterQuery: _searchQuery, downloadedOnly: _downloadedOnly),
-              ],
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: SettingsApplyBar(onApply: _apply),
-    ),
     );
   }
 }
@@ -179,7 +185,11 @@ class _ModelList extends ConsumerStatefulWidget {
   final String filterQuery;
   final bool downloadedOnly;
 
-  const _ModelList({required this.type, this.filterQuery = '', this.downloadedOnly = false});
+  const _ModelList({
+    required this.type,
+    this.filterQuery = '',
+    this.downloadedOnly = false,
+  });
 
   @override
   ConsumerState<_ModelList> createState() => _ModelListState();
@@ -201,8 +211,9 @@ class _ModelListState extends ConsumerState<_ModelList> {
 
     double initialOffset = 0;
     if (selectedId != null) {
-      final index = ModelCatalog.byType(widget.type)
-          .indexWhere((e) => e.id == selectedId);
+      final index = ModelCatalog.byType(
+        widget.type,
+      ).indexWhere((e) => e.id == selectedId);
       if (index > 0) initialOffset = index * _cardHeight;
     }
 
@@ -222,9 +233,11 @@ class _ModelListState extends ConsumerState<_ModelList> {
     var results = all;
     if (widget.downloadedOnly) {
       results = results
-          .where((e) =>
-              downloadState.isDownloaded(e.id) ||
-              downloadState.isDownloadingModel(e.id))
+          .where(
+            (e) =>
+                downloadState.isDownloaded(e.id) ||
+                downloadState.isDownloadingModel(e.id),
+          )
           .toList();
     }
     if (widget.filterQuery.isEmpty) return results;
@@ -239,9 +252,7 @@ class _ModelListState extends ConsumerState<_ModelList> {
         .toList();
   }
 
-  List<ImportedModelEntry> _applyImportedFilter(
-    List<ImportedModelEntry> all,
-  ) {
+  List<ImportedModelEntry> _applyImportedFilter(List<ImportedModelEntry> all) {
     // Imported models are always locally available; include them when downloadedOnly.
     if (widget.filterQuery.isEmpty) return all;
     final q = widget.filterQuery.toLowerCase();
@@ -282,8 +293,7 @@ class _ModelListState extends ConsumerState<_ModelList> {
 
     return Column(
       children: [
-        if (importedState.isImporting)
-          const LinearProgressIndicator(),
+        if (importedState.isImporting) const LinearProgressIndicator(),
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
@@ -445,8 +455,10 @@ class _ModelEntryCard extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text('${progress!.percent}%',
-                          style: theme.textTheme.bodySmall),
+                      Text(
+                        '${progress!.percent}%',
+                        style: theme.textTheme.bodySmall,
+                      ),
                       const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.close, size: 20),
@@ -522,8 +534,10 @@ class _ModelEntryCard extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Model'),
-        content: Text('Delete "${entry.displayName}"? '
-            'You can re-download it later.'),
+        content: Text(
+          'Delete "${entry.displayName}"? '
+          'You can re-download it later.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -605,8 +619,10 @@ class _ImportedModelCard extends ConsumerWidget {
               ),
               if (entry.languages.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(entry.languages.join(', '),
-                    style: theme.textTheme.bodySmall),
+                Text(
+                  entry.languages.join(', '),
+                  style: theme.textTheme.bodySmall,
+                ),
               ],
               const SizedBox(height: 8),
               Align(
@@ -667,7 +683,9 @@ class _ImportedModelCard extends ConsumerWidget {
     );
     if (updated == null || !context.mounted) return;
 
-    await ref.read(importedModelsProvider.notifier).updateModel(
+    await ref
+        .read(importedModelsProvider.notifier)
+        .updateModel(
           ImportedModelEntry(
             id: entry.id,
             displayName: updated.displayName,
@@ -684,8 +702,10 @@ class _ImportedModelCard extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Imported Model'),
-        content: Text('Delete "${entry.displayName}"? '
-            'This cannot be undone.'),
+        content: Text(
+          'Delete "${entry.displayName}"? '
+          'This cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -769,9 +789,9 @@ class _ImportModelActionState extends ConsumerState<_ImportModelAction> {
     } catch (e) {
       if (mounted) {
         setState(() => _isPeeking = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read archive: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not read archive: $e')));
       }
       return;
     }
@@ -780,8 +800,10 @@ class _ImportModelActionState extends ConsumerState<_ImportModelAction> {
 
     if (!context.mounted) return;
 
-    final suggestedName = result.files.first.name
-        .replaceAll(RegExp(r'\.(tar\.bz2|tbz2|tar\.gz|tgz|tar|zip|bz2|gz)$'), '');
+    final suggestedName = result.files.first.name.replaceAll(
+      RegExp(r'\.(tar\.bz2|tbz2|tar\.gz|tgz|tar|zip|bz2|gz)$'),
+      '',
+    );
 
     final initialType = widget.tabController.index == 0
         ? ModelType.asr
@@ -804,9 +826,9 @@ class _ImportModelActionState extends ConsumerState<_ImportModelAction> {
 
     final error = ref.read(importedModelsProvider).operationError;
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
       ref.read(importedModelsProvider.notifier).clearError();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

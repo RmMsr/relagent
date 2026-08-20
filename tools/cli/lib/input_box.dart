@@ -8,7 +8,8 @@
 /// independent of real terminal state.
 List<String> renderInputBoxLines(String buffer, {required int width}) {
   final effectiveWidth = width < 8 ? 8 : width;
-  final innerWidth = effectiveWidth - 4; // border + one space of padding each side
+  final innerWidth =
+      effectiveWidth - 4; // border + one space of padding each side
   final rawLines = buffer.isEmpty ? [''] : buffer.split('\n');
 
   final wrapped = <String>[];

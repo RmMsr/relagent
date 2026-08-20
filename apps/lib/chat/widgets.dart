@@ -167,13 +167,17 @@ class ChatInputState extends ConsumerState<ChatInput>
       padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+        border: Border(
+          top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
       ),
       child: Row(
         children: [
           Expanded(
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.5),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+              ),
               child: TextField(
                 autofocus: true,
                 controller: _controller,
@@ -181,7 +185,9 @@ class ChatInputState extends ConsumerState<ChatInput>
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   hintText: 'Type a message...',
-                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  hintStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 minLines: 1,
                 maxLines: null,
@@ -194,7 +200,10 @@ class ChatInputState extends ConsumerState<ChatInput>
           if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable)
             RecorderButton(),
           IconButton(
-            icon: Icon(Icons.send, color: Theme.of(context).colorScheme.primary),
+            icon: Icon(
+              Icons.send,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             onPressed: _submitText,
             tooltip: 'Send message',
           ),
@@ -522,32 +531,32 @@ class ChatMessageBubble extends StatelessWidget {
                         onLinkTap: linkTapHandler(context),
                       ),
                     ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (onRetry != null)
-                            IconButton.outlined(
-                              icon: const Icon(Icons.refresh, size: 18),
-                              iconSize: 18,
-                              padding: const EdgeInsets.all(8),
-                              constraints: const BoxConstraints(
-                                minWidth: 36,
-                                minHeight: 36,
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (onRetry != null)
+                              IconButton.outlined(
+                                icon: const Icon(Icons.refresh, size: 18),
+                                iconSize: 18,
+                                padding: const EdgeInsets.all(8),
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                                tooltip: 'Retry',
+                                onPressed: () => onRetry!(message.text),
                               ),
-                              tooltip: 'Retry',
-                              onPressed: () => onRetry!(message.text),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             ),
             ChatRole.assistant => Padding(
               padding: const EdgeInsets.all(10),

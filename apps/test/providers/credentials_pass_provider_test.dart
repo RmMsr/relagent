@@ -39,12 +39,17 @@ void main() {
     expect(container.read(credentialsPassProvider), isFalse);
   });
 
-  test('stays alive across an event-loop turn while something is watching it',
-      () async {
-    final sub = container.listen(credentialsPassProvider, (previous, next) {});
-    container.read(credentialsPassProvider.notifier).invalidate();
-    await Future<void>.delayed(Duration.zero);
-    expect(container.read(credentialsPassProvider), isFalse);
-    sub.close();
-  });
+  test(
+    'stays alive across an event-loop turn while something is watching it',
+    () async {
+      final sub = container.listen(
+        credentialsPassProvider,
+        (previous, next) {},
+      );
+      container.read(credentialsPassProvider.notifier).invalidate();
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(credentialsPassProvider), isFalse);
+      sub.close();
+    },
+  );
 }

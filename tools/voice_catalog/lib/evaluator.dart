@@ -84,19 +84,23 @@ class VoiceCatalogEvaluator {
           return switch (evalStatus) {
             'failed' => status == 'failed',
             'approved' => status == 'approved',
-            _ => status == 'untested' &&
-                !(e['notes'] as String? ?? '').startsWith('excluded:') &&
-                !(e['notes'] as String? ?? '').startsWith('skipped:'),
+            _ =>
+              status == 'untested' &&
+                  !(e['notes'] as String? ?? '').startsWith('excluded:') &&
+                  !(e['notes'] as String? ?? '').startsWith('skipped:'),
           };
         })
-        .where((e) =>
-            limitToIds == null || limitToIds!.contains(e['id'] as String))
+        .where(
+          (e) => limitToIds == null || limitToIds!.contains(e['id'] as String),
+        )
         .where(scope.matches)
         .toList();
 
     print('[Evaluate] ${candidates.length} entries to evaluate');
     if (!keep) {
-      print('[Evaluate] Downloads will be deleted after each test (--keep to retain)');
+      print(
+        '[Evaluate] Downloads will be deleted after each test (--keep to retain)',
+      );
     }
 
     var done = 0;
@@ -162,8 +166,8 @@ class VoiceCatalogEvaluator {
       entry['fileStructure'] = fileStructure;
 
       // Auto-detect languages when none are known yet.
-      final existingLangs =
-          (entry['languages'] as List<dynamic>? ?? []).cast<String>();
+      final existingLangs = (entry['languages'] as List<dynamic>? ?? [])
+          .cast<String>();
       if (existingLangs.isEmpty) {
         final detected = await _detectLanguages(modelDir, fileStructure);
         if (detected.isNotEmpty) {
@@ -222,7 +226,9 @@ class VoiceCatalogEvaluator {
       if (debug) stderr.writeln('[Debug] Detected ASR arch: ${detected.name}');
     }
 
-    final files = Map<String, String>.from(fileStructure.cast<String, String>());
+    final files = Map<String, String>.from(
+      fileStructure.cast<String, String>(),
+    );
     final loader = _DirectoryModelLoader(modelDir);
 
     if (debug) {
@@ -314,7 +320,9 @@ class VoiceCatalogEvaluator {
       if (debug) stderr.writeln('[Debug] Detected TTS arch: ${detected.name}');
     }
 
-    final files = Map<String, String>.from(fileStructure.cast<String, String>());
+    final files = Map<String, String>.from(
+      fileStructure.cast<String, String>(),
+    );
     final loader = _DirectoryModelLoader(modelDir);
 
     if (debug) {
@@ -344,7 +352,11 @@ class VoiceCatalogEvaluator {
           ),
         );
       } else {
-        audio = tts.generate(text: 'Hello, this is a test.', sid: 0, speed: 1.0);
+        audio = tts.generate(
+          text: 'Hello, this is a test.',
+          sid: 0,
+          speed: 1.0,
+        );
       }
       if (audio.samples.isEmpty) _appendNote(entry, 'note: empty TTS output');
     } finally {
@@ -454,7 +466,8 @@ class VoiceCatalogEvaluator {
         if (entity is! File || !entity.path.endsWith('.wav')) continue;
         final name = p.basenameWithoutExtension(entity.path).toLowerCase();
         // Prefer short/simple names (bria, loona) over long descriptive ones.
-        if (refWav == null || name.length < p.basenameWithoutExtension(refWav).length) {
+        if (refWav == null ||
+            name.length < p.basenameWithoutExtension(refWav).length) {
           refWav = p.relative(entity.path, from: modelDir);
         }
       }
@@ -677,7 +690,6 @@ class VoiceCatalogEvaluator {
     };
     return map[name];
   }
-
 
   void _appendNote(Map<String, dynamic> entry, String note) {
     final existing = entry['notes'] as String? ?? '';

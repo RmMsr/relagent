@@ -87,8 +87,14 @@ class AnimatedTtsControls extends StatelessWidget {
         child: FadeTransition(opacity: animation, child: child),
       ),
       child: showChunkControls
-          ? KeyedSubtree(key: const ValueKey('chunk-controls'), child: chunkControls)
-          : KeyedSubtree(key: const ValueKey('single-button'), child: singleButton),
+          ? KeyedSubtree(
+              key: const ValueKey('chunk-controls'),
+              child: chunkControls,
+            )
+          : KeyedSubtree(
+              key: const ValueKey('single-button'),
+              child: singleButton,
+            ),
     );
   }
 }

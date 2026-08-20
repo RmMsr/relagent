@@ -55,7 +55,8 @@ class ModelDownloadState {
   }
 
   bool isDownloaded(String modelId) => downloadedModels.contains(modelId);
-  bool isDownloadingModel(String modelId) => activeDownloads.containsKey(modelId);
+  bool isDownloadingModel(String modelId) =>
+      activeDownloads.containsKey(modelId);
   DownloadProgress? progressFor(String modelId) => activeDownloads[modelId];
 }
 
@@ -127,18 +128,19 @@ class ModelDownloadNotifier extends Notifier<ModelDownloadState> {
   Future<void> downloadModel(String modelId) async {
     final entry = ModelCatalog.findById(modelId);
     if (entry == null) {
-      state = state.copyWith(error: () => 'Model $modelId not found in catalog');
+      state = state.copyWith(
+        error: () => 'Model $modelId not found in catalog',
+      );
       return;
     }
 
     if (state.isDownloadingModel(modelId)) return;
 
     _cancelledIds.remove(modelId);
-    _updateProgress(modelId, DownloadProgress(
-      modelId: modelId,
-      bytesReceived: 0,
-      totalBytes: 0,
-    ));
+    _updateProgress(
+      modelId,
+      DownloadProgress(modelId: modelId, bytesReceived: 0, totalBytes: 0),
+    );
     state = state.copyWith(error: () => null);
 
     Object? lastError;
@@ -177,12 +179,15 @@ class ModelDownloadNotifier extends Notifier<ModelDownloadState> {
     }
 
     // Signal extracting phase while scanning filesystem.
-    _updateProgress(modelId, DownloadProgress(
-      modelId: modelId,
-      bytesReceived: 0,
-      totalBytes: 0,
-      isExtracting: true,
-    ));
+    _updateProgress(
+      modelId,
+      DownloadProgress(
+        modelId: modelId,
+        bytesReceived: 0,
+        totalBytes: 0,
+        isExtracting: true,
+      ),
+    );
     await _refreshDownloadedModels();
     _removeProgress(modelId);
 

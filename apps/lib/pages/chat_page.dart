@@ -13,6 +13,7 @@ import '/providers/voice_service_provider.dart';
 import '/services/api_health_check.dart';
 import '/theme/app_colors.dart';
 
+import '/widgets/error_copy_button.dart';
 import '/widgets/voice_mode_selector.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -236,7 +237,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         children: [
                           ChatHistory(
                             messages: chatState.messages,
-                            showAssistantPending: chatState.showAssistantPending,
+                            showAssistantPending:
+                                chatState.showAssistantPending,
                             retryState: chatState.retryState,
                             isVoiceAvailable: voiceCapabilities.isAsrAvailable,
                             onRetry: (text) {
@@ -248,7 +250,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                     final status = ttsState
                                         .getMessageState(messageId)
                                         .status;
-                                    final ttsNotifier = ref.read(ttsProvider.notifier);
+                                    final ttsNotifier = ref.read(
+                                      ttsProvider.notifier,
+                                    );
 
                                     switch (status) {
                                       case MessagePlaybackStatus.playing:
@@ -272,13 +276,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                             onSkipPrevious: !voiceCapabilities.isTtsAvailable
                                 ? null
                                 : (messageId) => ref
-                                    .read(ttsProvider.notifier)
-                                    .skipPreviousChunk(messageId),
+                                      .read(ttsProvider.notifier)
+                                      .skipPreviousChunk(messageId),
                             onSkipNext: !voiceCapabilities.isTtsAvailable
                                 ? null
                                 : (messageId) => ref
-                                    .read(ttsProvider.notifier)
-                                    .skipNextChunk(messageId),
+                                      .read(ttsProvider.notifier)
+                                      .skipNextChunk(messageId),
                           ),
                         ],
                       ),
@@ -327,94 +331,100 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       actionText = 'Check Settings';
     }
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: context.errorBg,
-        border: Border(
-          left: BorderSide(color: context.errorBorder, width: 4),
-        ),
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(10),
-          bottomRight: Radius.circular(10),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isAuthIssue ? Icons.lock : Icons.warning,
-                color: context.errorText,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: context.errorText,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.close,
-                  color: context.errorText,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _healthCheckBannerDismissed = true;
-                  });
-                },
-                tooltip: 'Dismiss',
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: context.errorText,
+    return Stack(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+          padding: const EdgeInsets.fromLTRB(12, 10, 32, 10),
+          decoration: BoxDecoration(
+            color: context.errorBg,
+            border: Border(
+              left: BorderSide(color: context.errorBorder, width: 4),
+            ),
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(10),
+              bottomRight: Radius.circular(10),
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              OutlinedButton.icon(
-                onPressed: () {
-                  ref
-                      .read(healthCheckProvider.notifier)
-                      .performImmediateHealthCheck();
-                  setState(() {
-                    _healthCheckBannerDismissed = false;
-                  });
-                },
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: context.errorText,
-                  side: BorderSide(color: context.errorText),
+              Row(
+                children: [
+                  Icon(
+                    isAuthIssue ? Icons.lock : Icons.warning,
+                    color: context.errorText,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: context.errorText,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: context.errorText),
+                    onPressed: () {
+                      setState(() {
+                        _healthCheckBannerDismissed = true;
+                      });
+                    },
+                    tooltip: 'Dismiss',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: context.errorText,
                 ),
               ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: _navigateToSettings,
-                icon: const Icon(Icons.settings),
-                label: Text(actionText),
-                style: FilledButton.styleFrom(
-                  backgroundColor: theme.colorScheme.error,
-                  foregroundColor: theme.colorScheme.onError,
-                ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      ref
+                          .read(healthCheckProvider.notifier)
+                          .performImmediateHealthCheck();
+                      setState(() {
+                        _healthCheckBannerDismissed = false;
+                      });
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.errorText,
+                      side: BorderSide(color: context.errorText),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _navigateToSettings,
+                    icon: const Icon(Icons.settings),
+                    label: Text(actionText),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.colorScheme.error,
+                      foregroundColor: theme.colorScheme.onError,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        ),
+        Positioned(
+          right: 4,
+          bottom: 4,
+          child: ErrorCopyButton(text: '$title\n$message'),
+        ),
+      ],
     );
   }
 }

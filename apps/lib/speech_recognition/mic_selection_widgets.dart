@@ -70,7 +70,11 @@ class MicSymbol extends StatelessWidget {
       category: category,
       color: color,
       size: size,
-      child: Icon(filled ? Icons.mic : Icons.mic_none, color: color, size: size),
+      child: Icon(
+        filled ? Icons.mic : Icons.mic_none,
+        color: color,
+        size: size,
+      ),
     );
   }
 }
@@ -117,7 +121,9 @@ class MicPickerSheet extends ConsumerWidget {
           for (final device in devices)
             ListTile(
               leading: MicSymbol(category: device.category, size: 24),
-              title: Text(device.name.isEmpty ? device.category.name : device.name),
+              title: Text(
+                device.name.isEmpty ? device.category.name : device.name,
+              ),
               trailing: !preference.isAuto && preference.matches(device)
                   ? const Icon(Icons.check)
                   : null,

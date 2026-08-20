@@ -28,12 +28,17 @@ void main() {
     expect(container.read(settingsTabRequestProvider), isNull);
   });
 
-  test('stays alive across an event-loop turn while something is watching it',
-      () async {
-    final sub = container.listen(settingsTabRequestProvider, (previous, next) {});
-    container.read(settingsTabRequestProvider.notifier).requestTab(0);
-    await Future<void>.delayed(Duration.zero);
-    expect(container.read(settingsTabRequestProvider), 0);
-    sub.close();
-  });
+  test(
+    'stays alive across an event-loop turn while something is watching it',
+    () async {
+      final sub = container.listen(
+        settingsTabRequestProvider,
+        (previous, next) {},
+      );
+      container.read(settingsTabRequestProvider.notifier).requestTab(0);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(settingsTabRequestProvider), 0);
+      sub.close();
+    },
+  );
 }

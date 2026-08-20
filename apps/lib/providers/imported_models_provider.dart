@@ -25,8 +25,9 @@ class ImportedModelsState {
     return ImportedModelsState(
       entries: entries ?? this.entries,
       isImporting: isImporting ?? this.isImporting,
-      operationError:
-          operationError != null ? operationError() : this.operationError,
+      operationError: operationError != null
+          ? operationError()
+          : this.operationError,
     );
   }
 }
@@ -46,9 +47,7 @@ class ImportedModelsNotifier extends Notifier<ImportedModelsState> {
   @override
   ImportedModelsState build() {
     _service = ref.watch(importedModelServiceProvider);
-    return ImportedModelsState(
-      entries: ImportedModelRegistry.entries,
-    );
+    return ImportedModelsState(entries: ImportedModelRegistry.entries);
   }
 
   Future<void> importFromFile(File archive, ImportedModelEntry template) async {

@@ -84,8 +84,8 @@ List<SpeechChunk> splitIntoSpeechChunks(
     final pauseAfterParagraph = !hasNext
         ? ChunkPause.none
         : (paragraph.isHeading || nextIsHeading
-            ? ChunkPause.heading
-            : ChunkPause.paragraph);
+              ? ChunkPause.heading
+              : ChunkPause.paragraph);
 
     final clauses = paragraph.text
         .split(clausePauseMarker)

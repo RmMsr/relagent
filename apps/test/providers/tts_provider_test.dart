@@ -56,8 +56,7 @@ final _longListItemText = List.filled(
   10,
   'This is a moderately long sentence for testing purposes.',
 ).join(' ');
-final _listWithOneLongItem =
-    '- short one\n- $_longListItemText\n- short three';
+final _listWithOneLongItem = '- short one\n- $_longListItemText\n- short three';
 
 void main() {
   group('pauseDurationFor', () {
@@ -110,52 +109,56 @@ void main() {
       expect(messageState.totalChunks, 3);
     });
 
-    test('prefetch enqueues the next chunk once the first starts playing',
-        () async {
-      final tts = fixture.container.read(ttsProvider.notifier);
+    test(
+      'prefetch enqueues the next chunk once the first starts playing',
+      () async {
+        final tts = fixture.container.read(ttsProvider.notifier);
 
-      await tts.enqueue(_threeParagraphMessage, 'msg-prefetch');
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+        await tts.enqueue(_threeParagraphMessage, 'msg-prefetch');
+        await Future<void>.delayed(const Duration(milliseconds: 30));
 
-      expect(
-        fixture.container.read(playbackProvider).currentItem?.id,
-        'msg-prefetch#0',
-      );
-      expect(fixture.container.read(playbackProvider).queue.length, 2);
-      expect(
-        fixture.container.read(playbackProvider).queue.map((i) => i.id),
-        containsAll(['msg-prefetch#0', 'msg-prefetch#1']),
-      );
-    });
+        expect(
+          fixture.container.read(playbackProvider).currentItem?.id,
+          'msg-prefetch#0',
+        );
+        expect(fixture.container.read(playbackProvider).queue.length, 2);
+        expect(
+          fixture.container.read(playbackProvider).queue.map((i) => i.id),
+          containsAll(['msg-prefetch#0', 'msg-prefetch#1']),
+        );
+      },
+    );
 
-    test('message status becomes completed only after the last chunk',
-        () async {
-      final tts = fixture.container.read(ttsProvider.notifier);
+    test(
+      'message status becomes completed only after the last chunk',
+      () async {
+        final tts = fixture.container.read(ttsProvider.notifier);
 
-      await tts.enqueue(_threeParagraphMessage, 'msg-complete');
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+        await tts.enqueue(_threeParagraphMessage, 'msg-complete');
+        await Future<void>.delayed(const Duration(milliseconds: 30));
 
-      // First chunk is underway; the message must not be completed yet.
-      expect(
-        fixture.container
-            .read(ttsProvider)
-            .getMessageState('msg-complete')
-            .status,
-        isNot(MessagePlaybackStatus.completed),
-      );
+        // First chunk is underway; the message must not be completed yet.
+        expect(
+          fixture.container
+              .read(ttsProvider)
+              .getMessageState('msg-complete')
+              .status,
+          isNot(MessagePlaybackStatus.completed),
+        );
 
-      // Let all three chunks cascade through (play ~50ms + lock
-      // release/reacquire ~100ms per hop).
-      await Future<void>.delayed(const Duration(milliseconds: 900));
+        // Let all three chunks cascade through (play ~50ms + lock
+        // release/reacquire ~100ms per hop).
+        await Future<void>.delayed(const Duration(milliseconds: 900));
 
-      expect(
-        fixture.container
-            .read(ttsProvider)
-            .getMessageState('msg-complete')
-            .status,
-        MessagePlaybackStatus.completed,
-      );
-    });
+        expect(
+          fixture.container
+              .read(ttsProvider)
+              .getMessageState('msg-complete')
+              .status,
+          MessagePlaybackStatus.completed,
+        );
+      },
+    );
 
     test('a failed final chunk still marks the message completed', () async {
       final failingFixture = AudioTestFixture();
@@ -178,51 +181,49 @@ void main() {
     });
 
     test(
-        'skipPreviousChunk drops the stale prefetched chunk so nothing is skipped',
-        () async {
-      final tts = fixture.container.read(ttsProvider.notifier);
-      when(
-        fixture.mockAudioPlayer.position,
-      ).thenReturn(Duration.zero);
+      'skipPreviousChunk drops the stale prefetched chunk so nothing is skipped',
+      () async {
+        final tts = fixture.container.read(ttsProvider.notifier);
+        when(fixture.mockAudioPlayer.position).thenReturn(Duration.zero);
 
-      await tts.enqueue(_threeParagraphMessage, 'msg-back');
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      expect(
-        fixture.container.read(playbackProvider).currentItem?.id,
-        'msg-back#0',
-      );
+        await tts.enqueue(_threeParagraphMessage, 'msg-back');
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(
+          fixture.container.read(playbackProvider).currentItem?.id,
+          'msg-back#0',
+        );
 
-      // Force-advance to chunk 1. The mock player auto-completes whatever
-      // is playing ~50ms after it starts, so the window to observe "chunk 1
-      // is current, chunk 2 prefetched" is narrow — check promptly.
-      await tts.skipNextChunk('msg-back');
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      expect(
-        fixture.container.read(playbackProvider).currentItem?.id,
-        'msg-back#1',
-      );
-      expect(
-        fixture.container.read(playbackProvider).queue.map((i) => i.id),
-        containsAll(['msg-back#1', 'msg-back#2']),
-      );
+        // Force-advance to chunk 1. The mock player auto-completes whatever
+        // is playing ~50ms after it starts, so the window to observe "chunk 1
+        // is current, chunk 2 prefetched" is narrow — check promptly.
+        await tts.skipNextChunk('msg-back');
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(
+          fixture.container.read(playbackProvider).currentItem?.id,
+          'msg-back#1',
+        );
+        expect(
+          fixture.container.read(playbackProvider).queue.map((i) => i.id),
+          containsAll(['msg-back#1', 'msg-back#2']),
+        );
 
-      await tts.skipPreviousChunk('msg-back');
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+        await tts.skipPreviousChunk('msg-back');
+        await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      // Jumped back to chunk 0; the stale chunk 2 prefetch must be gone so
-      // chunk 1 gets replayed instead of being skipped over.
-      expect(
-        fixture.container.read(playbackProvider).currentItem?.id,
-        'msg-back#0',
-      );
-      expect(
-        fixture.container.read(playbackProvider).queue.map((i) => i.id),
-        isNot(contains('msg-back#2')),
-      );
-    });
+        // Jumped back to chunk 0; the stale chunk 2 prefetch must be gone so
+        // chunk 1 gets replayed instead of being skipped over.
+        expect(
+          fixture.container.read(playbackProvider).currentItem?.id,
+          'msg-back#0',
+        );
+        expect(
+          fixture.container.read(playbackProvider).queue.map((i) => i.id),
+          isNot(contains('msg-back#2')),
+        );
+      },
+    );
 
-    test(
-        'skipNextChunk treats a short list as one paragraph, skipping all '
+    test('skipNextChunk treats a short list as one paragraph, skipping all '
         'its items at once', () async {
       final tts = fixture.container.read(ttsProvider.notifier);
       when(fixture.mockAudioPlayer.position).thenReturn(Duration.zero);
@@ -244,8 +245,7 @@ void main() {
       );
     });
 
-    test(
-        "skipPreviousChunk from within a short list jumps to the list's "
+    test("skipPreviousChunk from within a short list jumps to the list's "
         'first item, not the previous one', () async {
       final tts = fixture.container.read(ttsProvider.notifier);
       when(fixture.mockAudioPlayer.position).thenReturn(Duration.zero);
@@ -271,8 +271,7 @@ void main() {
       );
     });
 
-    test(
-        "skipPreviousChunk from just after a short list jumps to the list's "
+    test("skipPreviousChunk from just after a short list jumps to the list's "
         'first item, not just its last item', () async {
       final tts = fixture.container.read(ttsProvider.notifier);
       when(fixture.mockAudioPlayer.position).thenReturn(Duration.zero);
@@ -295,8 +294,7 @@ void main() {
       );
     });
 
-    test(
-        'a list containing one long item is not collapsed for navigation — '
+    test('a list containing one long item is not collapsed for navigation — '
         'forward still steps one raw chunk at a time', () async {
       final tts = fixture.container.read(ttsProvider.notifier);
       when(fixture.mockAudioPlayer.position).thenReturn(Duration.zero);
@@ -319,10 +317,8 @@ void main() {
       );
     });
 
-    test(
-        'playNow clears a stale prefetched chunk left over from a different '
-        'message (e.g. one still playing in another chat session)',
-        () async {
+    test('playNow clears a stale prefetched chunk left over from a different '
+        'message (e.g. one still playing in another chat session)', () async {
       final tts = fixture.container.read(ttsProvider.notifier);
 
       await tts.enqueue(_threeParagraphMessage, 'msg-old');
@@ -350,10 +346,9 @@ void main() {
         fixture.container.read(playbackProvider).currentItem?.id,
         'msg-new#0',
       );
-      expect(
-        fixture.container.read(playbackProvider).queue.map((i) => i.id),
-        ['msg-new#0'],
-      );
+      expect(fixture.container.read(playbackProvider).queue.map((i) => i.id), [
+        'msg-new#0',
+      ]);
 
       // Let msg-new#0 finish (mock auto-completes ~50ms after play()) and
       // confirm playback goes idle instead of resurrecting msg-old#1.
@@ -364,8 +359,7 @@ void main() {
       );
     });
 
-    test(
-        'playNow resets a message it interrupts mid-playback, so it stops '
+    test('playNow resets a message it interrupts mid-playback, so it stops '
         'reporting playback focus (and its UI reverts to a single play '
         'button instead of the back/pause/forward row)', () async {
       final tts = fixture.container.read(ttsProvider.notifier);
@@ -393,36 +387,37 @@ void main() {
     });
 
     test(
-        'an external force-stop (e.g. the notification Stop button) resets '
-        'the message it interrupts mid-playback, so its UI reverts to a '
-        'single play button instead of staying stuck on back/pause/forward',
-        () async {
-      final tts = fixture.container.read(ttsProvider.notifier);
-      final coordinator = fixture.container.read(
-        audioCoordinatorProvider.notifier,
-      );
+      'an external force-stop (e.g. the notification Stop button) resets '
+      'the message it interrupts mid-playback, so its UI reverts to a '
+      'single play button instead of staying stuck on back/pause/forward',
+      () async {
+        final tts = fixture.container.read(ttsProvider.notifier);
+        final coordinator = fixture.container.read(
+          audioCoordinatorProvider.notifier,
+        );
 
-      await tts.enqueue(_threeParagraphMessage, 'msg-stopped');
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      // Mid-message: chunk 0 of 3, not the last chunk - same gap as the
-      // playNow case above, but this time nothing at the call site knows
-      // which message is being interrupted to manually reset it first.
-      expect(
-        fixture.container
+        await tts.enqueue(_threeParagraphMessage, 'msg-stopped');
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        // Mid-message: chunk 0 of 3, not the last chunk - same gap as the
+        // playNow case above, but this time nothing at the call site knows
+        // which message is being interrupted to manually reset it first.
+        expect(
+          fixture.container
+              .read(ttsProvider)
+              .getMessageState('msg-stopped')
+              .status,
+          MessagePlaybackStatus.playing,
+        );
+
+        coordinator.forceStop();
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+
+        final state = fixture.container
             .read(ttsProvider)
-            .getMessageState('msg-stopped')
-            .status,
-        MessagePlaybackStatus.playing,
-      );
-
-      coordinator.forceStop();
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-
-      final state = fixture.container
-          .read(ttsProvider)
-          .getMessageState('msg-stopped');
-      expect(state.hasPlaybackFocus, isFalse);
-      expect(state.status, MessagePlaybackStatus.idle);
-    });
+            .getMessageState('msg-stopped');
+        expect(state.hasPlaybackFocus, isFalse);
+        expect(state.status, MessagePlaybackStatus.idle);
+      },
+    );
   });
 }

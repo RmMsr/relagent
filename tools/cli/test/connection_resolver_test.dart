@@ -90,17 +90,20 @@ void main() {
       expect(resolved.token, 'persisted-token');
     });
 
-    test('falls back to the default engine URL when nothing else is set', () async {
-      final resolver = ConnectionResolver(
-        settingsStore: settingsStore,
-        tokenStore: _FakeTokenStore(),
-      );
+    test(
+      'falls back to the default engine URL when nothing else is set',
+      () async {
+        final resolver = ConnectionResolver(
+          settingsStore: settingsStore,
+          tokenStore: _FakeTokenStore(),
+        );
 
-      final resolved = await resolver.resolve();
+        final resolved = await resolver.resolve();
 
-      expect(resolved.engineUrl, defaultEngineBaseUrl);
-      expect(resolved.token, isNull);
-      expect(resolved.authType, AuthType.none);
-    });
+        expect(resolved.engineUrl, defaultEngineBaseUrl);
+        expect(resolved.token, isNull);
+        expect(resolved.authType, AuthType.none);
+      },
+    );
   });
 }

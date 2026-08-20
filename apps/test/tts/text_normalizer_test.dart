@@ -13,8 +13,10 @@ void main() {
     test('strips bold/italic/strikethrough markers', () {
       expect(stripMarkdownForSpeech('**bold**'), 'bold');
       expect(stripMarkdownForSpeech('__bold__'), 'bold');
-      expect(stripMarkdownForSpeech('This is _really_ important.'),
-          'This is really important.');
+      expect(
+        stripMarkdownForSpeech('This is _really_ important.'),
+        'This is really important.',
+      );
       expect(stripMarkdownForSpeech('*italic*'), 'italic');
       expect(stripMarkdownForSpeech('~~gone~~'), 'gone');
     });
@@ -33,10 +35,7 @@ void main() {
 
     test('strips bullet markers, keeping items on their own line, each '
         'tagged with a clause pause marker', () {
-      expect(
-        stripMarkdownForSpeech('- one\n- two'),
-        'one$_m\ntwo$_m',
-      );
+      expect(stripMarkdownForSpeech('- one\n- two'), 'one$_m\ntwo$_m');
     });
 
     test('keeps the number on numbered list items, each tagged with a '
@@ -105,10 +104,7 @@ void main() {
     });
 
     test('drops horizontal rules entirely', () {
-      expect(
-        stripMarkdownForSpeech('Above\n\n---\n\nBelow'),
-        'Above\n\nBelow',
-      );
+      expect(stripMarkdownForSpeech('Above\n\n---\n\nBelow'), 'Above\n\nBelow');
     });
 
     test('converts a prose colon into a pause-inducing comma', () {
@@ -119,7 +115,10 @@ void main() {
     });
 
     test('does not touch a colon with no following space (e.g. a time)', () {
-      expect(stripMarkdownForSpeech('It starts at 3:00 sharp.'), 'It starts at 3:00 sharp.');
+      expect(
+        stripMarkdownForSpeech('It starts at 3:00 sharp.'),
+        'It starts at 3:00 sharp.',
+      );
     });
 
     test('wraps a parenthetical aside in pause-inducing commas', () {

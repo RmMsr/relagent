@@ -120,15 +120,17 @@ class VoiceCatalogDiscovery {
       entry['origin'] = _withDistributor(parsed.origin);
       entry['sourceUrl'] = parsed.sourceUrl;
 
-      final existingLangs =
-          (entry['languages'] as List<dynamic>? ?? []).cast<String>();
+      final existingLangs = (entry['languages'] as List<dynamic>? ?? [])
+          .cast<String>();
       if (existingLangs.isEmpty && parsed.languages.isNotEmpty) {
         entry['languages'] = parsed.languages;
       }
-      final langsForDisplay =
-          existingLangs.isNotEmpty ? existingLangs : parsed.languages;
+      final langsForDisplay = existingLangs.isNotEmpty
+          ? existingLangs
+          : parsed.languages;
 
-      entry['displayName'] = parsed.displayNameOverride ??
+      entry['displayName'] =
+          parsed.displayNameOverride ??
           _deriveDisplayName(
             langsForDisplay,
             parsed.architecture,
@@ -196,7 +198,8 @@ class VoiceCatalogDiscovery {
       sourceUrl = 'https://github.com/k2-fsa/sherpa-onnx';
     }
 
-    final displayName = displayNameOverride ??
+    final displayName =
+        displayNameOverride ??
         _deriveDisplayName(languages, architecture, type);
 
     return {
@@ -504,8 +507,11 @@ class VoiceCatalogDiscovery {
       );
     }
     return _ParsedFilename(
-      type: 'asr', architecture: 'unknown', languages: [],
-      origin: 'unknown', sourceUrl: 'https://github.com/k2-fsa/sherpa-onnx',
+      type: 'asr',
+      architecture: 'unknown',
+      languages: [],
+      origin: 'unknown',
+      sourceUrl: 'https://github.com/k2-fsa/sherpa-onnx',
     );
   }
 
@@ -629,7 +635,9 @@ class VoiceCatalogDiscovery {
     return _ParsedFilename(
       type: 'asr',
       architecture: isZipformer
-          ? (isMobile ? 'zipformerStreamingMobile' : 'zipformerOfflineTransducer')
+          ? (isMobile
+                ? 'zipformerStreamingMobile'
+                : 'zipformerOfflineTransducer')
           : 'nextGenKaldiTransducer',
       languages: languages,
       origin: 'Next-gen Kaldi / k2-fsa (icefall)',
@@ -660,8 +668,13 @@ class VoiceCatalogDiscovery {
   }
 
   static const _mmsIso3ToIso2 = {
-    'deu': 'de', 'eng': 'en', 'fra': 'fr', 'rus': 'ru',
-    'spa': 'es', 'tha': 'th', 'ukr': 'uk',
+    'deu': 'de',
+    'eng': 'en',
+    'fra': 'fr',
+    'rus': 'ru',
+    'spa': 'es',
+    'tha': 'th',
+    'ukr': 'uk',
   };
 
   _ParsedFilename _parseVitsMms(String base) {
@@ -692,8 +705,11 @@ class VoiceCatalogDiscovery {
     final parts = base.split('-');
     if (parts.length < 4) {
       return _ParsedFilename(
-        type: 'tts', architecture: 'unknown', languages: [],
-        origin: 'unknown', sourceUrl: 'https://github.com/k2-fsa/sherpa-onnx',
+        type: 'tts',
+        architecture: 'unknown',
+        languages: [],
+        origin: 'unknown',
+        sourceUrl: 'https://github.com/k2-fsa/sherpa-onnx',
       );
     }
     final langCode = parts[2];
@@ -817,9 +833,31 @@ class VoiceCatalogDiscovery {
       'parakeet-tdt-0-6b-v2': ['en'],
       // Parakeet TDT 0.6B v3 — 25 European languages
       'parakeet-tdt-0-6b-v3': [
-        'bg', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fi', 'fr',
-        'hr', 'hu', 'it', 'lt', 'lv', 'mt', 'nl', 'pl', 'pt', 'ro',
-        'ru', 'sk', 'sl', 'sv', 'uk',
+        'bg',
+        'cs',
+        'da',
+        'de',
+        'el',
+        'en',
+        'es',
+        'et',
+        'fi',
+        'fr',
+        'hr',
+        'hu',
+        'it',
+        'lt',
+        'lv',
+        'mt',
+        'nl',
+        'pl',
+        'pt',
+        'ro',
+        'ru',
+        'sk',
+        'sl',
+        'sv',
+        'uk',
       ],
     };
 
@@ -845,8 +883,12 @@ class VoiceCatalogDiscovery {
   // Spelled-out language words that show up in filenames instead of codes
   // (e.g. "zipformer-cantonese", "giga-am-russian").
   static const _spelledOutLanguages = {
-    'cantonese': 'yue', 'thai': 'th', 'korean': 'ko', 'russian': 'ru',
-    'vietnamese': 'vi', 'mandarin': 'zh',
+    'cantonese': 'yue',
+    'thai': 'th',
+    'korean': 'ko',
+    'russian': 'ru',
+    'vietnamese': 'vi',
+    'mandarin': 'zh',
   };
 
   // 3-letter codes that appear as their own dash-segment (mostly Chinese
@@ -871,7 +913,7 @@ class VoiceCatalogDiscovery {
           RegExp(r'^[a-z]{2}$').hasMatch(segment) &&
           !_nonLanguageTwoLetterTokens.contains(segment)) {
         langs.add(segment);
-      // Underscore-joined codes: ar_en_id_ja_ru_th_vi_zh
+        // Underscore-joined codes: ar_en_id_ja_ru_th_vi_zh
       } else if (RegExp(r'^[a-z]{2}(?:_[a-z]{2})+$').hasMatch(segment)) {
         langs.addAll(segment.split('_'));
       } else if (_threeLetterLanguageCodes.contains(segment)) {
@@ -909,30 +951,66 @@ class VoiceCatalogDiscovery {
     final langLabel = languages.contains('multi')
         ? 'Multilingual'
         : languages.length == 1
-            ? _languageLabel(languages.first)
-            : languages.length > 1
-                ? 'Multilingual (${languages.length} languages)'
-                : 'Unknown';
+        ? _languageLabel(languages.first)
+        : languages.length > 1
+        ? 'Multilingual (${languages.length} languages)'
+        : 'Unknown';
     final archLabel = _architectureLabel(architecture);
     return '$langLabel - $archLabel';
   }
 
   String _languageLabel(String code) {
     const labels = {
-      'en': 'English',  'de': 'German',     'fr': 'French',     'es': 'Spanish',
-      'it': 'Italian',  'nl': 'Dutch',       'pl': 'Polish',     'ru': 'Russian',
-      'sv': 'Swedish',  'pt': 'Portuguese',  'cs': 'Czech',      'da': 'Danish',
-      'fi': 'Finnish',  'nb': 'Norwegian',   'no': 'Norwegian',  'el': 'Greek',
-      'ro': 'Romanian', 'sk': 'Slovak',      'sl': 'Slovenian',  'sr': 'Serbian',
-      'uk': 'Ukrainian','lv': 'Latvian',     'lb': 'Luxembourgish',
-      'ca': 'Catalan',  'cy': 'Welsh',       'is': 'Icelandic',
-      'tr': 'Turkish',  'hu': 'Hungarian',   'ar': 'Arabic',     'fa': 'Persian',
-      'hi': 'Hindi',    'bn': 'Bengali',     'ml': 'Malayalam',  'ne': 'Nepali',
-      'zh': 'Chinese',  'ja': 'Japanese',    'ko': 'Korean',     'th': 'Thai',
-      'vi': 'Vietnamese','id': 'Indonesian', 'sw': 'Swahili',
-      'am': 'Amharic',  'ka': 'Georgian',    'kk': 'Kazakh',
-      'yue': 'Cantonese', 'wu': 'Wu Chinese', 'wuu': 'Wu Chinese',
-      'ga': 'Irish',      'mt': 'Maltese',    'et': 'Estonian',
+      'en': 'English',
+      'de': 'German',
+      'fr': 'French',
+      'es': 'Spanish',
+      'it': 'Italian',
+      'nl': 'Dutch',
+      'pl': 'Polish',
+      'ru': 'Russian',
+      'sv': 'Swedish',
+      'pt': 'Portuguese',
+      'cs': 'Czech',
+      'da': 'Danish',
+      'fi': 'Finnish',
+      'nb': 'Norwegian',
+      'no': 'Norwegian',
+      'el': 'Greek',
+      'ro': 'Romanian',
+      'sk': 'Slovak',
+      'sl': 'Slovenian',
+      'sr': 'Serbian',
+      'uk': 'Ukrainian',
+      'lv': 'Latvian',
+      'lb': 'Luxembourgish',
+      'ca': 'Catalan',
+      'cy': 'Welsh',
+      'is': 'Icelandic',
+      'tr': 'Turkish',
+      'hu': 'Hungarian',
+      'ar': 'Arabic',
+      'fa': 'Persian',
+      'hi': 'Hindi',
+      'bn': 'Bengali',
+      'ml': 'Malayalam',
+      'ne': 'Nepali',
+      'zh': 'Chinese',
+      'ja': 'Japanese',
+      'ko': 'Korean',
+      'th': 'Thai',
+      'vi': 'Vietnamese',
+      'id': 'Indonesian',
+      'sw': 'Swahili',
+      'am': 'Amharic',
+      'ka': 'Georgian',
+      'kk': 'Kazakh',
+      'yue': 'Cantonese',
+      'wu': 'Wu Chinese',
+      'wuu': 'Wu Chinese',
+      'ga': 'Irish',
+      'mt': 'Maltese',
+      'et': 'Estonian',
       'gu': 'Gujarati',
     };
     return labels[code] ?? code.toUpperCase();
@@ -954,7 +1032,8 @@ class VoiceCatalogDiscovery {
       'nemotronStreaming': 'Nemotron Streaming', 'whisper': 'Whisper',
       'moonshine': 'Moonshine', 'wenetCtc': 'WeNet CTC',
       'zipformerOfflineTransducer': 'Zipformer (offline)',
-      'nemoCacheAwareStreamingTransducer': 'NeMo Cache-Aware Streaming Transducer',
+      'nemoCacheAwareStreamingTransducer':
+          'NeMo Cache-Aware Streaming Transducer',
       'zipformerStreamingMobile': 'Zipformer Streaming (mobile)',
       'omnilingualCtc': 'Omnilingual CTC',
       'funasrNano': 'FunASR Nano',

@@ -35,14 +35,19 @@ class VoiceCatalogStatusReporter {
   ///
   /// Valid states: ignored, pending, failed, approved.
   /// When [namesOnly] is true, prints just the id per line for shell piping.
-  void list(List<Map<String, dynamic>> entries, String state,
-      {bool namesOnly = false, bool withNotes = false}) {
+  void list(
+    List<Map<String, dynamic>> entries,
+    String state, {
+    bool namesOnly = false,
+    bool withNotes = false,
+  }) {
     final candidates = entries.where(scope.matches).toList();
 
     bool matches(Map<String, dynamic> e) {
       final status = e['status'] as String? ?? '';
       final notes = e['notes'] as String? ?? '';
-      final isExcluded = status == 'untested' &&
+      final isExcluded =
+          status == 'untested' &&
           (notes.startsWith('excluded:') || notes.startsWith('skipped:'));
       return switch (state) {
         'ignored' => isExcluded,
@@ -56,8 +61,9 @@ class VoiceCatalogStatusReporter {
     final matching = candidates.where(matches).toList()
       ..sort((a, b) {
         // Group by notes first (clusters same exclusion reasons), then by id.
-        final notesCmp = (a['notes'] as String? ?? '')
-            .compareTo(b['notes'] as String? ?? '');
+        final notesCmp = (a['notes'] as String? ?? '').compareTo(
+          b['notes'] as String? ?? '',
+        );
         if (notesCmp != 0) return notesCmp;
         return (a['id'] as String).compareTo(b['id'] as String);
       });
@@ -84,8 +90,9 @@ class VoiceCatalogStatusReporter {
       final id = e['id'] as String;
       final type = e['type'] as String? ?? '';
       final notes = e['notes'] as String? ?? '';
-      final langs =
-          (e['languages'] as List<dynamic>? ?? []).cast<String>().join(',');
+      final langs = (e['languages'] as List<dynamic>? ?? [])
+          .cast<String>()
+          .join(',');
       final langStr = langs.isNotEmpty ? ' [$langs]' : '';
       final noteStr = notes.isNotEmpty ? '  $notes' : '';
       print('  [$type] $id$langStr$noteStr');
@@ -104,24 +111,26 @@ class VoiceCatalogStatusReporter {
       byArch.putIfAbsent(arch, () => []).add(e);
     }
 
-    final rows = byArch.entries.map((e) {
-      final types = e.value.map((m) => m['type'] as String? ?? '?').toSet();
-      final typeLabel = types.length == 1 ? types.first : 'mixed';
-      final approved = e.value.where((m) => m['status'] == 'approved').length;
-      return (
-        arch: e.key,
-        typeLabel: typeLabel,
-        supported: supportedArchitectures.contains(e.key),
-        approved: approved,
-        total: e.value.length,
-      );
-    }).toList()
-      ..sort((a, b) {
-        final byType = a.typeLabel.compareTo(b.typeLabel);
-        if (byType != 0) return byType;
-        if (a.supported != b.supported) return a.supported ? -1 : 1;
-        return a.arch.compareTo(b.arch);
-      });
+    final rows =
+        byArch.entries.map((e) {
+          final types = e.value.map((m) => m['type'] as String? ?? '?').toSet();
+          final typeLabel = types.length == 1 ? types.first : 'mixed';
+          final approved = e.value
+              .where((m) => m['status'] == 'approved')
+              .length;
+          return (
+            arch: e.key,
+            typeLabel: typeLabel,
+            supported: supportedArchitectures.contains(e.key),
+            approved: approved,
+            total: e.value.length,
+          );
+        }).toList()..sort((a, b) {
+          final byType = a.typeLabel.compareTo(b.typeLabel);
+          if (byType != 0) return byType;
+          if (a.supported != b.supported) return a.supported ? -1 : 1;
+          return a.arch.compareTo(b.arch);
+        });
 
     const typeW = 5;
     const supW = 9;
@@ -132,16 +141,20 @@ class VoiceCatalogStatusReporter {
 
     print('=== Architectures ===');
     print('');
-    print('  ${pad('TYPE', typeW)} ${pad('SUPPORTED', supW)}'
-        ' ${pad('ARCHITECTURE', archW)}'
-        ' ${'APPROVED'.padLeft(countW)} ${'TOTAL'.padLeft(countW)}');
+    print(
+      '  ${pad('TYPE', typeW)} ${pad('SUPPORTED', supW)}'
+      ' ${pad('ARCHITECTURE', archW)}'
+      ' ${'APPROVED'.padLeft(countW)} ${'TOTAL'.padLeft(countW)}',
+    );
     print('  ${'─' * (typeW + supW + archW + countW * 2 + 5)}');
 
     for (final row in rows) {
-      print('  ${pad(row.typeLabel, typeW)}'
-          ' ${pad(row.supported ? 'yes' : 'no', supW)}'
-          ' ${pad(row.arch, archW)}'
-          ' ${num(row.approved, countW)} ${num(row.total, countW)}');
+      print(
+        '  ${pad(row.typeLabel, typeW)}'
+        ' ${pad(row.supported ? 'yes' : 'no', supW)}'
+        ' ${pad(row.arch, archW)}'
+        ' ${num(row.approved, countW)} ${num(row.total, countW)}',
+      );
     }
     print('');
   }
@@ -172,8 +185,9 @@ class VoiceCatalogStatusReporter {
       int indent = 0,
     }) {
       final pad = ' ' * indent;
-      final selCols =
-          showSelected ? ' ${v1.padLeft(cw)} ${v2.padLeft(cw)}' : '';
+      final selCols = showSelected
+          ? ' ${v1.padLeft(cw)} ${v2.padLeft(cw)}'
+          : '';
       return '  ${(pad + label).padRight(lw)}'
           '$selCols'
           ' ${v3.padLeft(cw)} ${v4.padLeft(cw)}';
@@ -187,36 +201,48 @@ class VoiceCatalogStatusReporter {
       int n4, {
       bool naInSel = false,
       int indent = 0,
-    }) =>
-        row(
-          label,
-          naInSel ? '-' : n1.toString(),
-          naInSel ? '-' : n2.toString(),
-          n3.toString(),
-          n4.toString(),
-          indent: indent,
-        );
+    }) => row(
+      label,
+      naInSel ? '-' : n1.toString(),
+      naInSel ? '-' : n2.toString(),
+      n3.toString(),
+      n4.toString(),
+      indent: indent,
+    );
 
-    final divWidth =
-        showSelected ? lw + groupW * 2 + 3 : lw + groupW + 1;
+    final divWidth = showSelected ? lw + groupW * 2 + 3 : lw + groupW + 1;
     final div = '  ${'─' * divWidth}';
 
     print('=== Catalog Status ===');
     print('');
     if (showSelected) {
-      print('  ${' ' * lw} ${center(selLabel, groupW)} ${center('All', groupW)}');
+      print(
+        '  ${' ' * lw} ${center(selLabel, groupW)} ${center('All', groupW)}',
+      );
     } else {
       print('  ${' ' * lw} ${center(selLabel, groupW)}');
     }
     print(row('', 'ASR', 'TTS', 'ASR', 'TTS'));
     print(div);
-    print(numRow('Discovered',
-        selAsr.discovered, selTts.discovered,
-        allAsr.discovered, allTts.discovered));
+    print(
+      numRow(
+        'Discovered',
+        selAsr.discovered,
+        selTts.discovered,
+        allAsr.discovered,
+        allTts.discovered,
+      ),
+    );
     print(div);
-    print(numRow('Ignored',
-        selAsr.ignored, selTts.ignored,
-        allAsr.ignored, allTts.ignored));
+    print(
+      numRow(
+        'Ignored',
+        selAsr.ignored,
+        selTts.ignored,
+        allAsr.ignored,
+        allTts.ignored,
+      ),
+    );
 
     const _ignoredCategories = [
       ('unsupported architecture', false),
@@ -226,34 +252,61 @@ class VoiceCatalogStatusReporter {
       ('int8 variant preferred', false),
     ];
     for (final (label, naInSel) in _ignoredCategories) {
-      final allCount = (allAsr.ignoredReasons[label] ?? 0) +
+      final allCount =
+          (allAsr.ignoredReasons[label] ?? 0) +
           (allTts.ignoredReasons[label] ?? 0);
       if (allCount == 0) continue;
-      print(numRow(
-        label,
-        selAsr.ignoredReasons[label] ?? 0,
-        selTts.ignoredReasons[label] ?? 0,
-        allAsr.ignoredReasons[label] ?? 0,
-        allTts.ignoredReasons[label] ?? 0,
-        naInSel: naInSel,
-        indent: 2,
-      ));
+      print(
+        numRow(
+          label,
+          selAsr.ignoredReasons[label] ?? 0,
+          selTts.ignoredReasons[label] ?? 0,
+          allAsr.ignoredReasons[label] ?? 0,
+          allTts.ignoredReasons[label] ?? 0,
+          naInSel: naInSel,
+          indent: 2,
+        ),
+      );
     }
 
-    print(numRow('Pending (D-I)',
-        selAsr.pending - selAsr.ignored, selTts.pending - selTts.ignored,
-        allAsr.pending - allAsr.ignored, allTts.pending - allTts.ignored));
+    print(
+      numRow(
+        'Pending (D-I)',
+        selAsr.pending - selAsr.ignored,
+        selTts.pending - selTts.ignored,
+        allAsr.pending - allAsr.ignored,
+        allTts.pending - allTts.ignored,
+      ),
+    );
     print(div);
-    print(numRow('Failed',
-        selAsr.failed, selTts.failed,
-        allAsr.failed, allTts.failed));
+    print(
+      numRow(
+        'Failed',
+        selAsr.failed,
+        selTts.failed,
+        allAsr.failed,
+        allTts.failed,
+      ),
+    );
     print(div);
-    print(numRow('Approved',
-        selAsr.approved, selTts.approved,
-        allAsr.approved, allTts.approved));
-    print(numRow('Recommended',
-        selAsr.recommended, selTts.recommended,
-        allAsr.recommended, allTts.recommended));
+    print(
+      numRow(
+        'Approved',
+        selAsr.approved,
+        selTts.approved,
+        allAsr.approved,
+        allTts.approved,
+      ),
+    );
+    print(
+      numRow(
+        'Recommended',
+        selAsr.recommended,
+        selTts.recommended,
+        allAsr.recommended,
+        allTts.recommended,
+      ),
+    );
     print(div);
     print('');
   }
@@ -276,7 +329,8 @@ class VoiceCatalogStatusReporter {
       final notes = e['notes'] as String? ?? '';
       // Only count as ignored when still untested — approved/failed entries with
       // skipped: notes were evaluated and should not inflate the ignored count.
-      final isExcluded = status == 'untested' &&
+      final isExcluded =
+          status == 'untested' &&
           (notes.startsWith('excluded:') || notes.startsWith('skipped:'));
 
       if (isExcluded) {

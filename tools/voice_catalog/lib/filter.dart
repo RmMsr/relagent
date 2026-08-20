@@ -57,7 +57,8 @@ class VoiceCatalogFilter {
 
     for (final entry in untested) {
       final currentNotes = entry['notes'] as String? ?? '';
-      final wasExcluded = currentNotes.startsWith('excluded:') ||
+      final wasExcluded =
+          currentNotes.startsWith('excluded:') ||
           currentNotes.startsWith('skipped:');
 
       final reason = _checkExclusion(entry, allIds);
@@ -73,8 +74,10 @@ class VoiceCatalogFilter {
     final totalExcluded = exclusionCounts.values.fold(0, (a, b) => a + b);
     final candidates = untested.length - totalExcluded;
 
-    print('[Filter] Criteria applied to ${untested.length} untested entries '
-        'in scope:');
+    print(
+      '[Filter] Criteria applied to ${untested.length} untested entries '
+      'in scope:',
+    );
     for (final entry in exclusionCounts.entries) {
       print('[Filter]   ${entry.key.padRight(40)} ${entry.value}');
     }

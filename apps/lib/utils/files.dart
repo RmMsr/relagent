@@ -123,8 +123,11 @@ Future<String?> dumpDebugWav(
   return target;
 }
 
-List<int> _uint32le(int v) =>
-    [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff];
+List<int> _uint32le(int v) => [
+  v & 0xff,
+  (v >> 8) & 0xff,
+  (v >> 16) & 0xff,
+  (v >> 24) & 0xff,
+];
 
 List<int> _uint16le(int v) => [v & 0xff, (v >> 8) & 0xff];
-

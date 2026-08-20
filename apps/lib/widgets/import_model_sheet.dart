@@ -73,7 +73,9 @@ class _ImportModelSheetState extends State<_ImportModelSheet> {
     );
     _modelType = widget.initialType;
     // Only pre-select the initial arch if it is valid for the initial type.
-    final allowed = _modelType == ModelType.tts ? _ttsArchitectures : _asrArchitectures;
+    final allowed = _modelType == ModelType.tts
+        ? _ttsArchitectures
+        : _asrArchitectures;
     _architecture = allowed.contains(widget.initialArchitecture)
         ? widget.initialArchitecture
         : null;
@@ -222,7 +224,8 @@ class _ImportModelSheetState extends State<_ImportModelSheet> {
           DropdownButtonFormField<ModelArchitecture>(
             value: _architecture,
             decoration: InputDecoration(
-              labelText: 'Architecture${_architecture == null ? ' (required)' : ''}',
+              labelText:
+                  'Architecture${_architecture == null ? ' (required)' : ''}',
               border: const OutlineInputBorder(),
             ),
             items: _allowedArchitectures.map((a) {
@@ -236,28 +239,26 @@ class _ImportModelSheetState extends State<_ImportModelSheet> {
           if (widget.detectedArchitecture != null) ...[
             const SizedBox(height: 4),
             if (_isAmbiguousPick)
+              _noteRow((
+                'Ambiguous format:',
+                'if it leads to app crash, try the other Transducer.',
+              ), theme.colorScheme.error),
+            if (_isAmbiguousPick ||
+                _architecture == widget.detectedArchitecture)
               _noteRow(
                 (
-                  'Ambiguous format:',
-                  'if it leads to app crash, try the other Transducer.',
+                  'Detected:',
+                  architectureFamilyLabel(widget.detectedArchitecture!),
                 ),
-                theme.colorScheme.error,
-              ),
-            if (_isAmbiguousPick || _architecture == widget.detectedArchitecture)
-              _noteRow(
-                ('Detected:', architectureFamilyLabel(widget.detectedArchitecture!)),
                 _isAmbiguousPick
                     ? theme.colorScheme.onSurfaceVariant
                     : theme.colorScheme.primary,
               )
             else
-              _noteRow(
-                (
-                  'Architecture mismatch:',
-                  'Detected ${architectureFamilyLabel(widget.detectedArchitecture!)}',
-                ),
-                theme.colorScheme.error,
-              ),
+              _noteRow((
+                'Architecture mismatch:',
+                'Detected ${architectureFamilyLabel(widget.detectedArchitecture!)}',
+              ), theme.colorScheme.error),
           ],
           if (_architecture != null && architectureHint(_architecture!) != null)
             _noteRow(
@@ -296,7 +297,6 @@ class _ImportModelSheetState extends State<_ImportModelSheet> {
       ),
     );
   }
-
 }
 
 String architectureLabel(ModelArchitecture a) {
@@ -355,7 +355,10 @@ String architectureFamilyLabel(ModelArchitecture a) {
       return ('Live:', 'text appears continuously as you speak.');
     case ModelArchitecture.offlineNemoTransducer:
     case ModelArchitecture.whisper:
-      return ('Chunked:', 'waits for a pause, then transcribes a few words at once.');
+      return (
+        'Chunked:',
+        'waits for a pause, then transcribes a few words at once.',
+      );
     case ModelArchitecture.vitsPiper:
     case ModelArchitecture.kokoro:
     case ModelArchitecture.pocket:

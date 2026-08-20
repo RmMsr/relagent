@@ -93,7 +93,8 @@ class VadAsr implements AsrService {
 
   @override
   Future<void> start({bool isBluetoothRoute = false}) async {
-    final routeChanged = _isInitialized && isBluetoothRoute != _isBluetoothRoute;
+    final routeChanged =
+        _isInitialized && isBluetoothRoute != _isBluetoothRoute;
     _isBluetoothRoute = isBluetoothRoute;
     _hpPrevIn = 0.0;
     _hpPrevOut = 0.0;

@@ -42,7 +42,9 @@ class ConnectionResolver {
         defaultEngineBaseUrl;
 
     final token =
-        flagToken ?? environment['ENGINE_TOKEN'] ?? await tokenStore.readToken();
+        flagToken ??
+        environment['ENGINE_TOKEN'] ??
+        await tokenStore.readToken();
 
     return ResolvedConnection(engineUrl: url, token: token);
   }

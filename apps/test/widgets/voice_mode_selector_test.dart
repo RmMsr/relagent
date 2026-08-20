@@ -11,7 +11,10 @@ import 'package:relagent/widgets/voice_mode_selector.dart';
 const _base =
     '"simpleChatBaseUrl":"http://localhost:1234","simpleChatModel":"test"';
 
-String _settingsJson({required String voiceMode, required bool continuousVoiceEnabled}) =>
+String _settingsJson({
+  required String voiceMode,
+  required bool continuousVoiceEnabled,
+}) =>
     '{$_base,"voiceMode":"$voiceMode","continuousVoiceEnabled":$continuousVoiceEnabled}';
 
 Widget _wrap(Widget child, SharedPreferences prefs) => ProviderScope(
@@ -23,9 +26,14 @@ Widget _wrap(Widget child, SharedPreferences prefs) => ProviderScope(
 );
 
 void main() {
-  testWidgets('mic icon appears when continuous recording is on', (tester) async {
+  testWidgets('mic icon appears when continuous recording is on', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({
-      'user_settings': _settingsJson(voiceMode: 'listening', continuousVoiceEnabled: true),
+      'user_settings': _settingsJson(
+        voiceMode: 'listening',
+        continuousVoiceEnabled: true,
+      ),
     });
     final prefs = await SharedPreferences.getInstance();
 
@@ -36,9 +44,14 @@ void main() {
     expect(find.byIcon(Icons.mic_off), findsNothing);
   });
 
-  testWidgets('mic_off icon appears when continuous recording is off', (tester) async {
+  testWidgets('mic_off icon appears when continuous recording is off', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({
-      'user_settings': _settingsJson(voiceMode: 'silent', continuousVoiceEnabled: false),
+      'user_settings': _settingsJson(
+        voiceMode: 'silent',
+        continuousVoiceEnabled: false,
+      ),
     });
     final prefs = await SharedPreferences.getInstance();
 
@@ -49,9 +62,14 @@ void main() {
     expect(find.byIcon(Icons.mic), findsNothing);
   });
 
-  testWidgets('ON toggle button has primaryContainer background', (tester) async {
+  testWidgets('ON toggle button has primaryContainer background', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({
-      'user_settings': _settingsJson(voiceMode: 'listening', continuousVoiceEnabled: true),
+      'user_settings': _settingsJson(
+        voiceMode: 'listening',
+        continuousVoiceEnabled: true,
+      ),
     });
     final prefs = await SharedPreferences.getInstance();
 
@@ -59,9 +77,14 @@ void main() {
     await tester.pumpAndSettle();
 
     final micButton = tester.widget<IconButton>(
-      find.ancestor(of: find.byIcon(Icons.mic), matching: find.byType(IconButton)),
+      find.ancestor(
+        of: find.byIcon(Icons.mic),
+        matching: find.byType(IconButton),
+      ),
     );
-    final colorScheme = Theme.of(tester.element(find.byIcon(Icons.mic))).colorScheme;
+    final colorScheme = Theme.of(
+      tester.element(find.byIcon(Icons.mic)),
+    ).colorScheme;
     final bg = micButton.style?.backgroundColor?.resolve({});
     expect(bg, colorScheme.primaryContainer);
   });

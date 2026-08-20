@@ -128,7 +128,11 @@ class _ChunkItemInfo {
   final String messageId;
   final int chunkIndex;
   final int sourceParagraphIndex;
-  const _ChunkItemInfo(this.messageId, this.chunkIndex, this.sourceParagraphIndex);
+  const _ChunkItemInfo(
+    this.messageId,
+    this.chunkIndex,
+    this.sourceParagraphIndex,
+  );
 }
 
 /// Per-message chunk bookkeeping: the full ordered chunks, and how far
@@ -221,7 +225,9 @@ class TtsNotifier extends Notifier<TtsState> {
 
     final currentId = ref.read(settingsProvider).selectedTtsModelId;
     if (currentId == crashedId) {
-      Logger.error('TtsProvider: model "$crashedId" crashed on last init, deselecting');
+      Logger.error(
+        'TtsProvider: model "$crashedId" crashed on last init, deselecting',
+      );
       await ref.read(settingsProvider.notifier).clearModelSelection(crashedId);
       state = state.copyWith(
         initError: () =>
@@ -413,8 +419,7 @@ class TtsNotifier extends Notifier<TtsState> {
         final interruptedInfo = interruptedItemId == null
             ? null
             : _chunkItemInfo[interruptedItemId];
-        if (interruptedInfo != null &&
-            interruptedInfo.messageId != messageId) {
+        if (interruptedInfo != null && interruptedInfo.messageId != messageId) {
           _chunkedMessages.remove(interruptedInfo.messageId);
           _updateMessageState(
             interruptedInfo.messageId,
@@ -712,7 +717,8 @@ class TtsNotifier extends Notifier<TtsState> {
             // forever, stuck showing back/pause/forward controls for
             // content that already stopped.
             final sameMessageContinues = next.queue.any(
-              (queued) => _chunkItemInfo[queued.id]?.messageId == info.messageId,
+              (queued) =>
+                  _chunkItemInfo[queued.id]?.messageId == info.messageId,
             );
             if (!sameMessageContinues) {
               _chunkedMessages.remove(info.messageId);

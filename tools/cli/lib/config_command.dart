@@ -30,7 +30,8 @@ class ConfigCommand extends Command<int> {
        healthCheck = healthCheck ?? EngineHealthCheckService() {
     argParser.addFlag(
       'clear',
-      help: 'Remove the persisted engine URL and stored auth token, '
+      help:
+          'Remove the persisted engine URL and stored auth token, '
           'resetting to defaults.',
       negatable: false,
     );

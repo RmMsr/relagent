@@ -168,18 +168,31 @@ Future<Map<String, String>> _resolveImportedTtsPaths(
       paths['model'] = findFile((n) => n.endsWith('.onnx')) ?? '';
       paths['voices'] = findFile((n) => n == 'voices.bin') ?? '';
       paths['tokens'] = findFile((n) => n == 'tokens.txt') ?? '';
-      paths['dataDir'] = findDir((n) => n == 'espeak-ng-data' || n == 'data') ?? '';
+      paths['dataDir'] =
+          findDir((n) => n == 'espeak-ng-data' || n == 'data') ?? '';
       final lexicon = findFile((n) => n.contains('lexicon'));
       if (lexicon != null) paths['lexicon'] = lexicon;
 
     case ModelArchitecture.pocket:
-      paths['lmFlow'] = findFile((n) => n.contains('lm') && n.contains('flow')) ?? '';
-      paths['lmMain'] = findFile((n) => n.contains('lm') && n.contains('main')) ?? '';
+      paths['lmFlow'] =
+          findFile((n) => n.contains('lm') && n.contains('flow')) ?? '';
+      paths['lmMain'] =
+          findFile((n) => n.contains('lm') && n.contains('main')) ?? '';
       paths['encoder'] = findFile((n) => n.contains('encoder')) ?? '';
       paths['decoder'] = findFile((n) => n.contains('decoder')) ?? '';
-      paths['textConditioner'] = findFile((n) => n.contains('text_conditioner') || n.contains('textconditioner')) ?? '';
-      paths['vocabJson'] = findFile((n) => n.contains('vocab') && n.endsWith('.json')) ?? '';
-      paths['tokenScoresJson'] = findFile((n) => n.contains('token_scores') || n.contains('tokenscores')) ?? '';
+      paths['textConditioner'] =
+          findFile(
+            (n) =>
+                n.contains('text_conditioner') || n.contains('textconditioner'),
+          ) ??
+          '';
+      paths['vocabJson'] =
+          findFile((n) => n.contains('vocab') && n.endsWith('.json')) ?? '';
+      paths['tokenScoresJson'] =
+          findFile(
+            (n) => n.contains('token_scores') || n.contains('tokenscores'),
+          ) ??
+          '';
 
     default:
       break;
@@ -236,8 +249,13 @@ void _validateImportedTtsPaths(
       required = ['model', 'voices', 'tokens', 'dataDir'];
     case ModelArchitecture.pocket:
       required = [
-        'lmFlow', 'lmMain', 'encoder', 'decoder',
-        'textConditioner', 'vocabJson', 'tokenScoresJson',
+        'lmFlow',
+        'lmMain',
+        'encoder',
+        'decoder',
+        'textConditioner',
+        'vocabJson',
+        'tokenScoresJson',
       ];
     default:
       return;

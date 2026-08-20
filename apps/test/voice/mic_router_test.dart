@@ -137,36 +137,37 @@ void main() {
     NativeVoiceService buildService() =>
         NativeVoiceService(micRouter: MicRouter(supportedOverride: true));
 
-    test('recording configuration establishes the route via ensureReady', () async {
-      mockMicChannel((call) async => {'status': 'ok', 'device': null});
-      final service = buildService();
-      await service.configureAudioSessionForRecording();
-      expect(calls.map((c) => c.method), contains('ensureReady'));
-    });
+    test(
+      'recording configuration establishes the route via ensureReady',
+      () async {
+        mockMicChannel((call) async => {'status': 'ok', 'device': null});
+        final service = buildService();
+        await service.configureAudioSessionForRecording();
+        expect(calls.map((c) => c.method), contains('ensureReady'));
+      },
+    );
 
     test('preference set on the service reaches ensureReady', () async {
       mockMicChannel((call) async => {'status': 'ok', 'device': null});
       final service = buildService();
       service.setInputDevicePreference(
-        const MicPreference.pinned(
-          category: MicDeviceCategory.builtin,
-        ),
+        const MicPreference.pinned(category: MicDeviceCategory.builtin),
       );
       await service.configureAudioSessionForRecording();
       final ensureReady = calls.singleWhere((c) => c.method == 'ensureReady');
-      expect(
-        (ensureReady.arguments as Map)['mode'],
-        'pinned',
-      );
+      expect((ensureReady.arguments as Map)['mode'], 'pinned');
       expect((ensureReady.arguments as Map)['category'], 'builtin');
     });
 
-    test('stopRecording schedules idle release (route kept for follow-ups)', () async {
-      mockMicChannel((call) async => null);
-      final service = buildService();
-      await service.stopRecording();
-      expect(calls.map((c) => c.method), ['releaseAfterIdle']);
-    });
+    test(
+      'stopRecording schedules idle release (route kept for follow-ups)',
+      () async {
+        mockMicChannel((call) async => null);
+        final service = buildService();
+        await service.stopRecording();
+        expect(calls.map((c) => c.method), ['releaseAfterIdle']);
+      },
+    );
 
     test('playback configuration releases the route immediately', () async {
       mockMicChannel((call) async => null);

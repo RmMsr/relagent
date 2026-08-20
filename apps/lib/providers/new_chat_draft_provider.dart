@@ -141,9 +141,7 @@ class NewChatDraftNotifier extends Notifier<NewChatDraftState> {
       state = NewChatDraftState.initial();
       Logger.debug('NewChatDraft: Created session $newSessionId');
     } catch (e) {
-      final errorText = e is EngineApiException
-          ? e.userMessage
-          : e.toString();
+      final errorText = e is EngineApiException ? e.userMessage : e.toString();
       state = state.copyWith(isLoading: false, error: errorText);
       Logger.debug('NewChatDraft: Failed to create session: $e');
     }

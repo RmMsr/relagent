@@ -100,8 +100,7 @@ class SessionInFlightException extends EngineApiException {
     required super.technicalDetails,
     super.url,
   }) : super(
-          userMessage:
-              'Interaction is not complete, please retry to continue.',
+          userMessage: 'Interaction is not complete, please retry to continue.',
         );
 }
 
@@ -634,8 +633,7 @@ Future<ChatResponseData> continueSession({
 // -- Helpers for new endpoints --
 
 EngineApiException _networkException(Object e, Uri uri) {
-  final isNetworkError =
-      e.toString().contains('SocketException') ||
+  final isNetworkError = e.toString().contains('SocketException') ||
       e.toString().contains('Connection refused') ||
       e.toString().contains('Network is unreachable') ||
       e.toString().contains('Connection timeout');
@@ -664,13 +662,15 @@ EngineApiException _httpException(
   if (response.statusCode == 401 || response.statusCode == 403) {
     userMessage = 'Authentication failed';
   } else if (response.statusCode == 404) {
-    userMessage = notFoundMessage ?? 'Endpoint not found (check engine URL and version)';
+    userMessage =
+        notFoundMessage ?? 'Endpoint not found (check engine URL and version)';
   } else if (response.statusCode == 422) {
     userMessage = invalidDataMessage ?? 'Invalid request data';
   } else if (response.statusCode == 503) {
     // Reached only when the 503 had no structured provider_unavailable body.
     return ProviderUnavailableException(
-      technicalDetails: _extractErrorDetails(response.statusCode, response.body),
+      technicalDetails:
+          _extractErrorDetails(response.statusCode, response.body),
       url: uri.toString(),
     );
   } else if (response.statusCode >= 500) {

@@ -110,9 +110,7 @@ class ImportedModelService {
   Future<Directory> _modelDir(ModelType type, String id) async {
     final support = await getApplicationSupportDirectory();
     final typeDir = type == ModelType.asr ? 'asr' : 'tts';
-    final dir = Directory(
-      p.join(support.path, 'imported_models', typeDir, id),
-    );
+    final dir = Directory(p.join(support.path, 'imported_models', typeDir, id));
     await dir.create(recursive: true);
     return dir;
   }
@@ -124,15 +122,19 @@ class ImportedModelService {
 /// Supports: .tar.bz2, .tar.gz / .tgz, .zip, plain .tar.
 Archive _decodeArchive(List<int> bytes) {
   if (bytes.length >= 4 &&
-      bytes[0] == 0x50 && bytes[1] == 0x4B &&
-      bytes[2] == 0x03 && bytes[3] == 0x04) {
+      bytes[0] == 0x50 &&
+      bytes[1] == 0x4B &&
+      bytes[2] == 0x03 &&
+      bytes[3] == 0x04) {
     return ZipDecoder().decodeBytes(bytes);
   }
   final List<int> decompressed;
   if (bytes.length >= 2 && bytes[0] == 0x1F && bytes[1] == 0x8B) {
     decompressed = GZipDecoder().decodeBytes(bytes);
   } else if (bytes.length >= 3 &&
-      bytes[0] == 0x42 && bytes[1] == 0x5A && bytes[2] == 0x68) {
+      bytes[0] == 0x42 &&
+      bytes[1] == 0x5A &&
+      bytes[2] == 0x68) {
     decompressed = BZip2Decoder().decodeBytes(bytes);
   } else {
     decompressed = bytes; // plain tar
@@ -176,8 +178,9 @@ Future<void> _extractArchive(_ExtractArgs args) async {
     await outFile.writeAsBytes(entry.content as List<int>);
   }
 
-  await File(p.join(args.destPath, '.complete'))
-      .writeAsString(DateTime.now().toIso8601String());
+  await File(
+    p.join(args.destPath, '.complete'),
+  ).writeAsString(DateTime.now().toIso8601String());
 }
 
 String? _topLevelPrefix(Archive archive) {

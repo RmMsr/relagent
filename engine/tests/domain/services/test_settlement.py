@@ -210,9 +210,7 @@ class TestStopCycle:
             chat_service.stop_cycle(session_id)
         assert exc.value.session_id == session_id
 
-    def test_missing_session_raises_context_not_found(
-        self, chat_service: ChatService
-    ):
+    def test_missing_session_raises_context_not_found(self, chat_service: ChatService):
         with pytest.raises(ChatContextNotFound):
             chat_service.stop_cycle(uuid4())
 
@@ -460,5 +458,3 @@ class TestCycleStartPublish:
             e for e in event_store.events if isinstance(e, SessionMessagesAppendedEvent)
         ]
         assert len(appended) == 1
-
-

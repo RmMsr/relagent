@@ -186,9 +186,7 @@ class TestFinalImmutabilityGuard:
             )
         assert exc_info.value.message_id == user_id
 
-    def test_flipping_final_false_to_true_is_allowed(
-        self, persistence: Persistence
-    ):
+    def test_flipping_final_false_to_true_is_allowed(self, persistence: Persistence):
         # Settlement: a previously in-flight UserMessage is flipped to final=True
         # alongside the appended AssistantMessage. The guard MUST permit this.
         session = SessionInfo()
@@ -231,9 +229,7 @@ class TestFinalImmutabilityGuard:
         assert len(loaded.messages) == 3
         assert loaded.messages[2].content == "follow-up"
 
-    def test_mutating_an_in_flight_message_is_allowed(
-        self, persistence: Persistence
-    ):
+    def test_mutating_an_in_flight_message_is_allowed(self, persistence: Persistence):
         # Granting an approval mutates the trailing in-flight SystemAction
         # in place; the guard MUST NOT trip on final=False records.
         session = SessionInfo()
@@ -244,9 +240,7 @@ class TestFinalImmutabilityGuard:
             purpose="p",
         )
         sys_id = uuid.uuid4()
-        sys_action = SystemAction(
-            message_id=sys_id, approvals=[approval], final=False
-        )
+        sys_action = SystemAction(message_id=sys_id, approvals=[approval], final=False)
         persistence.save_context(
             session_id=session.session_id,
             context=ChatContext(messages=[user, sys_action]),

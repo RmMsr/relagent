@@ -36,18 +36,32 @@ void main() {
   group('RelagentThemeExtension', () {
     testWidgets('errorBg returns dark value in dark theme', (tester) async {
       late BuildContext ctx;
-      await tester.pumpWidget(MaterialApp(
-        theme: AppTheme.dark(),
-        home: Builder(builder: (c) { ctx = c; return const SizedBox(); }),
-      ));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark(),
+          home: Builder(
+            builder: (c) {
+              ctx = c;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
       expect(ctx.errorBg, RelagentColors.errorBgDark);
     });
     testWidgets('errorBg returns light value in light theme', (tester) async {
       late BuildContext ctx;
-      await tester.pumpWidget(MaterialApp(
-        theme: AppTheme.light(),
-        home: Builder(builder: (c) { ctx = c; return const SizedBox(); }),
-      ));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Builder(
+            builder: (c) {
+              ctx = c;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
       expect(ctx.errorBg, RelagentColors.errorBg);
     });
   });

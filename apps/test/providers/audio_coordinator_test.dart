@@ -16,7 +16,10 @@ class _NoOpModelDownloadService extends ModelDownloadService {
   @override
   Future<int> totalStorageUsed() async => 0;
   @override
-  Future<void> downloadModel(CatalogEntry entry, {void Function(DownloadProgress)? onProgress}) async {}
+  Future<void> downloadModel(
+    CatalogEntry entry, {
+    void Function(DownloadProgress)? onProgress,
+  }) async {}
   @override
   void cancelDownload(String modelId) {}
   @override
@@ -45,7 +48,9 @@ void main() {
     container = ProviderContainer(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-        modelDownloadServiceProvider.overrideWithValue(_NoOpModelDownloadService()),
+        modelDownloadServiceProvider.overrideWithValue(
+          _NoOpModelDownloadService(),
+        ),
       ],
     );
   });

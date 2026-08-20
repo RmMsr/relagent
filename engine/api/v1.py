@@ -211,9 +211,7 @@ def grant_session_approval(
     approval does not exist. Replaces the removed POST
     `/sessions/{id}/grants` (which is now only the global GET/POST `/grants`)."""
     if body.grant is not None:
-        approval_service.register_session_grant(
-            session_id=session_id, grant=body.grant
-        )
+        approval_service.register_session_grant(session_id=session_id, grant=body.grant)
     try:
         approval_service.grant_session_approval(
             session_id=session_id,
@@ -252,9 +250,7 @@ def decline_session_approval(
 
 
 @api_router.post("/sessions/{session_id}/stop")
-def stop_session(
-    session_id: UUID, service: ChatServiceDepends
-) -> MessagesResponse:
+def stop_session(session_id: UUID, service: ChatServiceDepends) -> MessagesResponse:
     """Settle the in-flight cycle by declining undecided approvals.
 
     Sets every undecided approval to `granted=false`, flips the trailing

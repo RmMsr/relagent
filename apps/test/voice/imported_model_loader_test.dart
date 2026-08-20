@@ -71,20 +71,26 @@ void main() {
     );
   }
 
-  test('isModelAvailable returns false when directory does not exist', () async {
-    final loader = _loader();
-    expect(await loader.isModelAvailable('test'), isFalse);
-  });
+  test(
+    'isModelAvailable returns false when directory does not exist',
+    () async {
+      final loader = _loader();
+      expect(await loader.isModelAvailable('test'), isFalse);
+    },
+  );
 
-  test('isModelAvailable returns false when .complete marker is absent', () async {
-    final modelDir = Directory(
-      p.join(tmpDir.path, 'imported_models', 'asr', 'imported-abc12345'),
-    );
-    await modelDir.create(recursive: true);
+  test(
+    'isModelAvailable returns false when .complete marker is absent',
+    () async {
+      final modelDir = Directory(
+        p.join(tmpDir.path, 'imported_models', 'asr', 'imported-abc12345'),
+      );
+      await modelDir.create(recursive: true);
 
-    final loader = _loader();
-    expect(await loader.isModelAvailable('test'), isFalse);
-  });
+      final loader = _loader();
+      expect(await loader.isModelAvailable('test'), isFalse);
+    },
+  );
 
   test('isModelAvailable returns true when .complete marker exists', () async {
     final modelDir = Directory(
@@ -97,13 +103,16 @@ void main() {
     expect(await loader.isModelAvailable('test'), isTrue);
   });
 
-  test('loadModel returns path under support/imported_models/asr/<id>', () async {
-    final loader = _loader(type: ModelType.asr);
-    final path = await loader.loadModel('any');
-    expect(path, contains('imported_models'));
-    expect(path, contains('asr'));
-    expect(path, contains('imported-abc12345'));
-  });
+  test(
+    'loadModel returns path under support/imported_models/asr/<id>',
+    () async {
+      final loader = _loader(type: ModelType.asr);
+      final path = await loader.loadModel('any');
+      expect(path, contains('imported_models'));
+      expect(path, contains('asr'));
+      expect(path, contains('imported-abc12345'));
+    },
+  );
 
   test('loadModel uses tts subdir for tts models', () async {
     final loader = _loader(type: ModelType.tts);

@@ -21,6 +21,7 @@ final _strikethrough = RegExp(r'~~(.+?)~~');
 final _italicStar = RegExp(r'\*(.+?)\*');
 // Flanking guard avoids treating snake_case_names as italic spans.
 final _italicUnderscore = RegExp(r'(?<![\w])_([^_\n]+?)_(?![\w])');
+
 /// Invisible marker inserted after each list item so the chunker can split
 /// there and append a real, tunable silence between items — a plain newline
 /// alone gets whatever (if any) pause the TTS model happens to give it,
@@ -54,10 +55,7 @@ String stripMarkdownForSpeech(String input) {
     return label.isEmpty ? 'link' : '$label, link';
   });
   text = text.replaceAll(_bareUrlPattern, 'link');
-  text = text.replaceAllMapped(
-    _inlineCodePattern,
-    (m) => m.group(1)!,
-  );
+  text = text.replaceAllMapped(_inlineCodePattern, (m) => m.group(1)!);
   text = _stripEmphasis(text);
   text = _insertPauseCues(text);
   return _collapseWhitespace(text);
@@ -134,7 +132,10 @@ String _insertPauseCues(String text) {
   t = t.replaceAll(_spaceBeforeComma, ',');
   t = t.replaceAll(_doubleComma, ',');
   t = t.replaceAll(_commaBeforeTerminal, '');
-  t = t.split('\n').map((line) => line.replaceFirst(_leadingComma, '')).join('\n');
+  t = t
+      .split('\n')
+      .map((line) => line.replaceFirst(_leadingComma, ''))
+      .join('\n');
   return t;
 }
 

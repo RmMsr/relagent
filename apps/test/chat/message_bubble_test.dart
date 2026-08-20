@@ -9,23 +9,30 @@ import 'package:relagent/theme/app_colors.dart';
 import 'package:relagent/widgets/message_markdown_actions.dart';
 
 Widget _wrap(Widget child) => ProviderScope(
-  child: MaterialApp(theme: AppTheme.light(), home: Scaffold(body: child)),
+  child: MaterialApp(
+    theme: AppTheme.light(),
+    home: Scaffold(body: child),
+  ),
 );
 
-ChatMessage _msg(ChatRole role, String text) => ChatMessage(
-  text,
-  id: 'test-id',
-  role: role,
-  timestamp: DateTime(2026),
-);
+ChatMessage _msg(ChatRole role, String text) =>
+    ChatMessage(text, id: 'test-id', role: role, timestamp: DateTime(2026));
 
 void main() {
-  testWidgets('user message bubble has outline border and no fill', (tester) async {
-    await tester.pumpWidget(_wrap(ChatMessageBubble(message: _msg(ChatRole.user, 'hello'))));
+  testWidgets('user message bubble has outline border and no fill', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(ChatMessageBubble(message: _msg(ChatRole.user, 'hello'))),
+    );
     await tester.pump();
 
-    final outlineColor = Theme.of(tester.element(find.byType(ChatMessageBubble))).colorScheme.outline;
-    final containers = tester.widgetList<Container>(find.byType(Container)).toList();
+    final outlineColor = Theme.of(
+      tester.element(find.byType(ChatMessageBubble)),
+    ).colorScheme.outline;
+    final containers = tester
+        .widgetList<Container>(find.byType(Container))
+        .toList();
     final bubble = containers.firstWhere(
       (c) {
         final deco = c.decoration as BoxDecoration?;
@@ -39,11 +46,17 @@ void main() {
   });
 
   testWidgets('assistant message has no bubble decoration', (tester) async {
-    await tester.pumpWidget(_wrap(ChatMessageBubble(message: _msg(ChatRole.assistant, 'hi'))));
+    await tester.pumpWidget(
+      _wrap(ChatMessageBubble(message: _msg(ChatRole.assistant, 'hi'))),
+    );
     await tester.pump();
 
-    final colorScheme = Theme.of(tester.element(find.byType(ChatMessageBubble))).colorScheme;
-    final containers = tester.widgetList<Container>(find.byType(Container)).toList();
+    final colorScheme = Theme.of(
+      tester.element(find.byType(ChatMessageBubble)),
+    ).colorScheme;
+    final containers = tester
+        .widgetList<Container>(find.byType(Container))
+        .toList();
     final hasBubble = containers.any((c) {
       final deco = c.decoration as BoxDecoration?;
       final border = deco?.border as Border?;
@@ -54,17 +67,18 @@ void main() {
   });
 
   testWidgets('error message uses errorBg and left border', (tester) async {
-    await tester.pumpWidget(_wrap(ChatMessageBubble(message: _msg(ChatRole.error, 'oops'))));
+    await tester.pumpWidget(
+      _wrap(ChatMessageBubble(message: _msg(ChatRole.error, 'oops'))),
+    );
     await tester.pump();
 
-    final containers = tester.widgetList<Container>(find.byType(Container)).toList();
-    final anchor = containers.firstWhere(
-      (c) {
-        final deco = c.decoration as BoxDecoration?;
-        return deco?.color == RelagentColors.errorBg;
-      },
-      orElse: () => throw TestFailure('No container with errorBg found'),
-    );
+    final containers = tester
+        .widgetList<Container>(find.byType(Container))
+        .toList();
+    final anchor = containers.firstWhere((c) {
+      final deco = c.decoration as BoxDecoration?;
+      return deco?.color == RelagentColors.errorBg;
+    }, orElse: () => throw TestFailure('No container with errorBg found'));
     final deco = anchor.decoration as BoxDecoration;
     final border = deco.border as Border?;
     expect(border?.left.width, 4.0);
@@ -99,7 +113,8 @@ void main() {
         ChatMessageBubble(
           message: _msg(ChatRole.assistant, 'hi'),
           onSpeak: (_, _) {},
-          getMessageTtsState: (_) => const MessageTtsState(status: MessagePlaybackStatus.idle),
+          getMessageTtsState: (_) =>
+              const MessageTtsState(status: MessagePlaybackStatus.idle),
           onSkipPrevious: (_) {},
           onSkipNext: (_) {},
         ),
@@ -112,37 +127,37 @@ void main() {
     expect(find.byIcon(Icons.skip_next), findsNothing);
   });
 
-  testWidgets(
-    'playing assistant message shows back/pause/forward controls',
-    (tester) async {
-      String? skippedPrevious;
-      String? skippedNext;
+  testWidgets('playing assistant message shows back/pause/forward controls', (
+    tester,
+  ) async {
+    String? skippedPrevious;
+    String? skippedNext;
 
-      await tester.pumpWidget(
-        _wrap(
-          ChatMessageBubble(
-            message: _msg(ChatRole.assistant, 'hi'),
-            onSpeak: (_, _) {},
-            getMessageTtsState: (_) => const MessageTtsState(status: MessagePlaybackStatus.playing),
-            onSkipPrevious: (id) => skippedPrevious = id,
-            onSkipNext: (id) => skippedNext = id,
-          ),
+    await tester.pumpWidget(
+      _wrap(
+        ChatMessageBubble(
+          message: _msg(ChatRole.assistant, 'hi'),
+          onSpeak: (_, _) {},
+          getMessageTtsState: (_) =>
+              const MessageTtsState(status: MessagePlaybackStatus.playing),
+          onSkipPrevious: (id) => skippedPrevious = id,
+          onSkipNext: (id) => skippedNext = id,
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.volume_up), findsNothing);
-      expect(find.byIcon(Icons.pause), findsOneWidget);
-      expect(find.byIcon(Icons.skip_previous), findsOneWidget);
-      expect(find.byIcon(Icons.skip_next), findsOneWidget);
+    expect(find.byIcon(Icons.volume_up), findsNothing);
+    expect(find.byIcon(Icons.pause), findsOneWidget);
+    expect(find.byIcon(Icons.skip_previous), findsOneWidget);
+    expect(find.byIcon(Icons.skip_next), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.skip_previous));
-      await tester.tap(find.byIcon(Icons.skip_next));
+    await tester.tap(find.byIcon(Icons.skip_previous));
+    await tester.tap(find.byIcon(Icons.skip_next));
 
-      expect(skippedPrevious, 'test-id');
-      expect(skippedNext, 'test-id');
-    },
-  );
+    expect(skippedPrevious, 'test-id');
+    expect(skippedNext, 'test-id');
+  });
 
   testWidgets('paused assistant message shows a resume icon in the row', (
     tester,
@@ -152,7 +167,8 @@ void main() {
         ChatMessageBubble(
           message: _msg(ChatRole.assistant, 'hi'),
           onSpeak: (_, _) {},
-          getMessageTtsState: (_) => const MessageTtsState(status: MessagePlaybackStatus.paused),
+          getMessageTtsState: (_) =>
+              const MessageTtsState(status: MessagePlaybackStatus.paused),
           onSkipPrevious: (_) {},
           onSkipNext: (_) {},
         ),

@@ -45,7 +45,6 @@ class SseState {
   }
 }
 
-
 final sseProvider = NotifierProvider<SseNotifier, SseState>(() {
   return SseNotifier();
 });
@@ -203,13 +202,17 @@ class SseNotifier extends Notifier<SseState> {
         if (ref.exists(agenticChatProvider(sessionId))) {
           Logger.debug('SSE: Messages appended, refreshing $sessionId');
           unawaited(
-            ref.read(agenticChatProvider(sessionId).notifier).refreshFromServer(),
+            ref
+                .read(agenticChatProvider(sessionId).notifier)
+                .refreshFromServer(),
           );
         } else {
           Logger.debug(
             'SSE: Messages appended for inactive session $sessionId, bumping activity',
           );
-          ref.read(sessionsProvider.notifier).bumpActivity(sessionId, createdAt);
+          ref
+              .read(sessionsProvider.notifier)
+              .bumpActivity(sessionId, createdAt);
         }
       case UnknownEvent(:final eventType):
         Logger.debug('SSE: Unknown event type: $eventType');

@@ -27,7 +27,8 @@ void main(List<String> rawArgs) async {
   final parser = ArgParser()
     ..addMultiOption(
       'arch',
-      help: 'Architecture values to include (repeat or comma-separate)\n'
+      help:
+          'Architecture values to include (repeat or comma-separate)\n'
           'See --list-architectures for valid values\n'
           '(default: all)',
       valueHelp: 'ARCH',
@@ -35,7 +36,8 @@ void main(List<String> rawArgs) async {
     ..addOption(
       'catalog',
       abbr: 'c',
-      help: 'Path to voice-models.json\n'
+      help:
+          'Path to voice-models.json\n'
           '(default: auto-detected from project root)',
       valueHelp: 'FILE',
     )
@@ -43,7 +45,8 @@ void main(List<String> rawArgs) async {
       'classify',
       negatable: false,
       hide: true, // documented under "Phase 2" above
-      help: 'Re-derive names/architecture and exclusion notes (see Phase 2).\n'
+      help:
+          'Re-derive names/architecture and exclusion notes (see Phase 2).\n'
           'Rare to need directly — implicit on --discover and --recheck.',
     )
     ..addFlag(
@@ -60,14 +63,16 @@ void main(List<String> rawArgs) async {
     ..addOption(
       'eval',
       hide: true, // documented under "Phase 3" above
-      help: 'Download and smoke-test entries with the given status\n'
+      help:
+          'Download and smoke-test entries with the given status\n'
           '(bare --eval defaults to pending)',
       valueHelp: 'STATUS',
       allowed: ['pending', 'failed', 'approved'],
     )
     ..addOption(
       'fixtures-dir',
-      help: 'Directory with reference WAV clips (en.wav, de.wav, …)\n'
+      help:
+          'Directory with reference WAV clips (en.wav, de.wav, …)\n'
           '(default: auto-detected from project root)',
       valueHelp: 'DIR',
     )
@@ -80,7 +85,8 @@ void main(List<String> rawArgs) async {
     ..addMultiOption(
       'lang',
       abbr: 'l',
-      help: 'Language codes to include (repeat or comma-separate)\n'
+      help:
+          'Language codes to include (repeat or comma-separate)\n'
           'Use "all" to disable the language filter\n'
           '(default: en)',
       valueHelp: 'LANG',
@@ -88,7 +94,8 @@ void main(List<String> rawArgs) async {
     ..addOption(
       'list',
       hide: true, // documented under "Informational" above
-      help: 'List entries matching a state (with language filter applied)\n'
+      help:
+          'List entries matching a state (with language filter applied)\n'
           'States: ignored, pending, failed, approved',
       valueHelp: 'STATE',
       defaultsTo: 'approved',
@@ -98,7 +105,8 @@ void main(List<String> rawArgs) async {
       'list-architectures',
       negatable: false,
       hide: true, // documented under "Informational" above
-      help: 'Print catalog architectures: type, runtime-supported,\n'
+      help:
+          'Print catalog architectures: type, runtime-supported,\n'
           'approved/total. Whole catalog, not scoped.',
     )
     ..addFlag(
@@ -109,7 +117,8 @@ void main(List<String> rawArgs) async {
     ..addMultiOption(
       'recheck',
       hide: true, // documented under "Phase 3" above
-      help: 'Reset and re-evaluate a specific model by ID\n'
+      help:
+          'Reset and re-evaluate a specific model by ID\n'
           '(clears its status and notes, implies eval for those entries)',
       valueHelp: 'ID',
     )
@@ -147,8 +156,7 @@ void main(List<String> rawArgs) async {
   final doEval = parsed.wasParsed('eval');
   final evalStatus = parsed['eval'] as String? ?? 'pending';
   final doStatus = parsed['status'] as bool;
-  final listState =
-      parsed.wasParsed('list') ? parsed['list'] as String : null;
+  final listState = parsed.wasParsed('list') ? parsed['list'] as String : null;
   final namesOnly = parsed['names-only'] as bool;
   final withNotes = parsed['with-notes'] as bool;
   final typeFilter = parsed['type'] as String?;
@@ -160,8 +168,13 @@ void main(List<String> rawArgs) async {
   final debug = parsed['debug'] as bool;
 
   if ((parsed['help'] as bool) ||
-      (!doDiscover && !doClassify && !doListArchitectures &&
-          !doEval && !doStatus && listState == null && recheckIds.isEmpty)) {
+      (!doDiscover &&
+          !doClassify &&
+          !doListArchitectures &&
+          !doEval &&
+          !doStatus &&
+          listState == null &&
+          recheckIds.isEmpty)) {
     print(_usage(parser));
     exit(0);
   }
@@ -169,8 +182,12 @@ void main(List<String> rawArgs) async {
   // --list-architectures always covers the whole catalog (see its doc) —
   // don't print a scope line for a scope it doesn't apply.
   final scopeApplies =
-      doDiscover || doClassify || doEval || doStatus || listState != null ||
-          recheckIds.isNotEmpty;
+      doDiscover ||
+      doClassify ||
+      doEval ||
+      doStatus ||
+      listState != null ||
+      recheckIds.isNotEmpty;
 
   // Resolve catalog path.
   var catalogPath = parsed['catalog'] as String? ?? _detectCatalogPath();
@@ -191,7 +208,8 @@ void main(List<String> rawArgs) async {
   }
 
   // Resolve models cache directory (XDG_CACHE_HOME / ~/.cache).
-  final cacheBase = Platform.environment['XDG_CACHE_HOME'] ??
+  final cacheBase =
+      Platform.environment['XDG_CACHE_HOME'] ??
       p.join(
         Platform.environment['HOME'] ??
             Platform.environment['USERPROFILE'] ??
@@ -201,8 +219,7 @@ void main(List<String> rawArgs) async {
   final modelsDir = p.join(cacheBase, 'relagent', 'models');
 
   // Resolve fixtures directory.
-  final fixturesDir =
-      parsed['fixtures-dir'] as String? ?? _detectFixturesDir();
+  final fixturesDir = parsed['fixtures-dir'] as String? ?? _detectFixturesDir();
 
   final keep = parsed['keep'] as bool;
 
@@ -212,8 +229,10 @@ void main(List<String> rawArgs) async {
   if (langArgs.isEmpty) {
     languages = {'en'};
   } else {
-    final codes =
-        langArgs.expand((s) => s.split(',')).map((s) => s.trim()).toSet();
+    final codes = langArgs
+        .expand((s) => s.split(','))
+        .map((s) => s.trim())
+        .toSet();
     languages = codes.contains('all') ? {} : codes;
   }
 
@@ -345,7 +364,12 @@ void main(List<String> rawArgs) async {
       print('=== List: $listState ===');
       print('');
     }
-    reporter.list(entries, listState, namesOnly: namesOnly, withNotes: withNotes);
+    reporter.list(
+      entries,
+      listState,
+      namesOnly: namesOnly,
+      withNotes: withNotes,
+    );
   }
 
   if (doListArchitectures) {
@@ -355,8 +379,8 @@ void main(List<String> rawArgs) async {
   exit(0);
 }
 
-
-String _usage(ArgParser parser) => '''
+String _usage(ArgParser parser) =>
+    '''
 Usage: voice-catalog --discover [OPTIONS]
        voice-catalog --eval [pending|failed|approved] [OPTIONS]
        voice-catalog --status [OPTIONS]
@@ -452,9 +476,7 @@ String? _detectFixturesDir() {
       p.join(dir.path, 'tools', 'voice_catalog', 'fixtures'),
     );
     if (candidate.existsSync()) return candidate.path;
-    final direct = Directory(
-      p.join(dir.path, 'voice_catalog', 'fixtures'),
-    );
+    final direct = Directory(p.join(dir.path, 'voice_catalog', 'fixtures'));
     if (direct.existsSync()) return direct.path;
     final parent = dir.parent;
     if (parent.path == dir.path) break;

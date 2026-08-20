@@ -35,7 +35,9 @@ void main() {
       );
 
       // Stage changes to the two remaining bulk-committed fields.
-      capturedRef.read(pendingSettingsProvider.notifier).updateDraft(
+      capturedRef
+          .read(pendingSettingsProvider.notifier)
+          .updateDraft(
             (s) => s.copyWith(
               simpleChatModel: 'new-model',
               primeMessage: 'new prime message',
@@ -54,45 +56,44 @@ void main() {
     },
   );
 
-  testWidgets(
-    'commitPendingSettings writes engineBaseUrl when it changed',
-    (tester) async {
-      SharedPreferences.setMockInitialValues({
-        'user_settings':
-            '{"simpleChatBaseUrl":"http://localhost:1234/api/v1","simpleChatModel":"test-model","primeMessage":"test","ttsSpeakerId":0,"ttsSpeed":1.0,"voiceMode":"silent","backgroundListeningDuration":"oneHour","engineBaseUrl":"http://localhost:8000"}',
-      });
-      final sharedPreferences = await SharedPreferences.getInstance();
+  testWidgets('commitPendingSettings writes engineBaseUrl when it changed', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'user_settings':
+          '{"simpleChatBaseUrl":"http://localhost:1234/api/v1","simpleChatModel":"test-model","primeMessage":"test","ttsSpeakerId":0,"ttsSpeed":1.0,"voiceMode":"silent","backgroundListeningDuration":"oneHour","engineBaseUrl":"http://localhost:8000"}',
+    });
+    final sharedPreferences = await SharedPreferences.getInstance();
 
-      late WidgetRef capturedRef;
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-          ],
-          child: MaterialApp(
-            home: Consumer(
-              builder: (context, ref, _) {
-                capturedRef = ref;
-                return const SizedBox.shrink();
-              },
-            ),
+    late WidgetRef capturedRef;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+        ],
+        child: MaterialApp(
+          home: Consumer(
+            builder: (context, ref, _) {
+              capturedRef = ref;
+              return const SizedBox.shrink();
+            },
           ),
         ),
-      );
+      ),
+    );
 
-      capturedRef.read(pendingSettingsProvider.notifier).updateDraft(
-            (s) => s.copyWith(engineBaseUrl: 'http://localhost:9000'),
-          );
+    capturedRef
+        .read(pendingSettingsProvider.notifier)
+        .updateDraft((s) => s.copyWith(engineBaseUrl: 'http://localhost:9000'));
 
-      await commitPendingSettings(capturedRef);
-      await tester.pump();
+    await commitPendingSettings(capturedRef);
+    await tester.pump();
 
-      expect(
-        capturedRef.read(settingsProvider).engineBaseUrl,
-        'http://localhost:9000',
-      );
-    },
-  );
+    expect(
+      capturedRef.read(settingsProvider).engineBaseUrl,
+      'http://localhost:9000',
+    );
+  });
 
   testWidgets(
     'commitPendingSettings leaves engineBaseUrl untouched when unchanged',
@@ -122,9 +123,9 @@ void main() {
 
       // Stage an unrelated field only — engineBaseUrl stays whatever the
       // draft was seeded with, i.e. unchanged from settingsProvider.
-      capturedRef.read(pendingSettingsProvider.notifier).updateDraft(
-            (s) => s.copyWith(simpleChatModel: 'new-model'),
-          );
+      capturedRef
+          .read(pendingSettingsProvider.notifier)
+          .updateDraft((s) => s.copyWith(simpleChatModel: 'new-model'));
 
       await commitPendingSettings(capturedRef);
       await tester.pump();

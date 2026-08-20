@@ -36,16 +36,13 @@ class EntryScope {
   /// so a non-default value like "en" visually stands out against the
   /// "all" rows. Printed at the start of a run.
   List<String> describeLines() {
-    final langDesc =
-        languages.isEmpty ? 'all' : (languages.toList()..sort()).join(',');
+    final langDesc = languages.isEmpty
+        ? 'all'
+        : (languages.toList()..sort()).join(',');
     final archDesc = architectures.isEmpty
         ? 'all'
         : (architectures.toList()..sort()).join(',');
-    return [
-      'type: ${type ?? 'all'}',
-      'lang: $langDesc',
-      'arch: $archDesc',
-    ];
+    return ['type: ${type ?? 'all'}', 'lang: $langDesc', 'arch: $archDesc'];
   }
 
   bool matches(Map<String, dynamic> entry) {
@@ -57,8 +54,9 @@ class EntryScope {
       return false;
     }
     if (languages.isNotEmpty) {
-      final entryLangs =
-          (entry['languages'] as List<dynamic>? ?? []).cast<String>().toSet();
+      final entryLangs = (entry['languages'] as List<dynamic>? ?? [])
+          .cast<String>()
+          .toSet();
       // 'multi' is a wildcard sentinel for models with too many supported
       // languages to enumerate (e.g. Omnilingual ASR's 1600) — treat it as
       // matching any requested language.

@@ -209,7 +209,8 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                         children: [
                           AgenticChatHistory(
                             messages: chatState.messages,
-                            showAssistantPending: chatState.showAssistantPending,
+                            showAssistantPending:
+                                chatState.showAssistantPending,
                             engineHealthResult: healthCheckState.lastResult,
                             sensitivityLevel: chatState.sensitivityLevel,
                             isVoiceAvailable: ref
@@ -238,7 +239,9 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                                         .cancelFailedMessages();
                                   },
                             onSpeak:
-                                !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
+                                !ref
+                                    .watch(voiceCapabilitiesProvider)
+                                    .isTtsAvailable
                                 ? null
                                 : (text, messageId) {
                                     final status = ttsState
@@ -264,17 +267,21 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                             getMessageTtsState: (messageId) =>
                                 ttsState.getMessageState(messageId),
                             onSkipPrevious:
-                                !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
+                                !ref
+                                    .watch(voiceCapabilitiesProvider)
+                                    .isTtsAvailable
                                 ? null
                                 : (messageId) => ref
-                                    .read(ttsProvider.notifier)
-                                    .skipPreviousChunk(messageId),
+                                      .read(ttsProvider.notifier)
+                                      .skipPreviousChunk(messageId),
                             onSkipNext:
-                                !ref.watch(voiceCapabilitiesProvider).isTtsAvailable
+                                !ref
+                                    .watch(voiceCapabilitiesProvider)
+                                    .isTtsAvailable
                                 ? null
                                 : (messageId) => ref
-                                    .read(ttsProvider.notifier)
-                                    .skipNextChunk(messageId),
+                                      .read(ttsProvider.notifier)
+                                      .skipNextChunk(messageId),
                             onChangeSensitivity: (level) {
                               if (displayedSessionId == null) {
                                 ref
@@ -341,9 +348,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                                         )
                                         .triggerContinuation();
                                   },
-                            onStop: displayedSessionId == null
-                                ? null
-                                : _onStop,
+                            onStop: displayedSessionId == null ? null : _onStop,
                             queuedMessage: chatState.queuedMessage,
                             onEditQueued: displayedSessionId == null
                                 ? null
@@ -458,9 +463,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: context.errorBg,
-        border: Border(
-          left: BorderSide(color: context.errorBorder, width: 4),
-        ),
+        border: Border(left: BorderSide(color: context.errorBorder, width: 4)),
         borderRadius: const BorderRadius.only(
           topRight: Radius.circular(10),
           bottomRight: Radius.circular(10),
@@ -487,10 +490,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                 ),
               ),
               IconButton(
-                icon: Icon(
-                  Icons.close,
-                  color: context.errorText,
-                ),
+                icon: Icon(Icons.close, color: context.errorText),
                 onPressed: () {
                   setState(() {
                     _healthCheckBannerDismissed = true;

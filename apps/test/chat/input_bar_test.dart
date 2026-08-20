@@ -20,10 +20,11 @@ class _NoVoice with VoiceCapabilities {
 }
 
 Widget _wrap(Widget child) => ProviderScope(
-  overrides: [
-    voiceCapabilitiesProvider.overrideWithValue(_NoVoice()),
-  ],
-  child: MaterialApp(theme: AppTheme.light(), home: Scaffold(body: child)),
+  overrides: [voiceCapabilitiesProvider.overrideWithValue(_NoVoice())],
+  child: MaterialApp(
+    theme: AppTheme.light(),
+    home: Scaffold(body: child),
+  ),
 );
 
 void _verifySendIsRightmost(WidgetTester tester) {
@@ -35,7 +36,11 @@ void _verifySendIsRightmost(WidgetTester tester) {
   final micFinder = find.byIcon(Icons.mic);
   if (micFinder.evaluate().isNotEmpty) {
     final micPos = tester.getCenter(micFinder);
-    expect(sendPos.dx, greaterThan(micPos.dx), reason: 'Send must be right of mic button');
+    expect(
+      sendPos.dx,
+      greaterThan(micPos.dx),
+      reason: 'Send must be right of mic button',
+    );
   }
 }
 
@@ -46,8 +51,12 @@ void main() {
     _verifySendIsRightmost(tester);
   });
 
-  testWidgets('send button is rightmost in AgenticChatInput row', (tester) async {
-    await tester.pumpWidget(_wrap(AgenticChatInput(onSubmitted: (_) {}, enabled: true)));
+  testWidgets('send button is rightmost in AgenticChatInput row', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(AgenticChatInput(onSubmitted: (_) {}, enabled: true)),
+    );
     await tester.pumpAndSettle();
     _verifySendIsRightmost(tester);
   });

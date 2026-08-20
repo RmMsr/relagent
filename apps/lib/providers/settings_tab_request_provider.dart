@@ -19,5 +19,5 @@ class SettingsTabRequestNotifier extends Notifier<int?> {
 
 final settingsTabRequestProvider =
     NotifierProvider.autoDispose<SettingsTabRequestNotifier, int?>(
-  SettingsTabRequestNotifier.new,
-);
+      SettingsTabRequestNotifier.new,
+    );

@@ -17,7 +17,13 @@ class SettingsStore {
   static File _defaultFile() {
     final home = Platform.environment['HOME'] ?? '';
     return File(
-      p.join(home, '.local', 'share', 'org.venkado.relagent-cli', 'settings.ini'),
+      p.join(
+        home,
+        '.local',
+        'share',
+        'org.venkado.relagent-cli',
+        'settings.ini',
+      ),
     );
   }
 

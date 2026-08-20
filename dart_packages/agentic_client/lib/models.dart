@@ -149,9 +149,11 @@ class ApprovalData {
 class GrantRequest {
   final ApprovalType approvalType;
   final String? component;
+
   /// Parameters constrained to specific values. The wildcarded parameter key,
   /// if any, is excluded from this map and placed in [wildcardParameter].
   final Map<String, dynamic> allowedParameters;
+
   /// When non-null, this parameter key may have any value at execution time.
   /// Only one parameter may be wildcarded per grant.
   final String? wildcardParameter;
@@ -188,7 +190,7 @@ class GrantRequest {
     // absent from the map and named separately in wildcard_parameter.
     final params = wildcardParameter != null
         ? (Map<String, dynamic>.from(approval.allowedParameters)
-            ..remove(wildcardParameter))
+          ..remove(wildcardParameter))
         : approval.allowedParameters;
     return GrantRequest(
       approvalType: approval.type,
@@ -263,7 +265,8 @@ class AgentStats {
 }
 
 class AgenticMessage {
-  final String messageId; // Non-nullable UUID: generated locally or read from engine
+  final String
+      messageId; // Non-nullable UUID: generated locally or read from engine
   final String localId; // Internal ID for UI tracking (TTS, etc.)
   final String text;
   final AgenticRole role;
@@ -427,8 +430,7 @@ class AgenticMessage {
     final bytes = List.generate(16, (_) => _rng.nextInt(256));
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    final hex =
-        bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
         '${hex.substring(20, 32)}';

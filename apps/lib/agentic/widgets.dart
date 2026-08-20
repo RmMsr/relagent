@@ -168,13 +168,17 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
       padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+        border: Border(
+          top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
       ),
       child: Row(
         children: [
           Expanded(
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.5),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+              ),
               child: TextField(
                 autofocus: true,
                 controller: _controller,
@@ -185,7 +189,9 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
                   hintText: enabled
                       ? 'Type a message...'
                       : 'Wait for response or edit queued message',
-                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  hintStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 minLines: 1,
                 maxLines: null,
@@ -198,7 +204,10 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
           if (ref.watch(voiceCapabilitiesProvider).isAsrAvailable)
             RecorderButton(),
           IconButton(
-            icon: Icon(Icons.send, color: Theme.of(context).colorScheme.primary),
+            icon: Icon(
+              Icons.send,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             onPressed: enabled ? _submitText : null,
             tooltip: 'Send message',
           ),
@@ -266,7 +275,7 @@ class AgenticChatHistory extends StatelessWidget {
   final SensitivityLevel sensitivityLevel;
   final ValueChanged<SensitivityLevel>? onChangeSensitivity;
   final void Function(ApprovalData, GrantRequest, bool isGlobal)?
-      onGrantApproval;
+  onGrantApproval;
   final ValueChanged<String>? onDeclineApproval;
   final void Function(List<String> approvalIds)? onDeclineAllApprovals;
   final VoidCallback? onContinue;
@@ -373,18 +382,15 @@ class AgenticChatHistory extends StatelessWidget {
           if (hasApprovals) {
             // Approval group with actionable cards
             // Historical approvals (not the latest) render as resolved
-            final formattedTime =
-                DateFormat('HH:mm:ss').format(message.timestamp.toLocal());
+            final formattedTime = DateFormat(
+              'HH:mm:ss',
+            ).format(message.timestamp.toLocal());
             chatWidgets.add(
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(
-                      top: 8,
-                      bottom: 4,
-                      left: 12,
-                    ),
+                    padding: const EdgeInsets.only(top: 8, bottom: 4, left: 12),
                     child: Builder(
                       builder: (context) {
                         final theme = Theme.of(context);
@@ -413,19 +419,14 @@ class AgenticChatHistory extends StatelessWidget {
               ),
             );
           } else if (message.notification != null) {
-            chatWidgets.add(
-              SystemNoteBubble(text: message.notification!),
-            );
+            chatWidgets.add(SystemNoteBubble(text: message.notification!));
           }
         }
       } else {
-        for (int msgIndex = 0;
-            msgIndex < group.messages.length;
-            msgIndex++) {
+        for (int msgIndex = 0; msgIndex < group.messages.length; msgIndex++) {
           final message = group.messages[msgIndex];
           final isFirstInGroup = msgIndex == 0;
-          final isLastInGroup =
-              msgIndex == group.messages.length - 1;
+          final isLastInGroup = msgIndex == group.messages.length - 1;
 
           chatWidgets.add(
             _AgenticMessageBubble(
@@ -454,10 +455,7 @@ class AgenticChatHistory extends StatelessWidget {
 
     if (queuedMessage != null) {
       chatWidgets.add(
-        QueuedMessageBubble(
-          text: queuedMessage!,
-          onEdit: onEditQueued,
-        ),
+        QueuedMessageBubble(text: queuedMessage!, onEdit: onEditQueued),
       );
     }
 
@@ -528,11 +526,19 @@ class _AgenticMessageBubble extends StatelessWidget {
             _ErrorMessageBubble(message: message)
           else if (isUser)
             ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.8,
+              ),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Theme.of(context).colorScheme.outline, width: 1.5),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outline,
+                    width: 1.5,
+                  ),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(14),
                     bottomLeft: Radius.circular(14),
@@ -542,7 +548,9 @@ class _AgenticMessageBubble extends StatelessWidget {
                 ),
                 child: Text(
                   message.text,
-                  style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
               ),
             )
@@ -682,9 +690,7 @@ class _ErrorMessageBubbleState extends State<_ErrorMessageBubble> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: context.errorBg,
-        border: Border(
-          left: BorderSide(color: context.errorBorder, width: 4),
-        ),
+        border: Border(left: BorderSide(color: context.errorBorder, width: 4)),
         borderRadius: const BorderRadius.only(
           topRight: Radius.circular(10),
           bottomRight: Radius.circular(10),
@@ -695,11 +701,7 @@ class _ErrorMessageBubbleState extends State<_ErrorMessageBubble> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 18,
-                color: context.errorText,
-              ),
+              Icon(Icons.error_outline, size: 18, color: context.errorText),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1151,11 +1153,7 @@ class QueuedMessageBubble extends StatelessWidget {
   final String text;
   final VoidCallback? onEdit;
 
-  const QueuedMessageBubble({
-    super.key,
-    required this.text,
-    this.onEdit,
-  });
+  const QueuedMessageBubble({super.key, required this.text, this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -1187,7 +1185,9 @@ class QueuedMessageBubble extends StatelessWidget {
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 0),
+                        horizontal: 6,
+                        vertical: 0,
+                      ),
                       foregroundColor: theme.colorScheme.onSurfaceVariant,
                       textStyle: theme.textTheme.labelSmall,
                       minimumSize: Size.zero,
@@ -1255,4 +1255,3 @@ class _DashedRRectPainter extends CustomPainter {
   bool shouldRepaint(covariant _DashedRRectPainter old) =>
       old.color != color || old.radius != radius;
 }
-

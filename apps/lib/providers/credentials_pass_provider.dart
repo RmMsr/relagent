@@ -24,5 +24,5 @@ class CredentialsPassNotifier extends Notifier<bool> {
 
 final credentialsPassProvider =
     NotifierProvider.autoDispose<CredentialsPassNotifier, bool>(
-  CredentialsPassNotifier.new,
-);
+      CredentialsPassNotifier.new,
+    );

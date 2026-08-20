@@ -28,24 +28,20 @@ class ImportedModelRegistry {
         return;
       }
       final raw = jsonDecode(await file.readAsString()) as List<dynamic>;
-      _entries = raw
-          .cast<Map<String, dynamic>>()
-          .expand((e) {
-            try {
-              return [ImportedModelEntry.fromJson(e)];
-            } catch (_) {
-              return <ImportedModelEntry>[];
-            }
-          })
-          .toList();
+      _entries = raw.cast<Map<String, dynamic>>().expand((e) {
+        try {
+          return [ImportedModelEntry.fromJson(e)];
+        } catch (_) {
+          return <ImportedModelEntry>[];
+        }
+      }).toList();
     } catch (_) {
       _entries = [];
     }
   }
 
   static List<ImportedModelEntry> byType(ModelType type) {
-    return _entries.where((e) => e.type == type).toList()
-      ..sort(_newestFirst);
+    return _entries.where((e) => e.type == type).toList()..sort(_newestFirst);
   }
 
   static List<ImportedModelEntry> byTypeAndLanguage(
@@ -76,9 +72,7 @@ class ImportedModelRegistry {
   }
 
   static Future<void> update(ImportedModelEntry entry) async {
-    _entries = [
-      for (final e in _entries) e.id == entry.id ? entry : e,
-    ];
+    _entries = [for (final e in _entries) e.id == entry.id ? entry : e];
     await _persist();
   }
 

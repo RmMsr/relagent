@@ -33,30 +33,27 @@ void main() {
     });
 
     test('detects ctc from model.onnx and tokens.txt without espeak', () {
-      final entries = [
-        'ctc/model.onnx',
-        'ctc/tokens.txt',
-      ];
+      final entries = ['ctc/model.onnx', 'ctc/tokens.txt'];
       expect(detectArchitecture(entries), ModelArchitecture.ctc);
     });
 
     test('returns null when no pattern matches', () {
-      final entries = [
-        'unknown/weights.bin',
-        'unknown/config.json',
-      ];
+      final entries = ['unknown/weights.bin', 'unknown/config.json'];
       expect(detectArchitecture(entries), isNull);
     });
 
-    test('detects transducer for encoder+decoder+joiner regardless of naming style', () {
-      final entries = [
-        'model/encoder-epoch-30-avg-1.onnx',
-        'model/decoder-epoch-30-avg-1.onnx',
-        'model/joiner-epoch-30-avg-1.onnx',
-        'model/tokens.txt',
-      ];
-      expect(detectArchitecture(entries), ModelArchitecture.transducer);
-    });
+    test(
+      'detects transducer for encoder+decoder+joiner regardless of naming style',
+      () {
+        final entries = [
+          'model/encoder-epoch-30-avg-1.onnx',
+          'model/decoder-epoch-30-avg-1.onnx',
+          'model/joiner-epoch-30-avg-1.onnx',
+          'model/tokens.txt',
+        ];
+        expect(detectArchitecture(entries), ModelArchitecture.transducer);
+      },
+    );
 
     test('guesses offlineNemoTransducer for encoder+decoder+joiner when '
         '"nemo" appears in the path', () {
@@ -68,17 +65,23 @@ void main() {
       ];
       // A guess only — the shape is ambiguous either way, see
       // isAmbiguousTransducerShape below.
-      expect(detectArchitecture(entries), ModelArchitecture.offlineNemoTransducer);
+      expect(
+        detectArchitecture(entries),
+        ModelArchitecture.offlineNemoTransducer,
+      );
     });
 
-    test('detects whisper from sherpa-onnx export-onnx.py prefixed filenames', () {
-      final entries = [
-        'model/nb-whisper-base-encoder.onnx',
-        'model/nb-whisper-base-decoder.onnx',
-        'model/nb-whisper-base-tokens.txt',
-      ];
-      expect(detectArchitecture(entries), ModelArchitecture.whisper);
-    });
+    test(
+      'detects whisper from sherpa-onnx export-onnx.py prefixed filenames',
+      () {
+        final entries = [
+          'model/nb-whisper-base-encoder.onnx',
+          'model/nb-whisper-base-decoder.onnx',
+          'model/nb-whisper-base-tokens.txt',
+        ];
+        expect(detectArchitecture(entries), ModelArchitecture.whisper);
+      },
+    );
 
     test('detects whisper from int8-quantized prefixed filenames', () {
       final entries = [

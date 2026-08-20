@@ -14,8 +14,7 @@ class AskCommand extends Command<int> {
   @override
   final name = 'ask';
   @override
-  final description =
-      'Send a single prompt to the engine and print the reply.';
+  final description = 'Send a single prompt to the engine and print the reply.';
 
   final ConnectionResolver connectionResolver;
 

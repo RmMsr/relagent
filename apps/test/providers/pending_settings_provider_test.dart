@@ -47,33 +47,45 @@ void main() {
   });
 
   test('updateDraft applies a partial change, leaving the rest untouched', () {
-    container.read(pendingSettingsProvider.notifier).updateDraft(
-          (s) => s.copyWith(selectedAsrModelId: 'asr-new'),
-        );
+    container
+        .read(pendingSettingsProvider.notifier)
+        .updateDraft((s) => s.copyWith(selectedAsrModelId: 'asr-new'));
     final draft = container.read(pendingSettingsProvider);
     expect(draft.selectedAsrModelId, 'asr-new');
     expect(draft.selectedTtsModelId, 'tts-saved');
     expect(draft.simpleChatModel, 'test-model');
   });
 
-  test('discardPending drops a pending edit and resyncs to current settings', () {
-    container.read(pendingSettingsProvider.notifier).updateDraft(
-          (s) => s.copyWith(simpleChatModel: 'edited-model'),
-        );
-    expect(container.read(pendingSettingsProvider).simpleChatModel, 'edited-model');
+  test(
+    'discardPending drops a pending edit and resyncs to current settings',
+    () {
+      container
+          .read(pendingSettingsProvider.notifier)
+          .updateDraft((s) => s.copyWith(simpleChatModel: 'edited-model'));
+      expect(
+        container.read(pendingSettingsProvider).simpleChatModel,
+        'edited-model',
+      );
 
-    container.read(pendingSettingsProvider.notifier).discardPending();
+      container.read(pendingSettingsProvider.notifier).discardPending();
 
-    expect(container.read(pendingSettingsProvider).simpleChatModel, 'test-model');
-  });
+      expect(
+        container.read(pendingSettingsProvider).simpleChatModel,
+        'test-model',
+      );
+    },
+  );
 
-  test('automatically resyncs when settingsProvider changes externally (e.g. after Save)', () async {
-    await container
-        .read(settingsProvider.notifier)
-        .updateSelectedTtsModelId('tts-changed-elsewhere');
-    final draft = container.read(pendingSettingsProvider);
-    expect(draft.selectedTtsModelId, 'tts-changed-elsewhere');
-  });
+  test(
+    'automatically resyncs when settingsProvider changes externally (e.g. after Save)',
+    () async {
+      await container
+          .read(settingsProvider.notifier)
+          .updateSelectedTtsModelId('tts-changed-elsewhere');
+      final draft = container.read(pendingSettingsProvider);
+      expect(draft.selectedTtsModelId, 'tts-changed-elsewhere');
+    },
+  );
 
   test('draft equals settings when nothing is pending, for dirty-checking', () {
     final draft = container.read(pendingSettingsProvider);
@@ -82,9 +94,9 @@ void main() {
   });
 
   test('draft differs from settings once something is pending', () {
-    container.read(pendingSettingsProvider.notifier).updateDraft(
-          (s) => s.copyWith(ttsSpeed: 1.5),
-        );
+    container
+        .read(pendingSettingsProvider.notifier)
+        .updateDraft((s) => s.copyWith(ttsSpeed: 1.5));
     final draft = container.read(pendingSettingsProvider);
     final settings = container.read(settingsProvider);
     expect(draft == settings, isFalse);

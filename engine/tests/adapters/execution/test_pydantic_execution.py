@@ -442,9 +442,7 @@ class TestGetHistoryFromMessages:
 
 
 class TestGetTrailingApprovals:
-    def test_returns_empty_when_no_system_action(
-        self, adapter: PydanticAgentAdapter
-    ):
+    def test_returns_empty_when_no_system_action(self, adapter: PydanticAgentAdapter):
         context = ChatContext(messages=[UserMessage(content="hi")])
         assert adapter._get_trailing_approvals(context) == []
 
@@ -452,10 +450,12 @@ class TestGetTrailingApprovals:
         self, adapter: PydanticAgentAdapter
     ):
         approval = _tool_approval()
-        context = ChatContext(messages=[
-            UserMessage(content="hi"),
-            SystemAction(approvals=[approval], final=False),
-        ])
+        context = ChatContext(
+            messages=[
+                UserMessage(content="hi"),
+                SystemAction(approvals=[approval], final=False),
+            ]
+        )
         result = adapter._get_trailing_approvals(context)
         assert result == [approval]
 
@@ -469,10 +469,12 @@ class TestGetTrailingApprovals:
            contain any unprocessed tool calls.'"""
         denied = _tool_approval()
         denied.granted = False
-        context = ChatContext(messages=[
-            UserMessage(content="Any european embassy?"),
-            SystemAction(approvals=[denied], final=True),
-        ])
+        context = ChatContext(
+            messages=[
+                UserMessage(content="Any european embassy?"),
+                SystemAction(approvals=[denied], final=True),
+            ]
+        )
         assert adapter._get_trailing_approvals(context) == []
 
     def test_stops_at_settled_system_action_while_collecting_in_flight(
@@ -483,22 +485,24 @@ class TestGetTrailingApprovals:
         pending = _tool_approval(tool_call_id="call_pending")
         settled = _tool_approval(tool_call_id="call_settled")
         settled.granted = True
-        context = ChatContext(messages=[
-            UserMessage(content="hi"),
-            SystemAction(approvals=[settled], final=True),
-            SystemAction(approvals=[pending], final=False),
-        ])
+        context = ChatContext(
+            messages=[
+                UserMessage(content="hi"),
+                SystemAction(approvals=[settled], final=True),
+                SystemAction(approvals=[pending], final=False),
+            ]
+        )
         result = adapter._get_trailing_approvals(context)
         assert result == [pending]
 
-    def test_stops_at_assistant_message(
-        self, adapter: PydanticAgentAdapter
-    ):
-        context = ChatContext(messages=[
-            UserMessage(content="Hi"),
-            AssistantMessage(content="Hello"),
-            UserMessage(content="Next"),
-        ])
+    def test_stops_at_assistant_message(self, adapter: PydanticAgentAdapter):
+        context = ChatContext(
+            messages=[
+                UserMessage(content="Hi"),
+                AssistantMessage(content="Hello"),
+                UserMessage(content="Next"),
+            ]
+        )
         assert adapter._get_trailing_approvals(context) == []
 
 

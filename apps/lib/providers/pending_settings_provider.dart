@@ -22,5 +22,5 @@ class PendingSettingsNotifier extends Notifier<Settings> {
 
 final pendingSettingsProvider =
     NotifierProvider.autoDispose<PendingSettingsNotifier, Settings>(
-  PendingSettingsNotifier.new,
-);
+      PendingSettingsNotifier.new,
+    );

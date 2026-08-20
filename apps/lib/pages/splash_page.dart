@@ -26,9 +26,11 @@ class _SplashPageState extends ConsumerState<SplashPage> {
     await Future<void>.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
     final hasPendingInvocation = ref.read(invocationProvider) != null;
-    context.go(hasPendingInvocation
-        ? '/invoke?t=${DateTime.now().millisecondsSinceEpoch}'
-        : '/chat');
+    context.go(
+      hasPendingInvocation
+          ? '/invoke?t=${DateTime.now().millisecondsSinceEpoch}'
+          : '/chat',
+    );
   }
 
   @override
@@ -47,16 +49,16 @@ class _SplashPageState extends ConsumerState<SplashPage> {
               height: 120,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(60),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.colorScheme.shadow.withValues(alpha: 0.2),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(60),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.shadow.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(60),
                 child: Image.asset(
                   'assets/icon/app-icon.png',
                   width: 120,

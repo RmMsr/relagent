@@ -30,8 +30,9 @@ Future<void> extractModelArchive(File archiveFile, String destDir) async {
     await outFile.writeAsBytes(file.content as List<int>);
   }
 
-  await File(p.join(destDir, '.complete'))
-      .writeAsString(DateTime.now().toIso8601String());
+  await File(
+    p.join(destDir, '.complete'),
+  ).writeAsString(DateTime.now().toIso8601String());
 }
 
 /// Find the common top-level directory prefix shared by all archive entries,

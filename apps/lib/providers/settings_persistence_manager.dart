@@ -49,7 +49,9 @@ class SettingsPersistenceManager {
       if (success) {
         final verified = _prefs.getString(_settingsKey);
         if (verified != jsonString) {
-          Logger.warning('Save verification failed - data may not be persisted');
+          Logger.warning(
+            'Save verification failed - data may not be persisted',
+          );
           return false;
         }
       } else {

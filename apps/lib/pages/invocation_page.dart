@@ -57,8 +57,9 @@ class _InvocationPageState extends ConsumerState<InvocationPage> {
         .split('\n')
         .map((line) => '> $line')
         .join('\n');
-    final message =
-        instruction.isEmpty ? blockquote : '$instruction\n\n$blockquote';
+    final message = instruction.isEmpty
+        ? blockquote
+        : '$instruction\n\n$blockquote';
 
     final backend = ref.read(settingsProvider).selectedBackend;
     if (backend == ChatBackendType.relagentEngine) {
@@ -84,16 +85,8 @@ class _InvocationPageState extends ConsumerState<InvocationPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ask Relagent'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: _cancel,
-        ),
-        actions: [
-          TextButton(
-            onPressed: _send,
-            child: const Text('Send'),
-          ),
-        ],
+        leading: IconButton(icon: const Icon(Icons.close), onPressed: _cancel),
+        actions: [TextButton(onPressed: _send, child: const Text('Send'))],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -116,8 +109,7 @@ class _InvocationPageState extends ConsumerState<InvocationPage> {
               ),
             ),
           ),
-          if (_receivedText.isNotEmpty)
-            _TextAttachment(text: _receivedText),
+          if (_receivedText.isNotEmpty) _TextAttachment(text: _receivedText),
         ],
       ),
     );

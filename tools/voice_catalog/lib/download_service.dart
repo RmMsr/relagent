@@ -14,8 +14,7 @@ class ModelDownloadService {
 
   ModelDownloadService(this.modelsBaseDir);
 
-  String modelDir(String type, String id) =>
-      p.join(modelsBaseDir, type, id);
+  String modelDir(String type, String id) => p.join(modelsBaseDir, type, id);
 
   bool isDownloaded(String type, String id) {
     final marker = File(p.join(modelDir(type, id), '.complete'));
@@ -76,10 +75,12 @@ class ModelDownloadService {
       }
 
       final total = response.contentLength ?? 0;
-      final tempFile = File(p.join(
-        Directory.systemTemp.path,
-        '$id-${DateTime.now().millisecondsSinceEpoch}.tar.bz2',
-      ));
+      final tempFile = File(
+        p.join(
+          Directory.systemTemp.path,
+          '$id-${DateTime.now().millisecondsSinceEpoch}.tar.bz2',
+        ),
+      );
       final sink = tempFile.openWrite();
       var received = 0;
 

@@ -18,8 +18,9 @@ class _FakeCachePathProvider extends PathProviderPlatform {
 
 void main() {
   setUpAll(() async {
-    final fixture =
-        await File('test/fixtures/voice-models.json').readAsString();
+    final fixture = await File(
+      'test/fixtures/voice-models.json',
+    ).readAsString();
     await ModelCatalog.init(jsonOverride: fixture);
   });
 
@@ -51,8 +52,11 @@ void main() {
       final downloadState = const ModelDownloadState(downloadedModels: {});
 
       final result = await resolveAsrMetadata(settings, downloadState);
-      expect(result, isNull,
-          reason: 'Selected model not in downloadedModels should return null');
+      expect(
+        result,
+        isNull,
+        reason: 'Selected model not in downloadedModels should return null',
+      );
     });
 
     test('returns metadata when model is selected and downloaded', () async {
@@ -69,18 +73,24 @@ void main() {
       expect(result.architecture, ModelArchitecture.transducer);
     });
 
-    test('returns null when TTS model ID is passed for ASR (wrong type)', () async {
-      final settings = Settings.defaults().copyWith(
-        selectedAsrModelId: 'kokoro-en-v0_19-int8',
-      );
-      final downloadState = const ModelDownloadState(
-        downloadedModels: {'kokoro-en-v0_19-int8'},
-      );
+    test(
+      'returns null when TTS model ID is passed for ASR (wrong type)',
+      () async {
+        final settings = Settings.defaults().copyWith(
+          selectedAsrModelId: 'kokoro-en-v0_19-int8',
+        );
+        final downloadState = const ModelDownloadState(
+          downloadedModels: {'kokoro-en-v0_19-int8'},
+        );
 
-      final result = await resolveAsrMetadata(settings, downloadState);
-      expect(result, isNull,
-          reason: 'TTS model ID should not resolve as ASR metadata');
-    });
+        final result = await resolveAsrMetadata(settings, downloadState);
+        expect(
+          result,
+          isNull,
+          reason: 'TTS model ID should not resolve as ASR metadata',
+        );
+      },
+    );
   });
 
   // --- TTS fallback chain ---
@@ -137,20 +147,18 @@ void main() {
       for (final entry_ in entry.fileStructure.entries) {
         final relativePath = entry_.value;
         if (entry_.key == 'dataDir') {
-          await Directory(p.join(modelDir.path, relativePath))
-              .create(recursive: true);
+          await Directory(
+            p.join(modelDir.path, relativePath),
+          ).create(recursive: true);
         } else {
-          await File(p.join(modelDir.path, relativePath))
-              .writeAsString('fake');
+          await File(p.join(modelDir.path, relativePath)).writeAsString('fake');
         }
       }
 
       final settings = Settings.defaults().copyWith(
         selectedTtsModelId: modelId,
       );
-      final downloadState = ModelDownloadState(
-        downloadedModels: {modelId},
-      );
+      final downloadState = ModelDownloadState(downloadedModels: {modelId});
 
       final result = await resolveTtsModel(settings, downloadState);
       expect(result, isNotNull);

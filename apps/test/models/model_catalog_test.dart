@@ -5,7 +5,9 @@ import 'package:relagent/models/model_catalog.dart';
 
 void main() {
   setUpAll(() async {
-    final fixture = await File('test/fixtures/voice-models.json').readAsString();
+    final fixture = await File(
+      'test/fixtures/voice-models.json',
+    ).readAsString();
     await ModelCatalog.init(jsonOverride: fixture);
   });
 
@@ -87,10 +89,13 @@ void main() {
         }
       });
 
-      test('returns only the multi-language wildcard for an unsupported code', () {
-        final models = ModelCatalog.byLanguage('xx');
-        expect(models.map((e) => e.id), ['omnilingual-asr-300m-ctc-int8']);
-      });
+      test(
+        'returns only the multi-language wildcard for an unsupported code',
+        () {
+          final models = ModelCatalog.byLanguage('xx');
+          expect(models.map((e) => e.id), ['omnilingual-asr-300m-ctc-int8']);
+        },
+      );
 
       test('"multi" entry matches any language code', () {
         for (final code in ['en', 'de', 'fr', 'xx']) {
@@ -200,9 +205,9 @@ void main() {
       });
 
       test('Piper models have single speaker', () {
-        final piperModels = ModelCatalog.byType(ModelType.tts).where(
-          (e) => e.architecture == ModelArchitecture.vitsPiper,
-        );
+        final piperModels = ModelCatalog.byType(
+          ModelType.tts,
+        ).where((e) => e.architecture == ModelArchitecture.vitsPiper);
         for (final model in piperModels) {
           expect(
             model.speakerCount,
@@ -308,8 +313,13 @@ void main() {
           'multi-language wildcard entry', () {
         for (final entry in ModelCatalog.entries) {
           if (entry.id == 'omnilingual-asr-300m-ctc-int8') {
-            expect(entry.recommended, isFalse, reason: '${entry.id} is the '
-                'deliberate non-recommended fixture entry');
+            expect(
+              entry.recommended,
+              isFalse,
+              reason:
+                  '${entry.id} is the '
+                  'deliberate non-recommended fixture entry',
+            );
             continue;
           }
           expect(
@@ -330,8 +340,11 @@ void main() {
           for (final entry in entries) {
             if (!entry.recommended) seenNonRecommended = true;
             if (seenNonRecommended) {
-              expect(entry.recommended, isFalse,
-                  reason: 'Recommended entries must come before non-recommended');
+              expect(
+                entry.recommended,
+                isFalse,
+                reason: 'Recommended entries must come before non-recommended',
+              );
             }
           }
         }

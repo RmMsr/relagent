@@ -23,11 +23,12 @@ void main() {
 
     if (Process.runSync('which', ['uv']).exitCode != 0) return;
 
-    server = await Process.start(
-      'uv',
-      ['run', 'python', '-m', 'engine.api.demo'],
-      workingDirectory: repoRoot,
-    );
+    server = await Process.start('uv', [
+      'run',
+      'python',
+      '-m',
+      'engine.api.demo',
+    ], workingDirectory: repoRoot);
 
     final ready = await _waitForStatus(
       'http://127.0.0.1:8000/api/v1/status',
@@ -78,18 +79,14 @@ void main() {
 }
 
 Future<ProcessResult> _runAsk(String prompt, String cliRoot) {
-  return Process.run(
-    'dart',
-    [
-      'run',
-      'bin/relagent_cli.dart',
-      'ask',
-      prompt,
-      '--engine-url',
-      'http://127.0.0.1:8000',
-    ],
-    workingDirectory: cliRoot,
-  );
+  return Process.run('dart', [
+    'run',
+    'bin/relagent_cli.dart',
+    'ask',
+    prompt,
+    '--engine-url',
+    'http://127.0.0.1:8000',
+  ], workingDirectory: cliRoot);
 }
 
 Future<bool> _waitForStatus(String url, {required Duration timeout}) async {

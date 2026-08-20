@@ -20,6 +20,7 @@ class AgenticChatState {
   final bool showAssistantPending;
   final String? sessionTitle;
   final SensitivityLevel sensitivityLevel;
+
   /// At most one user message awaiting dispatch while a cycle is in flight.
   final String? queuedMessage;
 
@@ -316,7 +317,11 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
 
     // Optimistic add (in-flight: isFinal defaults to false)
     _ingestMessages([userMessage]);
-    state = state.copyWith(isLoading: true, error: null, showAssistantPending: true);
+    state = state.copyWith(
+      isLoading: true,
+      error: null,
+      showAssistantPending: true,
+    );
 
     try {
       final password = await settingsNotifier.getEnginePassword();
@@ -357,7 +362,9 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       final preview = response.text.length > 50
           ? '${response.text.substring(0, 50)}...'
           : response.text;
-      Logger.debug('AgenticChat: Received response [id=${response.messageId}]: $preview');
+      Logger.debug(
+        'AgenticChat: Received response [id=${response.messageId}]: $preview',
+      );
 
       // Re-read settings rather than reusing the snapshot captured before
       // the request: auto-playback may have been turned on while the
@@ -372,9 +379,14 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       if (!ref.mounted) return;
 
       final errorText = e is EngineApiException ? e.userMessage : e.toString();
-      final technicalDetails = e is EngineApiException ? e.technicalDetails : null;
+      final technicalDetails = e is EngineApiException
+          ? e.technicalDetails
+          : null;
 
-      final errorMessage = AgenticMessage.error(errorText, technicalDetails: technicalDetails);
+      final errorMessage = AgenticMessage.error(
+        errorText,
+        technicalDetails: technicalDetails,
+      );
 
       // Error settles the cycle so the user is not stuck in awaiting.
       final settled = state.messages
@@ -523,12 +535,16 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     final updatedMessages = state.messages.map((msg) {
       if (msg.role == AgenticRole.system &&
           msg.approvals != null &&
-          msg.approvals!.any((a) => a.resolution == ApprovalResolution.pending)) {
-        final newApprovals = msg.approvals!.map((a) =>
-          a.resolution == ApprovalResolution.pending
-              ? a.copyWith(resolution: ApprovalResolution.stale)
-              : a,
-        ).toList();
+          msg.approvals!.any(
+            (a) => a.resolution == ApprovalResolution.pending,
+          )) {
+        final newApprovals = msg.approvals!
+            .map(
+              (a) => a.resolution == ApprovalResolution.pending
+                  ? a.copyWith(resolution: ApprovalResolution.stale)
+                  : a,
+            )
+            .toList();
         return msg.copyWith(isStale: true, approvals: newApprovals);
       }
       return msg;
@@ -616,8 +632,9 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       Logger.debug('AgenticChat: Failed to grant approval: $e');
       if (!ref.mounted) return;
       final errorText = e is EngineApiException ? e.userMessage : e.toString();
-      final technicalDetails =
-          e is EngineApiException ? e.technicalDetails : null;
+      final technicalDetails = e is EngineApiException
+          ? e.technicalDetails
+          : null;
       _ingestMessages([
         AgenticMessage.error(errorText, technicalDetails: technicalDetails),
       ]);
@@ -628,8 +645,11 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
   /// so /continue never races ahead of the decline API calls.
   Future<void> declineAllAndContinue(List<String> approvalIds) async {
     for (final id in approvalIds) {
-      _updateApprovalResolution(id, ApprovalResolution.declined,
-          skipAutoTrigger: true);
+      _updateApprovalResolution(
+        id,
+        ApprovalResolution.declined,
+        skipAutoTrigger: true,
+      );
     }
 
     final settings = ref.read(settingsProvider);
@@ -652,7 +672,9 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
           ),
       ]);
 
-      Logger.debug('AgenticChat: Declined ${approvalIds.length} approval(s), continuing');
+      Logger.debug(
+        'AgenticChat: Declined ${approvalIds.length} approval(s), continuing',
+      );
     } catch (e) {
       Logger.debug('AgenticChat: Failed to decline approvals: $e');
       rethrow;
@@ -731,10 +753,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
 
-    state = state.copyWith(
-      isLoading: true,
-      showAssistantPending: true,
-    );
+    state = state.copyWith(isLoading: true, showAssistantPending: true);
 
     try {
       final password = await settingsNotifier.getEnginePassword();
@@ -774,8 +793,9 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       if (!ref.mounted) return;
 
       final errorText = e is EngineApiException ? e.userMessage : e.toString();
-      final technicalDetails =
-          e is EngineApiException ? e.technicalDetails : null;
+      final technicalDetails = e is EngineApiException
+          ? e.technicalDetails
+          : null;
 
       final errorMessage = AgenticMessage.error(
         errorText,
@@ -864,7 +884,8 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       }
     }
 
-    final isStuckContinuation = trailingNonError != null &&
+    final isStuckContinuation =
+        trailingNonError != null &&
         trailingNonError.role == AgenticRole.system &&
         !trailingNonError.isFinal &&
         (trailingNonError.approvals?.isNotEmpty ?? false) &&
@@ -943,10 +964,7 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       lastNonError--;
     }
     final cleaned = messages.sublist(0, lastNonError + 1);
-    state = state.copyWith(
-      messages: cleaned,
-      clearQueuedMessage: true,
-    );
+    state = state.copyWith(messages: cleaned, clearQueuedMessage: true);
     Logger.debug('AgenticChat: Cancelled failed messages');
   }
 }

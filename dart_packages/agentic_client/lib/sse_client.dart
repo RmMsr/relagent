@@ -8,6 +8,7 @@ import 'logger.dart';
 
 sealed class SseEvent {
   final int id;
+
   /// When the engine emitted this event. Present on every event envelope
   /// server-side (`BaseEvent.created_at`); used e.g. to bump a
   /// non-displayed session's activity timestamp without a full fetch.
@@ -20,26 +21,27 @@ sealed class SseEvent {
     final createdAt = DateTime.parse(json['created_at'] as String).toUtc();
     return switch (eventType) {
       'session.created' => SessionCreatedEvent(
-        id: parsedId,
-        createdAt: createdAt,
-        sessionId: json['session_id'] as String,
-      ),
+          id: parsedId,
+          createdAt: createdAt,
+          sessionId: json['session_id'] as String,
+        ),
       'session.deleted' => SessionDeletedEvent(
-        id: parsedId,
-        createdAt: createdAt,
-        sessionId: json['session_id'] as String,
-      ),
+          id: parsedId,
+          createdAt: createdAt,
+          sessionId: json['session_id'] as String,
+        ),
       'session.updated' => SessionUpdatedEvent(
-        id: parsedId,
-        createdAt: createdAt,
-        sessionId: json['session_id'] as String,
-      ),
+          id: parsedId,
+          createdAt: createdAt,
+          sessionId: json['session_id'] as String,
+        ),
       'session.messages.appended' => MessagesAppendedEvent(
-        id: parsedId,
-        createdAt: createdAt,
-        sessionId: json['session_id'] as String,
-      ),
-      _ => UnknownEvent(id: parsedId, createdAt: createdAt, eventType: eventType),
+          id: parsedId,
+          createdAt: createdAt,
+          sessionId: json['session_id'] as String,
+        ),
+      _ =>
+        UnknownEvent(id: parsedId, createdAt: createdAt, eventType: eventType),
     };
   }
 }
@@ -133,8 +135,8 @@ class SseClient {
     this.apiKey,
     int lastEventId = 0,
     http.Client? httpClient,
-  }) : _lastEventId = lastEventId,
-       _injectedClient = httpClient;
+  })  : _lastEventId = lastEventId,
+        _injectedClient = httpClient;
 
   Future<void> connect() async {
     if (_isConnected) return;

@@ -66,7 +66,9 @@ void main() {
       expect(result.errorMessage, contains('Unsupported'));
     });
 
-    test('detects API key requirement from 401 with JSON content-type and no WWW-Authenticate', () {
+    test(
+        'detects API key requirement from 401 with JSON content-type and no WWW-Authenticate',
+        () {
       final response = http.Response(
         '{"detail": "API key required"}',
         401,
@@ -78,7 +80,8 @@ void main() {
       expect(result.isSuccess, true);
     });
 
-    test('detects API key from 401 with JSON content-type including charset', () {
+    test('detects API key from 401 with JSON content-type including charset',
+        () {
       final response = http.Response(
         '{"error": "unauthorized"}',
         401,
@@ -106,7 +109,9 @@ void main() {
       expect(result.realm, 'Proxy');
     });
 
-    test('returns none for 401 without JSON content-type and without WWW-Authenticate', () {
+    test(
+        'returns none for 401 without JSON content-type and without WWW-Authenticate',
+        () {
       final response = http.Response('Unauthorized', 401, headers: {});
       final result = detectAuthType(response);
 

@@ -126,9 +126,7 @@ class TtsService {
 
   void cleanup(Set<String> messageIdsToRemove) {
     final keysToRemove = _cacheOrder
-        .where(
-          (key) => messageIdsToRemove.any((id) => key.startsWith('$id#')),
-        )
+        .where((key) => messageIdsToRemove.any((id) => key.startsWith('$id#')))
         .toList();
     for (final key in keysToRemove) {
       _audioCache.remove(key);

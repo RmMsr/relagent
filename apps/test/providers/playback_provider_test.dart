@@ -530,41 +530,38 @@ void main() {
       },
     );
 
-    test(
-      'forceStop halts active playback even when voiceMode was already '
-      'silent - the resting default outside continuous voice, so an '
-      'edge-triggered voiceMode change alone never fires',
-      () async {
-        final playback = fixture.container.read(playbackProvider.notifier);
-        final coordinator = fixture.container.read(
-          audioCoordinatorProvider.notifier,
-        );
+    test('forceStop halts active playback even when voiceMode was already '
+        'silent - the resting default outside continuous voice, so an '
+        'edge-triggered voiceMode change alone never fires', () async {
+      final playback = fixture.container.read(playbackProvider.notifier);
+      final coordinator = fixture.container.read(
+        audioCoordinatorProvider.notifier,
+      );
 
-        final item = PlaybackItem(
-          id: 'now-playing',
-          content: Future.value(Uint8List.fromList([1])),
-        );
-        await playback.enqueue(item);
-        await Future<void>.delayed(const Duration(milliseconds: 20));
+      final item = PlaybackItem(
+        id: 'now-playing',
+        content: Future.value(Uint8List.fromList([1])),
+      );
+      await playback.enqueue(item);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
 
-        expect(
-          fixture.container.read(playbackProvider).status,
-          PlaybackStatus.playing,
-        );
+      expect(
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.playing,
+      );
 
-        coordinator.forceStop();
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+      coordinator.forceStop();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
 
-        expect(item.onFinished.isCompleted, true);
-        expect(
-          fixture.container.read(playbackProvider).status,
-          PlaybackStatus.idle,
-        );
-        expect(
-          fixture.container.read(audioCoordinatorProvider).mode,
-          AudioMode.idle,
-        );
-      },
-    );
+      expect(item.onFinished.isCompleted, true);
+      expect(
+        fixture.container.read(playbackProvider).status,
+        PlaybackStatus.idle,
+      );
+      expect(
+        fixture.container.read(audioCoordinatorProvider).mode,
+        AudioMode.idle,
+      );
+    });
   });
 }

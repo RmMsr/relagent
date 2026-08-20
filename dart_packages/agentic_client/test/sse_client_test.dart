@@ -9,7 +9,7 @@ import 'package:test/test.dart';
 /// Creates a [MockClient] that captures the request and streams SSE data
 /// from the returned [StreamController].
 ({MockClient client, StreamController<List<int>> controller})
-_createStreamingMock({void Function(http.BaseRequest request)? onRequest}) {
+    _createStreamingMock({void Function(http.BaseRequest request)? onRequest}) {
   final controller = StreamController<List<int>>();
   final client = MockClient.streaming((request, bodyStream) async {
     onRequest?.call(request);

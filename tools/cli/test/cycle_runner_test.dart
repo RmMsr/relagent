@@ -124,78 +124,88 @@ void main() {
     },
   );
 
-  test('an existing session id continues rather than creating a new session', () async {
-    final mockClient = MockClient((request) async {
-      final body = jsonDecode(request.body) as Map<String, dynamic>;
-      expect(body['session_id'], 'existing-session');
-      return http.Response(
-        jsonEncode({
-          'session_id': 'existing-session',
-          'message': _messageJson(id: 'm1', role: 'assistant', content: 'ok'),
-        }),
-        200,
+  test(
+    'an existing session id continues rather than creating a new session',
+    () async {
+      final mockClient = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['session_id'], 'existing-session');
+        return http.Response(
+          jsonEncode({
+            'session_id': 'existing-session',
+            'message': _messageJson(id: 'm1', role: 'assistant', content: 'ok'),
+          }),
+          200,
+        );
+      });
+
+      await runCycle(
+        connection: connection,
+        sessionId: 'existing-session',
+        content: 'continuing our chat',
+        decideApproval: (_) async => const ApprovalDecision.decline(),
+        client: mockClient,
       );
-    });
+    },
+  );
 
-    await runCycle(
-      connection: connection,
-      sessionId: 'existing-session',
-      content: 'continuing our chat',
-      decideApproval: (_) async => const ApprovalDecision.decline(),
-      client: mockClient,
-    );
-  });
+  test(
+    'onIntermediateMessage fires for non-final messages, not the final one',
+    () async {
+      final seen = <String>[];
+      var callCount = 0;
 
-  test('onIntermediateMessage fires for non-final messages, not the final one', () async {
-    final seen = <String>[];
-    var callCount = 0;
-
-    final mockClient = MockClient((request) async {
-      callCount++;
-      if (request.url.path == '/api/v1/messages') {
+      final mockClient = MockClient((request) async {
+        callCount++;
+        if (request.url.path == '/api/v1/messages') {
+          return http.Response(
+            jsonEncode({
+              'session_id': 's-1',
+              'message': _messageJson(
+                id: 'm1',
+                role: 'system',
+                isFinal: false,
+                approvals: [
+                  {
+                    'id': 'a1',
+                    'type': 'data/out',
+                    'purpose': 'search the web',
+                    'granted': null,
+                  },
+                ],
+              ),
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/api/v1/sessions/s-1/approvals/a1/decline') {
+          return http.Response('', 200);
+        }
         return http.Response(
           jsonEncode({
             'session_id': 's-1',
             'message': _messageJson(
-              id: 'm1',
-              role: 'system',
-              isFinal: false,
-              approvals: [
-                {
-                  'id': 'a1',
-                  'type': 'data/out',
-                  'purpose': 'search the web',
-                  'granted': null,
-                },
-              ],
+              id: 'm2',
+              role: 'assistant',
+              content: 'done',
             ),
           }),
           200,
         );
-      }
-      if (request.url.path == '/api/v1/sessions/s-1/approvals/a1/decline') {
-        return http.Response('', 200);
-      }
-      return http.Response(
-        jsonEncode({
-          'session_id': 's-1',
-          'message': _messageJson(id: 'm2', role: 'assistant', content: 'done'),
-        }),
-        200,
+      });
+
+      final result = await runCycle(
+        connection: connection,
+        sessionId: null,
+        content: 'search cats',
+        decideApproval: (_) async => const ApprovalDecision.decline(),
+        onIntermediateMessage: (m) => seen.add(m.messageId),
+        client: mockClient,
       );
-    });
 
-    final result = await runCycle(
-      connection: connection,
-      sessionId: null,
-      content: 'search cats',
-      decideApproval: (_) async => const ApprovalDecision.decline(),
-      onIntermediateMessage: (m) => seen.add(m.messageId),
-      client: mockClient,
-    );
-
-    expect(seen, ['m1']);
-    expect(result.messageId, 'm2');
-    expect(callCount, 3);
-  });
+      expect(seen, ['m1']);
+      expect(result.messageId, 'm2');
+      expect(callCount, 3);
+    },
+  );
 }

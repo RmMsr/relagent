@@ -125,16 +125,16 @@ void main() {
   late Directory tempDir;
 
   setUpAll(() async {
-    final fixture =
-        await File('test/fixtures/voice-models.json').readAsString();
+    final fixture = await File(
+      'test/fixtures/voice-models.json',
+    ).readAsString();
     await ModelCatalog.init(jsonOverride: fixture);
   });
 
   late _FakeWakelockPlatform fakeWakelock;
 
   setUp(() async {
-    tempDir =
-        await Directory.systemTemp.createTemp('model_dl_provider_test_');
+    tempDir = await Directory.systemTemp.createTemp('model_dl_provider_test_');
     PathProviderPlatform.instance = _FakeCachePathProvider(tempDir.path);
     fakeWakelock = _FakeWakelockPlatform();
     wakelockPlusPlatformInstance = fakeWakelock;

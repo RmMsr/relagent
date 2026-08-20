@@ -6,5 +6,6 @@ import 'package:sherpa_voice/model_architecture.dart';
 /// Anything else in the catalog is either 'unknown' (no information at all)
 /// or a catalog-only descriptive label — a model we know the identity of but
 /// can't run yet.
-final Set<String> supportedArchitectures =
-    ModelArchitecture.values.map((a) => a.name).toSet();
+final Set<String> supportedArchitectures = ModelArchitecture.values
+    .map((a) => a.name)
+    .toSet();

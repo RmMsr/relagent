@@ -55,7 +55,8 @@ class MicDevice {
 
   factory MicDevice.fromMap(Map<dynamic, dynamic> map) => MicDevice(
     id: (map['id'] as num?)?.toInt() ?? 0,
-    category: MicDeviceCategory.values.asNameMap()[map['category']] ??
+    category:
+        MicDeviceCategory.values.asNameMap()[map['category']] ??
         MicDeviceCategory.other,
     name: map['name'] as String? ?? '',
     address: map['address'] as String? ?? '',
@@ -92,12 +93,15 @@ class MicPreference {
       ? const {'mode': 'auto'}
       : {'mode': 'pinned', 'category': category!.name, 'address': address};
 
-  Map<String, Object?> toJson() =>
-      {'category': category?.name, 'address': address, 'name': name};
+  Map<String, Object?> toJson() => {
+    'category': category?.name,
+    'address': address,
+    'name': name,
+  };
 
   factory MicPreference.fromJson(Map<String, dynamic> json) {
-    final category =
-        MicDeviceCategory.values.asNameMap()[json['category'] as String?];
+    final category = MicDeviceCategory.values
+        .asNameMap()[json['category'] as String?];
     if (category == null) return const MicPreference.auto();
     return MicPreference.pinned(
       category: category,

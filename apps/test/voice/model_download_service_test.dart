@@ -32,8 +32,9 @@ class _UnavailablePathProvider extends PathProviderPlatform {
 
 void main() {
   setUpAll(() async {
-    final fixture =
-        await File('test/fixtures/voice-models.json').readAsString();
+    final fixture = await File(
+      'test/fixtures/voice-models.json',
+    ).readAsString();
     await ModelCatalog.init(jsonOverride: fixture);
   });
 
@@ -78,34 +79,43 @@ void main() {
       expect(models, contains('zipformer-en-kroko'));
     });
 
-    test('listDownloadedModels ignores directory without .complete marker',
-        () async {
-      // Simulate an interrupted download (directory exists, no marker)
-      final modelDir = Directory(
-        p.join(tempDir.path, 'models', 'asr', 'zipformer-en-kroko'),
-      );
-      await modelDir.create(recursive: true);
-      await File(p.join(modelDir.path, 'encoder.onnx')).writeAsString('fake');
+    test(
+      'listDownloadedModels ignores directory without .complete marker',
+      () async {
+        // Simulate an interrupted download (directory exists, no marker)
+        final modelDir = Directory(
+          p.join(tempDir.path, 'models', 'asr', 'zipformer-en-kroko'),
+        );
+        await modelDir.create(recursive: true);
+        await File(p.join(modelDir.path, 'encoder.onnx')).writeAsString('fake');
 
-      final models = await service.listDownloadedModels();
-      expect(models, isEmpty);
-    });
+        final models = await service.listDownloadedModels();
+        expect(models, isEmpty);
+      },
+    );
 
-    test('isModelDownloaded returns true when .complete marker exists',
-        () async {
-      await _seedFakeModel(tempDir, 'asr', 'zipformer-en-kroko');
-      final result = await service.isModelDownloaded('zipformer-en-kroko');
-      expect(result, isTrue);
-    });
+    test(
+      'isModelDownloaded returns true when .complete marker exists',
+      () async {
+        await _seedFakeModel(tempDir, 'asr', 'zipformer-en-kroko');
+        final result = await service.isModelDownloaded('zipformer-en-kroko');
+        expect(result, isTrue);
+      },
+    );
 
-    test('listDownloadedModels finds models in both asr and tts subdirs',
-        () async {
-      await _seedFakeModel(tempDir, 'asr', 'zipformer-en-kroko');
-      await _seedFakeModel(tempDir, 'tts', 'piper-en-lessac-medium-int8');
+    test(
+      'listDownloadedModels finds models in both asr and tts subdirs',
+      () async {
+        await _seedFakeModel(tempDir, 'asr', 'zipformer-en-kroko');
+        await _seedFakeModel(tempDir, 'tts', 'piper-en-lessac-medium-int8');
 
-      final models = await service.listDownloadedModels();
-      expect(models, containsAll(['zipformer-en-kroko', 'piper-en-lessac-medium-int8']));
-    });
+        final models = await service.listDownloadedModels();
+        expect(
+          models,
+          containsAll(['zipformer-en-kroko', 'piper-en-lessac-medium-int8']),
+        );
+      },
+    );
 
     // --- deletion ---
 
@@ -124,10 +134,7 @@ void main() {
 
     test('deleteModel does nothing for non-existent model', () async {
       // Should not throw
-      await expectLater(
-        service.deleteModel('non-existent-model'),
-        completes,
-      );
+      await expectLater(service.deleteModel('non-existent-model'), completes);
     });
 
     test('listDownloadedModels returns empty after deletion', () async {
@@ -150,8 +157,9 @@ void main() {
         p.join(tempDir.path, 'models', 'asr', 'test-model'),
       );
       await modelDir.create(recursive: true);
-      await File(p.join(modelDir.path, 'model.onnx'))
-          .writeAsBytes(List.filled(2048, 0));
+      await File(
+        p.join(modelDir.path, 'model.onnx'),
+      ).writeAsBytes(List.filled(2048, 0));
       await File(p.join(modelDir.path, '.complete')).writeAsString('done');
 
       final bytes = await service.totalStorageUsed();
@@ -168,8 +176,7 @@ void main() {
 
     // --- interrupted downloads ---
 
-    test(
-        'downloadModel throws when the connection drops mid-transfer '
+    test('downloadModel throws when the connection drops mid-transfer '
         '(not silently treated as cancellation)', () async {
       // Simulates a real-world interrupted download: the server accepts the
       // request, starts sending the body, then the connection dies before
@@ -205,7 +212,8 @@ void main() {
         type: ModelType.asr,
         languages: const ['en'],
         architecture: ModelArchitecture.transducer,
-        downloadUrl: 'http://${server.address.host}:${server.port}/model.tar.bz2',
+        downloadUrl:
+            'http://${server.address.host}:${server.port}/model.tar.bz2',
         downloadSizeMb: 1,
         fileStructure: const {},
         origin: 'test',
@@ -227,8 +235,9 @@ void main() {
       // The partial bytes must survive the failure — deleting them would
       // force every retry to redownload the whole (possibly huge) archive
       // from scratch instead of resuming.
-      final partialFile =
-          File(p.join(tempDir.path, 'interrupted-model.tar.bz2'));
+      final partialFile = File(
+        p.join(tempDir.path, 'interrupted-model.tar.bz2'),
+      );
       expect(partialFile.existsSync(), isTrue);
       expect(partialFile.lengthSync(), 1000);
     });
@@ -258,7 +267,8 @@ void main() {
         type: ModelType.asr,
         languages: const ['en'],
         architecture: ModelArchitecture.transducer,
-        downloadUrl: 'http://${server.address.host}:${server.port}/model.tar.bz2',
+        downloadUrl:
+            'http://${server.address.host}:${server.port}/model.tar.bz2',
         downloadSizeMb: 1,
         fileStructure: const {},
         origin: 'test',
@@ -279,73 +289,80 @@ void main() {
 
     // --- resuming downloads ---
 
-    test('downloadModel resumes from a partial file with a Range request',
-        () async {
-      final archiveBytes = _buildArchiveBytes({
-        'resume-model/tokens.txt': [1, 2, 3],
-        'resume-model/encoder.onnx': List.generate(4000, (i) => i % 256),
-      });
-      final splitPoint = (archiveBytes.length * 0.4).round();
-      final alreadyDownloaded = archiveBytes.sublist(0, splitPoint);
-      final remaining = archiveBytes.sublist(splitPoint);
-
-      // Seed a prior, interrupted attempt in the temp dir under the exact
-      // name _download() uses: '<modelId>.tar.bz2'.
-      final partialFile = File(p.join(tempDir.path, 'resume-model.tar.bz2'));
-      await partialFile.writeAsBytes(alreadyDownloaded);
-
-      String? rangeHeaderSeen;
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() => server.close(force: true));
-      server.listen((request) async {
-        rangeHeaderSeen = request.headers.value('range');
-        request.response
-          ..statusCode = 206
-          ..headers.set('Content-Range',
-              'bytes $splitPoint-${archiveBytes.length - 1}/${archiveBytes.length}')
-          ..headers.contentLength = remaining.length
-          ..add(remaining);
-        await request.response.close();
-      });
-
-      final entry = CatalogEntry(
-        id: 'resume-model',
-        displayName: 'Resume Model',
-        type: ModelType.asr,
-        languages: const ['en'],
-        architecture: ModelArchitecture.transducer,
-        downloadUrl: 'http://${server.address.host}:${server.port}/model.tar.bz2',
-        downloadSizeMb: 1,
-        fileStructure: const {},
-        origin: 'test',
-        sourceUrl: 'http://example.invalid',
-        releaseDate: '2025-01',
-      );
-
-      final progressEvents = <DownloadProgress>[];
-      await service.downloadModel(entry, onProgress: progressEvents.add);
-
-      expect(rangeHeaderSeen, 'bytes=$splitPoint-');
-
-      final modelDir = Directory(
-        p.join(tempDir.path, 'models', 'asr', 'resume-model'),
-      );
-      expect(File(p.join(modelDir.path, '.complete')).existsSync(), isTrue);
-
-      // Progress must account for the bytes we already had, not restart
-      // from zero — otherwise the UI misleadingly resets to 0% on resume.
-      expect(progressEvents, isNotEmpty);
-      expect(progressEvents.first.bytesReceived, greaterThanOrEqualTo(splitPoint));
-      expect(progressEvents.last.bytesReceived, archiveBytes.length);
-
-      expect(
-        await File(p.join(modelDir.path, 'encoder.onnx')).readAsBytes(),
-        List.generate(4000, (i) => i % 256),
-      );
-    });
-
     test(
-        'downloadModel restarts from scratch when the server ignores the '
+      'downloadModel resumes from a partial file with a Range request',
+      () async {
+        final archiveBytes = _buildArchiveBytes({
+          'resume-model/tokens.txt': [1, 2, 3],
+          'resume-model/encoder.onnx': List.generate(4000, (i) => i % 256),
+        });
+        final splitPoint = (archiveBytes.length * 0.4).round();
+        final alreadyDownloaded = archiveBytes.sublist(0, splitPoint);
+        final remaining = archiveBytes.sublist(splitPoint);
+
+        // Seed a prior, interrupted attempt in the temp dir under the exact
+        // name _download() uses: '<modelId>.tar.bz2'.
+        final partialFile = File(p.join(tempDir.path, 'resume-model.tar.bz2'));
+        await partialFile.writeAsBytes(alreadyDownloaded);
+
+        String? rangeHeaderSeen;
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          rangeHeaderSeen = request.headers.value('range');
+          request.response
+            ..statusCode = 206
+            ..headers.set(
+              'Content-Range',
+              'bytes $splitPoint-${archiveBytes.length - 1}/${archiveBytes.length}',
+            )
+            ..headers.contentLength = remaining.length
+            ..add(remaining);
+          await request.response.close();
+        });
+
+        final entry = CatalogEntry(
+          id: 'resume-model',
+          displayName: 'Resume Model',
+          type: ModelType.asr,
+          languages: const ['en'],
+          architecture: ModelArchitecture.transducer,
+          downloadUrl:
+              'http://${server.address.host}:${server.port}/model.tar.bz2',
+          downloadSizeMb: 1,
+          fileStructure: const {},
+          origin: 'test',
+          sourceUrl: 'http://example.invalid',
+          releaseDate: '2025-01',
+        );
+
+        final progressEvents = <DownloadProgress>[];
+        await service.downloadModel(entry, onProgress: progressEvents.add);
+
+        expect(rangeHeaderSeen, 'bytes=$splitPoint-');
+
+        final modelDir = Directory(
+          p.join(tempDir.path, 'models', 'asr', 'resume-model'),
+        );
+        expect(File(p.join(modelDir.path, '.complete')).existsSync(), isTrue);
+
+        // Progress must account for the bytes we already had, not restart
+        // from zero — otherwise the UI misleadingly resets to 0% on resume.
+        expect(progressEvents, isNotEmpty);
+        expect(
+          progressEvents.first.bytesReceived,
+          greaterThanOrEqualTo(splitPoint),
+        );
+        expect(progressEvents.last.bytesReceived, archiveBytes.length);
+
+        expect(
+          await File(p.join(modelDir.path, 'encoder.onnx')).readAsBytes(),
+          List.generate(4000, (i) => i % 256),
+        );
+      },
+    );
+
+    test('downloadModel restarts from scratch when the server ignores the '
         'Range request', () async {
       final archiveBytes = _buildArchiveBytes({
         'restart-model/tokens.txt': [9, 9, 9],
@@ -374,7 +391,8 @@ void main() {
         type: ModelType.asr,
         languages: const ['en'],
         architecture: ModelArchitecture.transducer,
-        downloadUrl: 'http://${server.address.host}:${server.port}/model.tar.bz2',
+        downloadUrl:
+            'http://${server.address.host}:${server.port}/model.tar.bz2',
         downloadSizeMb: 1,
         fileStructure: const {},
         origin: 'test',
@@ -388,10 +406,11 @@ void main() {
         p.join(tempDir.path, 'models', 'asr', 'restart-model'),
       );
       expect(File(p.join(modelDir.path, '.complete')).existsSync(), isTrue);
-      expect(
-        await File(p.join(modelDir.path, 'tokens.txt')).readAsBytes(),
-        [9, 9, 9],
-      );
+      expect(await File(p.join(modelDir.path, 'tokens.txt')).readAsBytes(), [
+        9,
+        9,
+        9,
+      ]);
     });
   });
 }
@@ -413,10 +432,9 @@ Future<void> _seedFakeModel(
   String typeDir,
   String modelId,
 ) async {
-  final modelDir = Directory(
-    p.join(tempDir.path, 'models', typeDir, modelId),
-  );
+  final modelDir = Directory(p.join(tempDir.path, 'models', typeDir, modelId));
   await modelDir.create(recursive: true);
-  await File(p.join(modelDir.path, '.complete'))
-      .writeAsString(DateTime.now().toIso8601String());
+  await File(
+    p.join(modelDir.path, '.complete'),
+  ).writeAsString(DateTime.now().toIso8601String());
 }

@@ -128,5 +128,5 @@ class SelfTestServiceException implements Exception {
 class SelfTestAuthException extends SelfTestServiceException {
   final int statusCode;
   const SelfTestAuthException(this.statusCode)
-    : super('Authentication failed (HTTP $statusCode)');
+      : super('Authentication failed (HTTP $statusCode)');
 }

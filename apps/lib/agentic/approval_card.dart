@@ -76,8 +76,10 @@ class _ApprovalCardState extends State<ApprovalCard> {
     final isStale = approval.resolution == ApprovalResolution.stale;
     final hasMismatch =
         approval.sensitivity.value > widget.sessionSensitivity.value;
-    final borderSide =
-        BorderSide(color: theme.colorScheme.outlineVariant, width: 1);
+    final borderSide = BorderSide(
+      color: theme.colorScheme.outlineVariant,
+      width: 1,
+    );
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -87,8 +89,8 @@ class _ApprovalCardState extends State<ApprovalCard> {
             color: isStale
                 ? theme.colorScheme.outlineVariant
                 : isResolved
-                    ? context.approvalBorder.withAlpha(128)
-                    : context.approvalBorder,
+                ? context.approvalBorder.withAlpha(128)
+                : context.approvalBorder,
             width: 4,
           ),
         ),
@@ -105,8 +107,8 @@ class _ApprovalCardState extends State<ApprovalCard> {
         color: isStale
             ? theme.colorScheme.surfaceContainerHighest.withAlpha(128)
             : isResolved
-                ? theme.colorScheme.surfaceContainerHighest
-                : context.approvalBg,
+            ? theme.colorScheme.surfaceContainerHighest
+            : context.approvalBg,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.only(
             topRight: Radius.circular(10),
@@ -152,7 +154,8 @@ class _ApprovalCardState extends State<ApprovalCard> {
                 ),
 
               // Sensitivity mismatch banner
-              if (!isResolved && hasMismatch) _buildMismatchBanner(theme, borderSide),
+              if (!isResolved && hasMismatch)
+                _buildMismatchBanner(theme, borderSide),
 
               // Section 6 — Action buttons
               if (!isResolved) _buildActionButtons(theme, borderSide),
@@ -211,7 +214,8 @@ class _ApprovalCardState extends State<ApprovalCard> {
                     Expanded(
                       child: GestureDetector(
                         onTap: () => setState(
-                            () => _isPurposeExpanded = !_isPurposeExpanded),
+                          () => _isPurposeExpanded = !_isPurposeExpanded,
+                        ),
                         child: Text.rich(
                           TextSpan(
                             children: [
@@ -270,7 +274,6 @@ class _ApprovalCardState extends State<ApprovalCard> {
     return header;
   }
 
-
   Widget _buildSensitivityRow(ThemeData theme, BorderSide borderSide) {
     final approval = widget.approval;
     return Container(
@@ -281,8 +284,9 @@ class _ApprovalCardState extends State<ApprovalCard> {
           children: [
             TextSpan(
               text: 'Current Sensitivity: ',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             TextSpan(
               text: approval.sensitivity.label,
@@ -297,7 +301,11 @@ class _ApprovalCardState extends State<ApprovalCard> {
     );
   }
 
-  Widget _buildParamsTable(ThemeData theme, BorderSide borderSide, {bool readOnly = false}) {
+  Widget _buildParamsTable(
+    ThemeData theme,
+    BorderSide borderSide, {
+    bool readOnly = false,
+  }) {
     final params = widget.approval.allowedParameters;
     final keys = params.keys.toList();
     final headerStyle = theme.textTheme.labelSmall?.copyWith(
@@ -346,82 +354,81 @@ class _ApprovalCardState extends State<ApprovalCard> {
               decoration: key != keys.last
                   ? BoxDecoration(border: Border(bottom: borderSide))
                   : null,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: IntrinsicHeight(
                 child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(key, style: cellStyle),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 5,
-                    child: GestureDetector(
-                      onTap: () => setState(() {
-                        if (_expandedParams.contains(key)) {
-                          _expandedParams.remove(key);
-                        } else {
-                          _expandedParams.add(key);
-                        }
-                      }),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 2,
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: Text(
-                          value.toString(),
-                          maxLines: _expandedParams.contains(key) ? null : 2,
-                          overflow: _expandedParams.contains(key)
-                              ? TextOverflow.visible
-                              : TextOverflow.ellipsis,
-                          style: cellStyle?.copyWith(
-                            color: theme.colorScheme.onSurface.withAlpha(
-                              isWildcard ? 160 : 230,
+                        child: Text(key, style: cellStyle),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 5,
+                      child: GestureDetector(
+                        onTap: () => setState(() {
+                          if (_expandedParams.contains(key)) {
+                            _expandedParams.remove(key);
+                          } else {
+                            _expandedParams.add(key);
+                          }
+                        }),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            value.toString(),
+                            maxLines: _expandedParams.contains(key) ? null : 2,
+                            overflow: _expandedParams.contains(key)
+                                ? TextOverflow.visible
+                                : TextOverflow.ellipsis,
+                            style: cellStyle?.copyWith(
+                              color: theme.colorScheme.onSurface.withAlpha(
+                                isWildcard ? 160 : 230,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  SizedBox(
-                    width: 72,
-                    child: readOnly
-                        ? Center(
-                            child: Icon(
-                              isWildcard
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_unchecked,
-                              size: 18,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          )
-                        : InkWell(
-                            onTap: () => setState(() {
-                              if (isWildcard) {
-                                _wildcardParams.remove(key);
-                              } else {
-                                // Only one wildcard at a time
-                                _wildcardParams = {key};
-                              }
-                            }),
-                            child: Center(
+                    SizedBox(
+                      width: 72,
+                      child: readOnly
+                          ? Center(
                               child: Icon(
                                 isWildcard
                                     ? Icons.radio_button_checked
                                     : Icons.radio_button_unchecked,
                                 size: 18,
-                                color: isWildcard
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.onSurfaceVariant,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            )
+                          : InkWell(
+                              onTap: () => setState(() {
+                                if (isWildcard) {
+                                  _wildcardParams.remove(key);
+                                } else {
+                                  // Only one wildcard at a time
+                                  _wildcardParams = {key};
+                                }
+                              }),
+                              child: Center(
+                                child: Icon(
+                                  isWildcard
+                                      ? Icons.radio_button_checked
+                                      : Icons.radio_button_unchecked,
+                                  size: 18,
+                                  color: isWildcard
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             ),
-                          ),
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
               ),
             );
           }),
@@ -502,7 +509,9 @@ class _ApprovalCardState extends State<ApprovalCard> {
               visualDensity: VisualDensity.compact,
               checkmarkColor: scheme.onPrimaryContainer,
               labelStyle: theme.textTheme.labelSmall?.copyWith(
-                color: isSelected ? scheme.onPrimaryContainer : scheme.onSurface,
+                color: isSelected
+                    ? scheme.onPrimaryContainer
+                    : scheme.onSurface,
               ),
               labelPadding: const EdgeInsets.symmetric(horizontal: 4),
               backgroundColor: Colors.transparent,
@@ -547,8 +556,7 @@ class _ApprovalCardState extends State<ApprovalCard> {
               ),
             ),
             TextButton(
-              onPressed: () =>
-                  widget.onChangeSensitivity?.call(targetLevel),
+              onPressed: () => widget.onChangeSensitivity?.call(targetLevel),
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 visualDensity: VisualDensity.compact,
@@ -627,6 +635,7 @@ class ApprovalGroup extends StatelessWidget {
   final AgenticMessage message;
   final SensitivityLevel sessionSensitivity;
   final bool isActionable;
+
   /// True while a /continue is in flight; suppresses the recovery Continue button.
   final bool isAgentRunInFlight;
   final ValueChanged<SensitivityLevel>? onChangeSensitivity;
@@ -660,15 +669,18 @@ class ApprovalGroup extends StatelessWidget {
       (a) => a.resolution == ApprovalResolution.pending,
     );
     // Stuck cycle (in-flight, all decided, no run): offer Continue.
-    final allDecided = approvals.isNotEmpty &&
+    final allDecided =
+        approvals.isNotEmpty &&
         approvals.every((a) => a.resolution != ApprovalResolution.pending);
-    final showContinueButton = isActionable &&
+    final showContinueButton =
+        isActionable &&
         !isStale &&
         !message.isFinal &&
         onContinue != null &&
         allDecided &&
         !isAgentRunInFlight;
-    final showStopBar = isActionable &&
+    final showStopBar =
+        isActionable &&
         !isStale &&
         !message.isFinal &&
         onStop != null &&
@@ -723,8 +735,10 @@ class ApprovalGroup extends StatelessWidget {
                       key: const Key('approval-group-cancel-button'),
                       onPressed: () {
                         final toDecline = approvals
-                            .where((a) =>
-                                a.resolution != ApprovalResolution.declined)
+                            .where(
+                              (a) =>
+                                  a.resolution != ApprovalResolution.declined,
+                            )
                             .map((a) => a.id)
                             .toList();
                         onDeclineAll!(toDecline);
@@ -743,9 +757,12 @@ class ApprovalGroup extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         side: BorderSide(
-                            color: theme.colorScheme.outlineVariant),
+                          color: theme.colorScheme.outlineVariant,
+                        ),
                       ),
                     ),
                   ],
@@ -774,7 +791,9 @@ class ApprovalGroup extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     side: BorderSide(color: theme.colorScheme.outlineVariant),
                   ),
                 ),

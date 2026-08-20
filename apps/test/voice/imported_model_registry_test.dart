@@ -97,16 +97,18 @@ void main() {
   });
 
   // init() runs before runApp(); throwing here leaves the app on a blank screen.
-  test('init without path_provider yields empty list instead of throwing',
-      () async {
-    await ImportedModelRegistry.init();
-    await ImportedModelRegistry.add(makeEntry());
+  test(
+    'init without path_provider yields empty list instead of throwing',
+    () async {
+      await ImportedModelRegistry.init();
+      await ImportedModelRegistry.add(makeEntry());
 
-    PathProviderPlatform.instance = _UnavailablePathProvider();
+      PathProviderPlatform.instance = _UnavailablePathProvider();
 
-    await expectLater(ImportedModelRegistry.init(), completes);
-    expect(ImportedModelRegistry.entries, isEmpty);
-  });
+      await expectLater(ImportedModelRegistry.init(), completes);
+      expect(ImportedModelRegistry.entries, isEmpty);
+    },
+  );
 
   test('add persists entry and it appears in entries', () async {
     await ImportedModelRegistry.init();
@@ -149,20 +151,23 @@ void main() {
 
   test('byType returns only matching type, newest first', () async {
     await ImportedModelRegistry.init();
-    await ImportedModelRegistry.add(makeEntry(
-      id: 'imported-a1',
-      type: ModelType.asr,
-      importedAt: DateTime(2026, 1, 1),
-    ));
-    await ImportedModelRegistry.add(makeEntry(
-      id: 'imported-a2',
-      type: ModelType.asr,
-      importedAt: DateTime(2026, 1, 2),
-    ));
-    await ImportedModelRegistry.add(makeEntry(
-      id: 'imported-t1',
-      type: ModelType.tts,
-    ));
+    await ImportedModelRegistry.add(
+      makeEntry(
+        id: 'imported-a1',
+        type: ModelType.asr,
+        importedAt: DateTime(2026, 1, 1),
+      ),
+    );
+    await ImportedModelRegistry.add(
+      makeEntry(
+        id: 'imported-a2',
+        type: ModelType.asr,
+        importedAt: DateTime(2026, 1, 2),
+      ),
+    );
+    await ImportedModelRegistry.add(
+      makeEntry(id: 'imported-t1', type: ModelType.tts),
+    );
 
     final asr = ImportedModelRegistry.byType(ModelType.asr);
     expect(asr, hasLength(2));

@@ -51,8 +51,15 @@ Uint8List _wav({
 void main() {
   group('appendSilenceToWav', () {
     test('extends the file and data-size header fields', () {
-      final original = _wav(sampleRate: 16000, numChannels: 1, bitsPerSample: 16);
-      final result = appendSilenceToWav(original, const Duration(milliseconds: 100));
+      final original = _wav(
+        sampleRate: 16000,
+        numChannels: 1,
+        bitsPerSample: 16,
+      );
+      final result = appendSilenceToWav(
+        original,
+        const Duration(milliseconds: 100),
+      );
 
       // 16000 Hz * 0.1s * 1 channel * 2 bytes/sample = 3200 bytes of silence.
       expect(result.length, original.length + 3200);
@@ -64,7 +71,10 @@ void main() {
 
     test('appended bytes are silent (zero)', () {
       final original = _wav(dataBytes: 4);
-      final result = appendSilenceToWav(original, const Duration(milliseconds: 50));
+      final result = appendSilenceToWav(
+        original,
+        const Duration(milliseconds: 50),
+      );
 
       final appended = result.sublist(original.length);
       expect(appended.every((b) => b == 0), isTrue);
@@ -80,7 +90,10 @@ void main() {
 
     test('input shorter than a WAV header is returned unchanged', () {
       final tooShort = Uint8List(10);
-      final result = appendSilenceToWav(tooShort, const Duration(milliseconds: 100));
+      final result = appendSilenceToWav(
+        tooShort,
+        const Duration(milliseconds: 100),
+      );
       expect(result, same(tooShort));
     });
   });

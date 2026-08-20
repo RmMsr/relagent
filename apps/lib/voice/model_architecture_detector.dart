@@ -50,12 +50,15 @@ ModelArchitecture? detectArchitecture(List<String> entryNames) {
   // archive with a stray "*decoder*.onnx" can't accidentally match. This
   // still correctly matches the bare "encoder.onnx"/"decoder.onnx"/
   // "tokens.txt" case too (empty shared prefix).
-  final onnxEncoderFiles =
-      names.where((n) => n.contains('encoder') && n.endsWith('.onnx')).toList();
-  final onnxDecoderFiles =
-      names.where((n) => n.contains('decoder') && n.endsWith('.onnx')).toList();
-  final onnxJoinerFiles =
-      names.where((n) => n.contains('joiner') && n.endsWith('.onnx'));
+  final onnxEncoderFiles = names
+      .where((n) => n.contains('encoder') && n.endsWith('.onnx'))
+      .toList();
+  final onnxDecoderFiles = names
+      .where((n) => n.contains('decoder') && n.endsWith('.onnx'))
+      .toList();
+  final onnxJoinerFiles = names.where(
+    (n) => n.contains('joiner') && n.endsWith('.onnx'),
+  );
   if (onnxEncoderFiles.length == 1 &&
       onnxDecoderFiles.length == 1 &&
       onnxJoinerFiles.isEmpty) {

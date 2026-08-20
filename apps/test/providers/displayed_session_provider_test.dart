@@ -9,8 +9,7 @@ class _StubSettingsNotifier extends SettingsNotifier {
   _StubSettingsNotifier({this.sessionId});
 
   @override
-  Settings build() =>
-      Settings.defaults().copyWith(agenticSessionId: sessionId);
+  Settings build() => Settings.defaults().copyWith(agenticSessionId: sessionId);
 
   @override
   Future<String?> getEnginePassword({String? url}) async => null;
@@ -63,7 +62,8 @@ void main() {
       expect(
         container.read(settingsProvider).agenticSessionId,
         'a',
-        reason: 'displayedSessionProvider is decoupled from Settings — '
+        reason:
+            'displayedSessionProvider is decoupled from Settings — '
             'callers persist explicitly at their own trigger points',
       );
     });

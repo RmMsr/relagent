@@ -58,8 +58,10 @@ void main() {
       final dest = p.join(tempDir.path, 'out');
       await extractModelArchive(archive, dest);
 
-      expect(File(p.join(dest, 'espeak-ng-data/lang/gmw/en')).existsSync(),
-          isTrue);
+      expect(
+        File(p.join(dest, 'espeak-ng-data/lang/gmw/en')).existsSync(),
+        isTrue,
+      );
     });
 
     test('writes .complete marker after extraction', () async {

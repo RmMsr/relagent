@@ -16,21 +16,26 @@ void main() {
       tempDir.deleteSync(recursive: true);
     });
 
-    test('detects tokens.txt with a shared model-name prefix (Whisper)', () async {
-      // sherpa-onnx's whisper export-onnx.py names every file with a shared
-      // "{model-name}-" prefix instead of the bare names every other
-      // architecture uses. Regression test for the null-check crash this
-      // caused: files['tokens']! on a Map that never got a 'tokens' entry.
-      File(p.join(tempDir.path, 'nb-whisper-base-encoder.onnx')).createSync();
-      File(p.join(tempDir.path, 'nb-whisper-base-decoder.onnx')).createSync();
-      File(p.join(tempDir.path, 'nb-whisper-base-tokens.txt')).createSync();
+    test(
+      'detects tokens.txt with a shared model-name prefix (Whisper)',
+      () async {
+        // sherpa-onnx's whisper export-onnx.py names every file with a shared
+        // "{model-name}-" prefix instead of the bare names every other
+        // architecture uses. Regression test for the null-check crash this
+        // caused: files['tokens']! on a Map that never got a 'tokens' entry.
+        File(p.join(tempDir.path, 'nb-whisper-base-encoder.onnx')).createSync();
+        File(p.join(tempDir.path, 'nb-whisper-base-decoder.onnx')).createSync();
+        File(p.join(tempDir.path, 'nb-whisper-base-tokens.txt')).createSync();
 
-      final structure = await VoiceCatalogEvaluator.inspectDirectory(tempDir.path);
+        final structure = await VoiceCatalogEvaluator.inspectDirectory(
+          tempDir.path,
+        );
 
-      expect(structure['encoder'], 'nb-whisper-base-encoder.onnx');
-      expect(structure['decoder'], 'nb-whisper-base-decoder.onnx');
-      expect(structure['tokens'], 'nb-whisper-base-tokens.txt');
-    });
+        expect(structure['encoder'], 'nb-whisper-base-encoder.onnx');
+        expect(structure['decoder'], 'nb-whisper-base-decoder.onnx');
+        expect(structure['tokens'], 'nb-whisper-base-tokens.txt');
+      },
+    );
 
     test('detects bare-named files (transducer/ctc/etc.)', () async {
       File(p.join(tempDir.path, 'encoder.onnx')).createSync();
@@ -38,7 +43,9 @@ void main() {
       File(p.join(tempDir.path, 'joiner.onnx')).createSync();
       File(p.join(tempDir.path, 'tokens.txt')).createSync();
 
-      final structure = await VoiceCatalogEvaluator.inspectDirectory(tempDir.path);
+      final structure = await VoiceCatalogEvaluator.inspectDirectory(
+        tempDir.path,
+      );
 
       expect(structure['encoder'], 'encoder.onnx');
       expect(structure['decoder'], 'decoder.onnx');
@@ -50,7 +57,9 @@ void main() {
       File(p.join(tempDir.path, 'model.onnx')).createSync();
       File(p.join(tempDir.path, 'token-scores.json')).createSync();
 
-      final structure = await VoiceCatalogEvaluator.inspectDirectory(tempDir.path);
+      final structure = await VoiceCatalogEvaluator.inspectDirectory(
+        tempDir.path,
+      );
 
       expect(structure['tokens'], isNull);
       expect(structure['tokenScoresJson'], 'token-scores.json');
