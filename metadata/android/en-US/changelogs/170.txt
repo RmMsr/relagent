@@ -1,0 +1,1 @@
+- Chat messages are now width-constrained and centered on wide screens for easier reading

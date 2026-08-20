@@ -1,0 +1,6 @@
+- Run fully offline with bundled local AI inference, no external provider needed
+- Invoke the assistant from any app via the share sheet or selected text
+- Import speech models from local storage
+- Full dark mode support across the app
+- "Continue without" option to skip stuck approval cycles
+- Various dark mode and layout fixes

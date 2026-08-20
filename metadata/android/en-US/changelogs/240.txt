@@ -1,0 +1,3 @@
+- More reliable Bluetooth/wired mic routing, with a badge showing the active input device and a long-press option to choose one
+- Settings now save instantly as you change them
+- Approval cards lead with a plain-language summary of what's being approved
