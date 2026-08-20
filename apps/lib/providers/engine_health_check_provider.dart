@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '/agentic/health_check.dart';
+import 'package:agentic_client/agentic_client.dart' hide Logger;
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';
 import '/utils/logger.dart';

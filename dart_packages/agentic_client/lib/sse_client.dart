@@ -3,8 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '/models/settings.dart';
-import '/utils/logger.dart';
+import 'auth_type.dart';
+import 'logger.dart';
 
 sealed class SseEvent {
   final int id;

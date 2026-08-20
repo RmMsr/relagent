@@ -5,8 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show KeepAliveLink;
 import 'package:http/http.dart' as http;
 
-import '/agentic/models.dart';
-import '/agentic/services.dart';
+import 'package:agentic_client/agentic_client.dart' hide Logger;
 import '/providers/displayed_session_provider.dart';
 import '/providers/sessions_provider.dart';
 import '/providers/settings_provider.dart';

@@ -1,4 +1,7 @@
+import 'package:agentic_client/agentic_client.dart' show AuthType;
 import 'package:flutter/foundation.dart' show kIsWeb;
+
+export 'package:agentic_client/agentic_client.dart' show AuthType;
 
 // Sentinel value for copyWith to distinguish "not provided" from "explicitly null"
 const Object _unset = Object();
@@ -12,12 +15,6 @@ enum VoiceMode {
   listening, // Continuous recording, no auto-playback
   conversation, // Continuous recording + auto-playback
   reading, // Dictation mode + auto-playback
-}
-
-enum AuthType {
-  none, // No authentication required
-  basic, // HTTP Basic authentication
-  apiKey, // API key required (detection signal only, not persisted as auth type)
 }
 
 enum ChatBackendType {

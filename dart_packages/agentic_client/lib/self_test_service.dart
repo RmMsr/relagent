@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '/models/settings.dart';
+import 'auth_type.dart';
 
 String _normalizeBaseUrl(String baseUrl) {
   var url = baseUrl.trim();

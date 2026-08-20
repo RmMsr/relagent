@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+# cli — Relagent terminal chat client
+
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+TOOLS_DIR="$SCRIPT_DIR/../tools/cli"
+
+# Resolve dependencies on first run (or whenever the lockfile is missing).
+if [ ! -f "$TOOLS_DIR/pubspec.lock" ]; then
+  echo "First run: resolving relagent CLI dependencies ..." >&2
+  (cd "$TOOLS_DIR" && dart pub get)
+fi
+
+exec dart run "$TOOLS_DIR/bin/relagent_cli.dart" "$@"

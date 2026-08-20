@@ -1,10 +1,9 @@
 import 'dart:convert';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:agentic_client/agentic_client.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:relagent/agentic/models.dart';
-import 'package:relagent/agentic/services.dart';
+import 'package:test/test.dart';
 
 void main() {
   final uri = Uri.parse('http://engine.test/api/v1/sessions/s-1/messages');

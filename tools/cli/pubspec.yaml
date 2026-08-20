@@ -1,0 +1,22 @@
+name: relagent_cli
+description: Standalone terminal client for the Relagent engine's chat API
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  agentic_client:
+    path: ../../dart_packages/agentic_client
+  args: ^2.7.0
+  async: ^2.13.0
+  dart_console: ^4.1.1
+  freedesktop_secret: ^0.1.2
+  ini: ^2.1.0
+
+dev_dependencies:
+  test: ^1.25.0
+
+executables:
+  relagent: relagent_cli

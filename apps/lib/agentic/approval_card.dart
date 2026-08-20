@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '/agentic/models.dart';
+import 'package:agentic_client/agentic_client.dart';
+import '/agentic/sensitivity_color.dart';
 import '/theme/app_colors.dart';
 
 // -- Approval Card --

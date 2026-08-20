@@ -3,8 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '/agentic/services.dart';
-import '/agentic/sse_client.dart';
+import 'package:agentic_client/agentic_client.dart' hide Logger;
 import '/providers/agentic_chat_provider.dart';
 import '/providers/displayed_session_provider.dart';
 import '/providers/settings_provider.dart';

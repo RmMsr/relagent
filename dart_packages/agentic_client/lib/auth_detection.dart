@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
-import '/models/settings.dart';
+
+import 'auth_type.dart';
 
 /// Result of authentication type detection
 class AuthDetectionResult {

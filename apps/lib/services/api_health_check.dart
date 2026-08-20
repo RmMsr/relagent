@@ -1,7 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '/chat/auth_detection.dart';
-import '/models/settings.dart';
+import 'package:agentic_client/agentic_client.dart' hide Logger;
 import '/utils/logger.dart';
 
 /// Result of API health check

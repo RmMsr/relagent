@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '/agentic/models.dart';
+import 'package:agentic_client/agentic_client.dart';
+import '/agentic/sensitivity_color.dart';
 import '/providers/agentic_chat_provider.dart';
 import '/providers/displayed_session_provider.dart';
 import '/providers/new_chat_draft_provider.dart';

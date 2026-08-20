@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:relagent/agentic/models.dart';
+import 'package:agentic_client/agentic_client.dart';
 import 'package:relagent/models/settings.dart';
 import 'package:relagent/providers/agentic_chat_provider.dart';
 import 'package:relagent/providers/displayed_session_provider.dart';

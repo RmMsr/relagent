@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '/agentic/health_check.dart';
-import '/agentic/models.dart';
+import 'package:agentic_client/agentic_client.dart';
 import '/agentic/widgets.dart';
 import '/providers/agentic_chat_provider.dart';
 import '/providers/audio_coordinator_provider.dart';

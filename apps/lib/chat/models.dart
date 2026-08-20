@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import '/agentic/models.dart';
+import 'package:agentic_client/agentic_client.dart';
 
 enum ChatRole { user, assistant, error }
 

@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '/chat/auth_detection.dart';
-import '/models/settings.dart';
-import '/utils/logger.dart';
+import 'auth_detection.dart';
+import 'auth_type.dart';
+import 'logger.dart';
 
 String _normalizeBaseUrl(String baseUrl) {
   var url = baseUrl.trim();

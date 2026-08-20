@@ -4,8 +4,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 
 import '/agentic/approval_card.dart';
-import '/agentic/health_check.dart';
-import '/agentic/models.dart';
+import 'package:agentic_client/agentic_client.dart' hide Logger;
 import '/models/app_info.dart';
 import '/providers/recording_provider.dart';
 import '/providers/tts_provider.dart';

@@ -1,7 +1,5 @@
 import 'dart:math';
 
-import 'package:flutter/material.dart';
-
 enum AgenticRole { user, assistant, system, error }
 
 enum SensitivityLevel {
@@ -9,49 +7,42 @@ enum SensitivityLevel {
     1,
     'Open Information',
     'O',
-    Colors.green,
     'Public information. No strong personal relevance, information could be related to anyone',
   ),
   specific(
     2,
     'Specific',
     'S',
-    Colors.teal,
     'Information is relevant to a group, but does not include personally identifiable information',
   ),
   personal(
     3,
     'Personal',
     'P',
-    Colors.orange,
     'May contain information identifying one person',
   ),
   confidential(
     4,
     'Confidential',
     'C',
-    Colors.deepOrange,
     'Clearly sensitive information',
   ),
   internal(
     5,
     'Internal',
     'I',
-    Colors.red,
     'Data not meant to be shared',
   );
 
   final int value;
   final String label;
   final String shortLabel;
-  final Color color;
   final String description;
 
   const SensitivityLevel(
     this.value,
     this.label,
     this.shortLabel,
-    this.color,
     this.description,
   );
 

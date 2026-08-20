@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  agentic_client:
+    path: ../dart_packages/agentic_client
   sherpa_voice:
     path: ../dart_packages/sherpa_voice
 

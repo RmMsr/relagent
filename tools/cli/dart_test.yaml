@@ -1,0 +1,5 @@
+tags:
+  integration:
+    description: >-
+      Spawns the engine's demo server as a subprocess; skips itself at
+      runtime if `uv` isn't available.

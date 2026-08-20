@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '/agentic/self_test_service.dart';
+import 'package:agentic_client/agentic_client.dart';
 import '/models/self_test_result.dart';
 import '/models/settings.dart';
 import '/providers/settings_provider.dart';

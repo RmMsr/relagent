@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
+import 'package:meta/meta.dart' show visibleForTesting;
 
-import '/agentic/models.dart';
-import '/models/settings.dart';
+import 'auth_type.dart';
+import 'models.dart';
 
 String _normalizeBaseUrl(String baseUrl) {
   var url = baseUrl.trim();
@@ -513,6 +513,7 @@ Future<void> declineSessionApproval({
   String? username,
   String? password,
   String? apiKey,
+  @visibleForTesting http.Client? client,
 }) async {
   final normalizedUrl = _normalizeBaseUrl(baseUrl);
   final uri = Uri.parse(
@@ -528,7 +529,9 @@ Future<void> declineSessionApproval({
 
   final http.Response response;
   try {
-    response = await http.post(uri, headers: headers);
+    final effectiveClient = client ?? http.Client();
+    response = await effectiveClient.post(uri, headers: headers);
+    if (client == null) effectiveClient.close();
   } catch (e) {
     throw _networkException(e, uri);
   }

@@ -1,7 +1,6 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:agentic_client/agentic_client.dart';
 import 'package:http/http.dart' as http;
-import 'package:relagent/chat/auth_detection.dart';
-import 'package:relagent/models/settings.dart';
+import 'package:test/test.dart';
 
 void main() {
   group('detectAuthType', () {

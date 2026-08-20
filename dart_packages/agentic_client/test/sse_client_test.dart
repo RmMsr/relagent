@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:agentic_client/agentic_client.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:relagent/agentic/sse_client.dart';
-import 'package:relagent/models/settings.dart';
+import 'package:test/test.dart';
 
 /// Creates a [MockClient] that captures the request and streams SSE data
 /// from the returned [StreamController].

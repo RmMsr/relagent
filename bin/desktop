@@ -1,5 +1,10 @@
-!#/usr/bin/env
+#!/usr/bin/env sh
+# desktop — Relagent Flutter desktop app
 
-pushd apps
-fvm flutter run --device-id linux --print-dtd 2>&1 |tee flutter-linux.log
-popd
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+APPS_DIR="$SCRIPT_DIR/../apps"
+
+cd "$APPS_DIR"
+fvm flutter run --device-id linux --print-dtd 2>&1 | tee flutter-linux.log
