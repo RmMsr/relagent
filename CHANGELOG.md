@@ -8,6 +8,38 @@ The engine and the apps ship with identical version. Keep both at the same
 release for best compatibility. When only one part changes, the other receives
 a no-change version bump to stay in sync.
 
+## 0.1.30 — Whisper ASR, chunked TTS, per-session chat state
+
+### Added
+
+- **Whisper ASR support.** sherpa-onnx Whisper exports (encoder+decoder+tokens) can now be imported and run as an offline recognizer alongside the existing streaming architectures.
+- **Chunked TTS playback.** Long replies are stripped of markdown and synthesized/played progressively in paragraphs, with navigation controls to skip forward and back.
+- **Resumable model downloads.** Interrupted downloads now continue from the partial file instead of restarting, and failed attempts retry automatically.
+- **Copy raw message text** and a confirm-before-open dialog for links in chat replies (link text can come from LLM-generated content and may not match the destination).
+- **relagent CLI chat client.** A new standalone command-line client (REPL and single-turn modes) for chatting with the engine.
+
+### Changed
+
+- Chat state is now isolated per session, so switching sessions can no longer leak messages, approvals, or loading indicators between them.
+- Settings > Voice shows each model's architecture next to its id and highlights the selected model card.
+- The CLI `ask` command now reads full multi-line stdin, and piped/redirected input defaults to `ask` instead of `chat`.
+
+### Fixed
+
+- Fixed a crash importing encoder+decoder+joiner models that were mistagged as an offline NeMo Transducer.
+- Fixed CTC-architecture ASR models failing to build due to a wrong file-key lookup, affecting both the eval tooling and production streaming ASR.
+- Fixed a Whisper/offline-ASR evaluation crash and excluded unsupported NeMo streaming-transducer exports that were misrouting into a crash-prone path.
+- TTS playback now stops reliably on interruption and no longer gets stuck failing after startup.
+- Fixed chat overflow with long model/agent names, dark/light theme staleness in markdown tables, and a continuous-playback toggle not applying to in-flight requests.
+- "New Session" now always clears the draft, even before the first message finishes sending.
+- Repaired the container build and its wasm health check.
+
+### Internal
+
+- Bluetooth mic-routing diagnostics and interim mitigations for poor Whisper transcription quality over Bluetooth.
+- voice_catalog CLI: architecture scoping, `--list-architectures` audit, and fixes for several mislabeled catalog entries.
+- Worktree scripts now use relagent-cli; documentation updates for HuggingFace model conversion.
+
 ## 0.1.28 — Reproducible builds
 
 ### Internal

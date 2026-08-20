@@ -1,0 +1,10 @@
+- Whisper ASR support: import and run sherpa-onnx Whisper models offline
+- Chunked TTS playback with navigation controls for long replies
+- Resumable model downloads that retry automatically after interruption
+- Copy raw message text and confirm-before-open for links in chat
+- Chat state is now isolated per session, preventing message/approval leaks between sessions
+- Settings > Voice shows each model's architecture and highlights the selected model
+- Fixed a crash importing certain mistagged transducer models
+- Fixed several ASR model architectures failing to build
+- TTS playback now stops reliably on interruption
+- Fixed chat overflow, dark/light theme staleness, and other UI bugs
