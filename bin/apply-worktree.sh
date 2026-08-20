@@ -78,7 +78,7 @@ done
 # Use ai to perform a simple task
 ask_ai() {
     export OPENCODE_PERMISSION='{"bash":"deny", "read":"deny", "glob":"deny", "list":"deny", "grep":"deny"}'
-    if result=$(echo "$@" | timeout --kill-after=5s 1m opencode run --pure); then
+    if result=$(echo "$@" | timeout --kill-after=5s 1m relagent-cli ask); then
         echo "$result"
     else
         return 1

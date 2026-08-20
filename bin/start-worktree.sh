@@ -62,21 +62,21 @@ if [ -z "$WORKTREE_NAME" ]; then
     seed=$(date +%N | tail -c 24 | tr -dc '0-9' | head -c 16)
   fi
 
-  # Try to generate a human-friendly suffix using opencode with seed
+  # Try to generate a human-friendly suffix using relagent cli with seed
   suffix=""
-  if command -v opencode >/dev/null 2>&1; then
+  if command -v relagent-cli >/dev/null 2>&1; then
     echo "Fantasizing a nice name..."
-    suffix=$(opencode run "Generate a brief, friendly and inpiring but unpredictable \
-        phrase made of 2-3 words. \
-        Look for a familiar reference in here as an inpiration: $seed. \
-        Use lower case. High temperature. No tool usage. No thinking." 2>/dev/null \
-        | head -n 3 | tr -dc 'a-zA-Z0-9-')
+    suffix=$(relagent-cli ask "Generate a brief, friendly and inpiring but unpredictable \
+        phrase made of 2-3 words. Quick and spontaneous. \
+        No spacing. Only lower case. No thinking. \
+        This is your seed: ${seed}"
+        )
     if [ -z "$suffix" ] || [ ${#suffix} -gt 20 ]; then
       suffix=""
     fi
   fi
 
-  # Fallback to the random seed if opencode failed or not available
+  # Fallback to the random seed if relagent cli failed or not available
   if [ -z "$suffix" ]; then
     suffix="$seed"
   fi
