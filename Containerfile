@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 FROM ghcr.io/cirruslabs/flutter:3.41.9 AS flutter-builder
 
 RUN chown -R ubuntu:ubuntu /sdks/flutter && \
@@ -44,7 +46,9 @@ EXPOSE 8000
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -60,7 +64,8 @@ ADD pyproject.toml uv.lock VERSION ./
 
 USER app
 
-RUN uv sync --locked --no-dev --no-cache
+RUN --mount=type=cache,target=/app/.cache/uv,uid=1000,gid=1000 \
+    uv sync --locked --no-dev
 
 ADD engine ./engine
 
