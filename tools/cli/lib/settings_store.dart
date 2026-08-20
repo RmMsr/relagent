@@ -46,8 +46,10 @@ class SettingsStore {
 
   /// Whether the `chat` command should purge the session on exit by
   /// default, without needing `--purge-session` passed each time. `null`
-  /// when never set.
-  bool? readAlwaysPurgeSession() {
+  /// when never set. Chat-only: `ask` always purges its session unless
+  /// `--no-purge-session` is passed, since each `ask` run is single-turn
+  /// and disposable by nature.
+  bool? readAlwaysPurgeChatSession() {
     if (!file.existsSync()) return null;
     try {
       final config = Config.fromString(file.readAsStringSync());
@@ -59,7 +61,7 @@ class SettingsStore {
     }
   }
 
-  void writeAlwaysPurgeSession(bool value) {
+  void writeAlwaysPurgeChatSession(bool value) {
     var config = _readConfig();
     if (!config.hasSection('chat')) config.addSection('chat');
     config.set('chat', 'always_purge_session', value.toString());

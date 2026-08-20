@@ -1356,7 +1356,7 @@ wheels = [
 
 [[package]]
 name = "relagent-engine"
-version = "0.1.29rc0"
+version = "0.1.30"
 source = { virtual = "." }
 dependencies = [
     { name = "ddgs" },

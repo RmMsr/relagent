@@ -66,7 +66,8 @@ if [ -z "$WORKTREE_NAME" ]; then
   suffix=""
   if command -v relagent-cli >/dev/null 2>&1; then
     echo "Fantasizing a nice name..."
-    suffix=$(relagent-cli ask "Generate a brief, friendly and inpiring but unpredictable \
+    suffix=$(relagent-cli ask \
+        "Generate a brief, friendly and inpiring but unpredictable \
         phrase made of 2-3 words. Quick and spontaneous. \
         No spacing. Only lower case. No thinking. \
         This is your seed: ${seed}"

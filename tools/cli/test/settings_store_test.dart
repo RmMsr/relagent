@@ -41,26 +41,33 @@ void main() {
     expect(store.readEngineUrl(), isNull);
   });
 
-  test('readAlwaysPurgeSession returns null when nothing has been written', () {
-    expect(store.readAlwaysPurgeSession(), isNull);
-  });
-
   test(
-    'writeAlwaysPurgeSession persists a value readAlwaysPurgeSession then returns',
+    'readAlwaysPurgeChatSession returns null when nothing has been written',
     () {
-      store.writeAlwaysPurgeSession(true);
-      expect(store.readAlwaysPurgeSession(), isTrue);
-
-      store.writeAlwaysPurgeSession(false);
-      expect(store.readAlwaysPurgeSession(), isFalse);
+      expect(store.readAlwaysPurgeChatSession(), isNull);
     },
   );
 
-  test('writeAlwaysPurgeSession does not clobber the persisted engine URL', () {
-    store.writeEngineUrl('http://engine.example.com');
-    store.writeAlwaysPurgeSession(true);
+  test(
+    'writeAlwaysPurgeChatSession persists a value '
+    'readAlwaysPurgeChatSession then returns',
+    () {
+      store.writeAlwaysPurgeChatSession(true);
+      expect(store.readAlwaysPurgeChatSession(), isTrue);
 
-    expect(store.readEngineUrl(), 'http://engine.example.com');
-    expect(store.readAlwaysPurgeSession(), isTrue);
-  });
+      store.writeAlwaysPurgeChatSession(false);
+      expect(store.readAlwaysPurgeChatSession(), isFalse);
+    },
+  );
+
+  test(
+    'writeAlwaysPurgeChatSession does not clobber the persisted engine URL',
+    () {
+      store.writeEngineUrl('http://engine.example.com');
+      store.writeAlwaysPurgeChatSession(true);
+
+      expect(store.readEngineUrl(), 'http://engine.example.com');
+      expect(store.readAlwaysPurgeChatSession(), isTrue);
+    },
+  );
 }

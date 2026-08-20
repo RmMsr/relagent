@@ -28,8 +28,8 @@ class ChatCommand extends Command<int> {
       'purge-session',
       help:
           'Delete the session from the engine when the chat ends. '
-          'Defaults to the "always purge session" setting from `relagent '
-          'config` when not passed.',
+          'Defaults to the "always purge chat session" setting from '
+          '`relagent config` when not passed.',
       defaultsTo: false,
     );
   }
@@ -72,7 +72,8 @@ class ChatCommand extends Command<int> {
     );
     final purgeOnExit = argResults!.wasParsed('purge-session')
         ? argResults!['purge-session'] as bool
-        : connectionResolver.settingsStore.readAlwaysPurgeSession() ?? false;
+        : connectionResolver.settingsStore.readAlwaysPurgeChatSession() ??
+              false;
 
     stdout.writeln(
       'Connected to ${connection.baseUrl}. /exit or Ctrl+D to quit.\n',

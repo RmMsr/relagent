@@ -124,28 +124,24 @@ squash_changes() {
 
     echo "Generating squash commit..."
 
-    git_log=$(git log main-worktree/HEAD..)
+    git_log=$(git log --stat main-worktree/HEAD..)
 
     git reset --soft "$(git merge-base main-worktree/HEAD HEAD)"
 
-    git_diff=$(git diff --staged)
+    query="We are squashing multiple commits. Summarize the following git messages into one conventional commit.
 
-    query="Write a conventional commit message for a squash commit.
+No multi turn discussion or reasoning. Just generate a reasonable commit message. If there is not enough input, return nothing.
 
-No multi turn thinking or reasoning. just generate the message. Leave out insignificant details.
+## Instructions
 
 1. Generate a short one line summary as title. Max 60 characters. Prefixed with feat:, fix: or chore:
 2. Describe only the major improvements and change patterns in one short paragraph. Add intention where context fits. Max 4 sentences. Use the collected commit messages for additional context.
 3. Quickly list fixes and other relevant differences.
 4. Skip insignificant details, focus on higher level impact.
 
-## Commit messages to be squashed for context
+## Existing commit messages
 
-$git_log
-
-## Aggregated diff
-
-$git_diff"
+$git_log"
 
     message="$(ask_ai "$query")"
 

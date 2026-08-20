@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:agentic_client/agentic_client.dart';
@@ -24,8 +25,10 @@ class AskCommand extends Command<int> {
     argParser.addOption('token', help: 'Engine auth token.');
     argParser.addFlag(
       'purge-session',
-      help: 'Delete the session from the engine after the reply is printed.',
-      defaultsTo: false,
+      help:
+          'Delete the session from the engine after the reply is printed. '
+          'On by default; pass --no-purge-session to keep it.',
+      defaultsTo: true,
     );
   }
 
@@ -35,9 +38,11 @@ class AskCommand extends Command<int> {
   @override
   Future<int> run() async {
     final rest = argResults!.rest;
-    final prompt = rest.isNotEmpty ? rest.join(' ') : stdin.readLineSync();
+    final prompt = rest.isNotEmpty
+        ? rest.join(' ')
+        : await utf8.decoder.bind(stdin).join();
 
-    if (prompt == null || prompt.trim().isEmpty) {
+    if (prompt.trim().isEmpty) {
       stderr.writeln('No prompt given (pass it as an argument or on stdin).');
       return 1;
     }

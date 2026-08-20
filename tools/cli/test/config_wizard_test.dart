@@ -71,11 +71,11 @@ void main() {
         currentUrl: 'http://localhost:8000',
         urlInput: '',
         tokenInput: '',
-        currentAlwaysPurgeSession: true,
-        alwaysPurgeSessionInput: '',
+        currentAlwaysPurgeChatSession: true,
+        alwaysPurgeChatSessionInput: '',
       );
 
-      expect(decision.alwaysPurgeSession, isTrue);
+      expect(decision.alwaysPurgeChatSession, isTrue);
     });
 
     test('"y" purge-session answer enables it', () {
@@ -83,11 +83,11 @@ void main() {
         currentUrl: 'http://localhost:8000',
         urlInput: '',
         tokenInput: '',
-        currentAlwaysPurgeSession: false,
-        alwaysPurgeSessionInput: 'y',
+        currentAlwaysPurgeChatSession: false,
+        alwaysPurgeChatSessionInput: 'y',
       );
 
-      expect(decision.alwaysPurgeSession, isTrue);
+      expect(decision.alwaysPurgeChatSession, isTrue);
     });
 
     test('non-"y" purge-session answer disables it', () {
@@ -95,11 +95,11 @@ void main() {
         currentUrl: 'http://localhost:8000',
         urlInput: '',
         tokenInput: '',
-        currentAlwaysPurgeSession: true,
-        alwaysPurgeSessionInput: 'n',
+        currentAlwaysPurgeChatSession: true,
+        alwaysPurgeChatSessionInput: 'n',
       );
 
-      expect(decision.alwaysPurgeSession, isFalse);
+      expect(decision.alwaysPurgeChatSession, isFalse);
     });
   });
 }

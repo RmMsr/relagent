@@ -56,8 +56,8 @@ class ConfigCommand extends Command<int> {
 
     final currentUrl = settingsStore.readEngineUrl() ?? defaultEngineBaseUrl;
     final hasToken = await tokenStore.readToken() != null;
-    final currentAlwaysPurgeSession =
-        settingsStore.readAlwaysPurgeSession() ?? false;
+    final currentAlwaysPurgeChatSession =
+        settingsStore.readAlwaysPurgeChatSession() ?? false;
 
     stdout.write('Engine URL [$currentUrl]: ');
     final urlInput = stdin.readLineSync() ?? '';
@@ -69,22 +69,22 @@ class ConfigCommand extends Command<int> {
 
     stdout.write(
       'Always purge session when chat ends? '
-      '[${currentAlwaysPurgeSession ? 'y' : 'N'}]: ',
+      '[${currentAlwaysPurgeChatSession ? 'y' : 'N'}]: ',
     );
-    final alwaysPurgeSessionInput = stdin.readLineSync() ?? '';
+    final alwaysPurgeChatSessionInput = stdin.readLineSync() ?? '';
 
     final decision = decideConfigWizardAnswers(
       currentUrl: currentUrl,
       urlInput: urlInput,
       tokenInput: tokenInput,
-      currentAlwaysPurgeSession: currentAlwaysPurgeSession,
-      alwaysPurgeSessionInput: alwaysPurgeSessionInput,
+      currentAlwaysPurgeChatSession: currentAlwaysPurgeChatSession,
+      alwaysPurgeChatSessionInput: alwaysPurgeChatSessionInput,
     );
 
     if (decision.urlChanged) {
       settingsStore.writeEngineUrl(decision.engineUrl);
     }
-    settingsStore.writeAlwaysPurgeSession(decision.alwaysPurgeSession);
+    settingsStore.writeAlwaysPurgeChatSession(decision.alwaysPurgeChatSession);
     if (decision.newToken != null) {
       final stored = await tokenStore.writeToken(decision.newToken!);
       if (!stored) {

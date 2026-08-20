@@ -15,15 +15,16 @@ class ConfigWizardDecision {
   final String? newToken;
 
   /// Whether `chat` should purge the session on exit by default —
-  /// [currentAlwaysPurgeSession] unchanged if [alwaysPurgeSessionInput] was
-  /// blank.
-  final bool alwaysPurgeSession;
+  /// [currentAlwaysPurgeChatSession] unchanged if
+  /// [alwaysPurgeChatSessionInput] was blank. Does not affect `ask`, which
+  /// always purges its session unless `--no-purge-session` is passed.
+  final bool alwaysPurgeChatSession;
 
   const ConfigWizardDecision({
     required this.engineUrl,
     required this.urlChanged,
     this.newToken,
-    required this.alwaysPurgeSession,
+    required this.alwaysPurgeChatSession,
   });
 }
 
@@ -31,21 +32,21 @@ ConfigWizardDecision decideConfigWizardAnswers({
   required String currentUrl,
   required String urlInput,
   required String tokenInput,
-  bool currentAlwaysPurgeSession = false,
-  String alwaysPurgeSessionInput = '',
+  bool currentAlwaysPurgeChatSession = false,
+  String alwaysPurgeChatSessionInput = '',
 }) {
   final trimmedUrl = urlInput.trim();
   final engineUrl = trimmedUrl.isEmpty ? currentUrl : trimmedUrl;
 
-  final trimmedPurge = alwaysPurgeSessionInput.trim().toLowerCase();
-  final alwaysPurgeSession = trimmedPurge.isEmpty
-      ? currentAlwaysPurgeSession
+  final trimmedPurge = alwaysPurgeChatSessionInput.trim().toLowerCase();
+  final alwaysPurgeChatSession = trimmedPurge.isEmpty
+      ? currentAlwaysPurgeChatSession
       : (trimmedPurge == 'y' || trimmedPurge == 'yes');
 
   return ConfigWizardDecision(
     engineUrl: engineUrl,
     urlChanged: trimmedUrl.isNotEmpty && trimmedUrl != currentUrl,
     newToken: tokenInput.isEmpty ? null : tokenInput,
-    alwaysPurgeSession: alwaysPurgeSession,
+    alwaysPurgeChatSession: alwaysPurgeChatSession,
   );
 }
