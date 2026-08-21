@@ -105,7 +105,7 @@ Give a list of significant changes. Leave out insignificant details. Use minimal
 
 $(git diff --staged)"
 
-    message=$(ask_ai "$query")
+    message=$(ask_ai "$query") || message=""
     if [ -z "$message" ]; then
         message="Latest changes (default message)"
     fi
@@ -126,8 +126,6 @@ squash_changes() {
 
     git_log=$(git log --stat main-worktree/HEAD..)
 
-    git reset --soft "$(git merge-base main-worktree/HEAD HEAD)"
-
     query="We are squashing multiple commits. Summarize the following git messages into one conventional commit.
 
 No multi turn discussion or reasoning. Just generate a reasonable commit message. If there is not enough input, return nothing.
@@ -143,7 +141,14 @@ No multi turn discussion or reasoning. Just generate a reasonable commit message
 
 $git_log"
 
-    message="$(ask_ai "$query")"
+    message=$(ask_ai "$query") || message=""
+    if [ -z "$message" ]; then
+        message="chore: squash commits (default message)"
+    fi
+
+    # Only mutate history once we have a message ready — if ask_ai fails,
+    # bail out here and the original commits are still intact to retry.
+    git reset --soft "$(git merge-base main-worktree/HEAD HEAD)"
 
     git commit --all --message "$message" > /dev/null
 
