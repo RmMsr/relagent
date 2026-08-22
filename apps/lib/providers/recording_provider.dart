@@ -122,44 +122,54 @@ class RecordingNotifier extends Notifier<RecordingState> {
     ref.listen<AudioCoordinatorState>(audioCoordinatorProvider, (
       previous,
       next,
-    ) async {
-      if (state.isRecording &&
-          previous?.mode == AudioMode.recording &&
-          next.mode != AudioMode.recording) {
-        Logger.debug(
-          'RecordingProvider: Coordinator forced stop, stopping recording',
-        );
-        await internalStop();
-      }
+    ) {
+      // Wrap async work to avoid unawaited futures and race conditions
+      Future.microtask(() async {
+        if (state.isRecording &&
+            previous?.mode == AudioMode.recording &&
+            next.mode != AudioMode.recording) {
+          Logger.debug(
+            'RecordingProvider: Coordinator forced stop, stopping recording',
+          );
+          await internalStop();
+        }
 
-      if (!state.isRecording &&
-          state.isContinuous &&
-          previous?.mode != AudioMode.recording &&
-          next.mode == AudioMode.recording) {
-        Logger.debug(
-          'RecordingProvider: Coordinator auto-resumed, restarting recording',
-        );
-        await internalStart();
-      }
+        if (!state.isRecording &&
+            state.isContinuous &&
+            previous?.mode != AudioMode.recording &&
+            next.mode == AudioMode.recording) {
+          Logger.debug(
+            'RecordingProvider: Coordinator auto-resumed, restarting recording',
+          );
+          await internalStart();
+        }
+      }).catchError((e) {
+        Logger.error('RecordingProvider: Error in coordinator listener: $e');
+      });
     });
 
     // Restart ASR when selected model finishes downloading (startup race fix)
     ref.listen<ModelDownloadState>(modelDownloadProvider, (
       previous,
       next,
-    ) async {
-      final selectedId = ref.read(settingsProvider).selectedAsrModelId;
-      if (selectedId != null &&
-          !(previous?.isDownloaded(selectedId) ?? false) &&
-          next.isDownloaded(selectedId) &&
-          state.isContinuous &&
-          state.isRecording) {
-        Logger.debug(
-          'RecordingProvider: Selected ASR model now downloaded, restarting...',
-        );
-        await internalStop();
-        await internalStart();
-      }
+    ) {
+      // Wrap async work to avoid unawaited futures and race conditions
+      Future.microtask(() async {
+        final selectedId = ref.read(settingsProvider).selectedAsrModelId;
+        if (selectedId != null &&
+            !(previous?.isDownloaded(selectedId) ?? false) &&
+            next.isDownloaded(selectedId) &&
+            state.isContinuous &&
+            state.isRecording) {
+          Logger.debug(
+            'RecordingProvider: Selected ASR model now downloaded, restarting...',
+          );
+          await internalStop();
+          await internalStart();
+        }
+      }).catchError((e) {
+        Logger.error('RecordingProvider: Error in model download listener: $e');
+      });
     });
 
     return RecordingState.initial();

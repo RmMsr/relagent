@@ -43,6 +43,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   // credentialsPass — a resync isn't a credential/URL change.
   TextEditingController? _chatUrlFieldController;
   bool _isSyncingChatUrlField = false;
+  final Set<TextEditingController> _listenersAttached = {};
   TextEditingController? _chatModelFieldController;
   bool _isSyncingChatModelField = false;
   TextEditingController? _engineUrlFieldController;
@@ -73,6 +74,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   // draft is discarded out from under it (the smart-nav "Discard" dialog
   // choice); see the ref.listen in build().
   late TextEditingController _primeMessageController;
+  bool _listenersSetup = false;
 
   @override
   void initState() {
@@ -94,7 +96,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
     _chatApiKeyController = TextEditingController();
 
     // Prime message — seeded once from the draft; kept in sync afterwards
-    // via ref.listen in build().
+    // via listener in build().
     _primeMessageController = TextEditingController(
       text: ref.read(pendingSettingsProvider).primeMessage,
     );
@@ -793,18 +795,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
 
   @override
   Widget build(BuildContext context) {
-    // Prime Message has no fieldViewBuilder to hook a post-frame resync
-    // into (unlike the Autocomplete-backed fields), so keep its controller
-    // in sync with the draft here instead — covers the smart-nav "Discard"
-    // dialog choice, which reverts pending.primeMessage out from under the
-    // field. The equality guard avoids fighting the user's own typing,
-    // which already wrote this same value into the draft via onChanged.
-    ref.listen<Settings>(pendingSettingsProvider, (previous, next) {
-      if (_primeMessageController.text != next.primeMessage) {
-        _primeMessageController.text = next.primeMessage;
-      }
-    });
-
     final settings = ref.watch(settingsProvider);
     final pending = ref.watch(pendingSettingsProvider);
     // credentialsPassProvider is autoDispose and only ever ref.read elsewhere
@@ -819,14 +809,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
     // Connection tab (index 0) regardless of whichever tab was last active
     // here; consumed and cleared as soon as it's applied below.
     ref.watch(settingsTabRequestProvider);
-    ref.listen<int?>(settingsTabRequestProvider, (previous, next) {
-      if (next != null) {
-        if (_tabController != null && next < _tabController!.length) {
-          _tabController!.index = next;
+
+    // Setup listeners on first build only to avoid multiple registrations
+    if (!_listenersSetup) {
+      _listenersSetup = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Sync prime message controller when draft changes
+        if (mounted && _primeMessageController.text != pending.primeMessage) {
+          _primeMessageController.text = pending.primeMessage;
         }
-        ref.read(settingsTabRequestProvider.notifier).clear();
-      }
-    });
+      });
+
+      // Register Riverpod listener for pending settings changes
+      ref.listen<Settings>(pendingSettingsProvider, (previous, next) {
+        if (mounted && _primeMessageController.text != next.primeMessage) {
+          _primeMessageController.text = next.primeMessage;
+        }
+      });
+
+      // Register listener for tab request changes
+      ref.listen<int?>(settingsTabRequestProvider, (previous, next) {
+        if (next != null) {
+          if (_tabController != null && next < _tabController!.length) {
+            _tabController!.index = next;
+          }
+          ref.read(settingsTabRequestProvider.notifier).clear();
+        }
+      });
+    }
     final voiceCapabilities = ref.watch(voiceCapabilitiesProvider);
     final hasVoice =
         voiceCapabilities.isAsrAvailable || voiceCapabilities.isTtsAvailable;
@@ -921,9 +931,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                       FocusNode fieldFocusNode,
                       VoidCallback onFieldSubmitted,
                     ) {
-                      if (_chatUrlFieldController !=
-                          fieldTextEditingController) {
-                        _chatUrlFieldController = fieldTextEditingController;
+                      _chatUrlFieldController = fieldTextEditingController;
+                      if (!_listenersAttached.contains(fieldTextEditingController)) {
+                        _listenersAttached.add(fieldTextEditingController);
                         fieldTextEditingController.addListener(() {
                           if (_isSyncingChatUrlField) return;
                           ref
@@ -994,9 +1004,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                       FocusNode fieldFocusNode,
                       VoidCallback onFieldSubmitted,
                     ) {
-                      if (_chatModelFieldController !=
-                          fieldTextEditingController) {
-                        _chatModelFieldController = fieldTextEditingController;
+                      _chatModelFieldController = fieldTextEditingController;
+                      if (!_listenersAttached.contains(fieldTextEditingController)) {
+                        _listenersAttached.add(fieldTextEditingController);
                         fieldTextEditingController.addListener(() {
                           if (_isSyncingChatModelField) return;
                           ref
@@ -1157,9 +1167,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                       FocusNode fieldFocusNode,
                       VoidCallback onFieldSubmitted,
                     ) {
-                      if (_engineUrlFieldController !=
-                          fieldTextEditingController) {
-                        _engineUrlFieldController = fieldTextEditingController;
+                      _engineUrlFieldController = fieldTextEditingController;
+                      if (!_listenersAttached.contains(fieldTextEditingController)) {
+                        _listenersAttached.add(fieldTextEditingController);
                         fieldTextEditingController.addListener(() {
                           if (_isSyncingEngineUrlField) return;
                           ref
