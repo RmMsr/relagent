@@ -766,15 +766,13 @@ class _ImportModelActionState extends ConsumerState<_ImportModelAction> {
   }
 
   Future<void> _startImport() async {
-    final result = await FilePicker.pickFiles(
+    final result = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['bz2', 'gz', 'tgz', 'zip', 'tar'],
-      allowMultiple: false,
-      withData: false,
     );
 
-    if (result == null || result.files.isEmpty) return;
-    final path = result.files.first.path;
+    if (result == null) return;
+    final path = result.path;
     if (path == null) return;
 
     if (!mounted) return;
@@ -800,7 +798,7 @@ class _ImportModelActionState extends ConsumerState<_ImportModelAction> {
 
     if (!context.mounted) return;
 
-    final suggestedName = result.files.first.name.replaceAll(
+    final suggestedName = result.name.replaceAll(
       RegExp(r'\.(tar\.bz2|tbz2|tar\.gz|tgz|tar|zip|bz2|gz)$'),
       '',
     );
