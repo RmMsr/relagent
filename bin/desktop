@@ -5,6 +5,27 @@ set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 APPS_DIR="$SCRIPT_DIR/../apps"
+AGENTIC_CLIENT_DIR="$SCRIPT_DIR/../dart_packages/agentic_client"
+SHERPA_VOICE_DIR="$SCRIPT_DIR/../dart_packages/sherpa_voice"
+BUNDLE_EXE="$APPS_DIR/build/linux/x64/release/bundle/relagent"
 
 cd "$APPS_DIR"
-fvm flutter run --device-id linux --print-dtd 2>&1 | tee flutter-linux.log
+
+# `flutter run` recompiles and relinks on every launch. Cache a release
+# build instead and only rebuild it when a source file, asset, the Linux
+# platform project, or a path-dependency's lib/ is newer than the bundle.
+needs_build=0
+if [ ! -x "$BUNDLE_EXE" ]; then
+  needs_build=1
+elif find lib linux pubspec.lock assets \
+         "$AGENTIC_CLIENT_DIR/lib" "$SHERPA_VOICE_DIR/lib" \
+         -newer "$BUNDLE_EXE" -print -quit 2>/dev/null | grep -q .; then
+  needs_build=1
+fi
+
+if [ "$needs_build" -eq 1 ]; then
+  echo "Building relagent desktop app (release) ..." >&2
+  fvm flutter build linux --release
+fi
+
+exec "$BUNDLE_EXE" "$@"

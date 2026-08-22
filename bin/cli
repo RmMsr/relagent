@@ -5,6 +5,8 @@ set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 TOOLS_DIR="$SCRIPT_DIR/../tools/cli"
+AGENTIC_CLIENT_DIR="$SCRIPT_DIR/../dart_packages/agentic_client"
+CACHED_EXE="$TOOLS_DIR/.dart_tool/relagent_cli_bin"
 
 # Resolve dependencies on first run (or whenever the lockfile is missing).
 if [ ! -f "$TOOLS_DIR/pubspec.lock" ]; then
@@ -12,4 +14,20 @@ if [ ! -f "$TOOLS_DIR/pubspec.lock" ]; then
   (cd "$TOOLS_DIR" && dart pub get)
 fi
 
-exec dart run "$TOOLS_DIR/bin/relagent_cli.dart" "$@"
+# `dart run` recompiles the whole package graph from source on every
+# invocation (multiple seconds). Cache a native executable instead and only
+# rebuild it when a source file or the lockfile is newer than the cache.
+needs_build=0
+if [ ! -x "$CACHED_EXE" ]; then
+  needs_build=1
+elif find "$TOOLS_DIR/bin" "$TOOLS_DIR/lib" "$TOOLS_DIR/pubspec.lock" \
+         "$AGENTIC_CLIENT_DIR/lib" -newer "$CACHED_EXE" -print -quit 2>/dev/null | grep -q .; then
+  needs_build=1
+fi
+
+if [ "$needs_build" -eq 1 ]; then
+  echo "Building relagent CLI ..." >&2
+  (cd "$TOOLS_DIR" && dart compile exe bin/relagent_cli.dart -o "$CACHED_EXE")
+fi
+
+exec "$CACHED_EXE" "$@"
