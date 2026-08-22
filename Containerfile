@@ -1,14 +1,13 @@
 # syntax=docker/dockerfile:1
 
-FROM ghcr.io/cirruslabs/flutter:3.41.9 AS flutter-builder
+# Required: the flutter-ci image published by .gitlab-ci.yml's build-flutter-image job, e.g. $CI_REGISTRY_IMAGE/flutter-ci:3.41.9
+ARG FLUTTER_CI_IMAGE
+FROM ${FLUTTER_CI_IMAGE} AS flutter-builder
 
-RUN chown -R ubuntu:ubuntu /sdks/flutter && \
-    mkdir -p /dart_packages/sherpa_voice && \
-    chown ubuntu:ubuntu /dart_packages/sherpa_voice && \
-    mkdir /app && \
-    chown ubuntu:ubuntu /app
-
-USER ubuntu
+USER root
+RUN mkdir -p /dart_packages/sherpa_voice /app && \
+    chown flutter:flutter /dart_packages/sherpa_voice /app
+USER flutter
 
 RUN flutter precache --web
 

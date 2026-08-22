@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 
+import json
 import subprocess
 import sys
 from pathlib import Path
 
-from _util import find_container_framework, run_subprocess
+from _util import ensure_registry_login, find_container_framework, run_subprocess
 
 REPO_ROOT = Path(__file__).parent.parent
 VERSION_FILE = REPO_ROOT / "VERSION"
+FVMRC_FILE = REPO_ROOT / ".fvmrc"
 IMAGE_BASE = "registry.gitlab.com/rmmsr/relagent"
 
 
@@ -19,6 +21,12 @@ def get_version() -> str:
     return VERSION_FILE.read_text().strip()
 
 
+def get_flutter_ci_image() -> str:
+    """Build the flutter-ci image reference from the pinned Flutter version in .fvmrc."""
+    flutter_version = json.loads(FVMRC_FILE.read_text())["flutter"]
+    return f"{IMAGE_BASE}/flutter-ci:{flutter_version}"
+
+
 def build_with_framework(framework: str, target: str = "", allow_cache: bool = False) -> str:
     """Build container image with version tag. Returns the version."""
     version = get_version()
@@ -28,12 +36,16 @@ def build_with_framework(framework: str, target: str = "", allow_cache: bool = F
 
     image = f"{IMAGE_BASE}:{version}"
 
+    ensure_registry_login()
+
     # Build with version tags
     command = [
         framework,
         "build",
         "--tag",
         image,
+        "--build-arg",
+        f"FLUTTER_CI_IMAGE={get_flutter_ci_image()}",
         "-f",
         "Containerfile",
     ]

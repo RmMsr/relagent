@@ -1,4 +1,6 @@
 stages:
+- verify
+- image
 - test
 - build
 - upload
@@ -9,16 +11,52 @@ variables:
   APP_ANDROID_PLATFORMS: android-arm,android-arm64,android-x64
   PACKAGE_VERSION: "${CI_COMMIT_REF_NAME}"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/app-releases"
-  FLUTTER_IMAGE: ghcr.io/cirruslabs/flutter:3.41.9
+  FLUTTER_VERSION: "3.41.9"
+  FLUTTER_CI_IMAGE: "$CI_REGISTRY_IMAGE/flutter-ci:$FLUTTER_VERSION"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle-cache"
 
 default:
   tags:
     - dedicated-generic
 
+verify-flutter-version-sync:
+  stage: verify
+  image: debian:trixie-slim
+  script:
+    - |
+      FVMRC_VERSION=$(grep -oP '"flutter":\s*"\K[^"]+' .fvmrc)
+      PUBSPEC_VERSION=$(grep -oP '^\s*flutter:\s*\K\S+' apps/pubspec.yaml | head -1)
+      if [ "$FVMRC_VERSION" != "$FLUTTER_VERSION" ] || [ "$PUBSPEC_VERSION" != "$FLUTTER_VERSION" ]; then
+        echo "Flutter version mismatch: .fvmrc=$FVMRC_VERSION pubspec=$PUBSPEC_VERSION FLUTTER_VERSION(CI var)=$FLUTTER_VERSION" >&2
+        exit 1
+      fi
+      echo "Flutter version in sync: $FLUTTER_VERSION"
+
+build-flutter-image:
+  stage: image
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - changes:
+        - ci/flutter.Containerfile
+        - .fvmrc
+  image: quay.io/buildah/stable
+  timeout: 3h
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - job_execution_timeout
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+  script:
+    - buildah build --layers --build-arg FLUTTER_VERSION=$FLUTTER_VERSION --tag $FLUTTER_CI_IMAGE -f ci/flutter.Containerfile .
+    - buildah push --retry 5 --retry-delay 10s $FLUTTER_CI_IMAGE
+
 test-apps:
   stage: test
-  image: $FLUTTER_IMAGE
+  image: $FLUTTER_CI_IMAGE
   script:
     - cd apps
     - cp assets/config.template.json assets/config.json
@@ -39,11 +77,11 @@ build-engine:
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
   script:
-    - buildah build --layers --platform=linux/amd64 --tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION .
+    - buildah build --layers --platform=linux/amd64 --build-arg FLUTTER_CI_IMAGE=$FLUTTER_CI_IMAGE --tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION .
     - buildah push $CI_REGISTRY_IMAGE:$PACKAGE_VERSION
     - buildah tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION $CI_REGISTRY_IMAGE:any
     - buildah push $CI_REGISTRY_IMAGE:any
-    - buildah build --layers --platform=linux/amd64 --target bundled --tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION-bundled .
+    - buildah build --layers --platform=linux/amd64 --build-arg FLUTTER_CI_IMAGE=$FLUTTER_CI_IMAGE --target bundled --tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION-bundled .
     - buildah push $CI_REGISTRY_IMAGE:$PACKAGE_VERSION-bundled
     - buildah tag $CI_REGISTRY_IMAGE:$PACKAGE_VERSION-bundled $CI_REGISTRY_IMAGE:any-bundled
     - buildah push $CI_REGISTRY_IMAGE:any-bundled
@@ -65,7 +103,7 @@ build-android-apk:
     - dedicated-build
   rules:
     - if: $CI_COMMIT_TAG
-  image: $FLUTTER_IMAGE
+  image: $FLUTTER_CI_IMAGE
   timeout: 2h
   retry:
     max: 1
@@ -74,9 +112,16 @@ build-android-apk:
     - key:
         files:
           - apps/pubspec.lock
+        # Cache key bumped (flutter-ci-v1) to invalidate any .pub-cache/
+        # left over from before this branch's self-hosted flutter-ci image,
+        # which could be owned by a different UID than this image's
+        # non-root flutter user - confirmed necessary: the Android build
+        # failed on a Gradle wrapper permission error under the old key,
+        # and ran cleanly through compilation once bumped.
+        prefix: flutter-ci-v1
       paths:
         - .pub-cache/
-    - key: gradle-android
+    - key: gradle-android-flutter-ci-v1
       paths:
         - .gradle-cache/
   script:
@@ -84,7 +129,6 @@ build-android-apk:
     - |
       pushd /tmp/build/org.venkado.relagent/apps
       export PUB_CACHE="$(pwd)/.pub-cache"
-      ln -sfn "$ANDROID_HOME" /opt/android-sdk
       export ANDROID_HOME=/opt/android-sdk
       export ANDROID_SDK_ROOT=/opt/android-sdk
       flutter build apk --release --split-per-abi
@@ -101,7 +145,7 @@ build-android-bundle:
     - dedicated-build
   rules:
     - if: $CI_COMMIT_TAG
-  image: $FLUTTER_IMAGE
+  image: $FLUTTER_CI_IMAGE
   timeout: 2h
   retry:
     max: 1
@@ -110,9 +154,16 @@ build-android-bundle:
     - key:
         files:
           - apps/pubspec.lock
+        # Cache key bumped (flutter-ci-v1) to invalidate any .pub-cache/
+        # left over from before this branch's self-hosted flutter-ci image,
+        # which could be owned by a different UID than this image's
+        # non-root flutter user - confirmed necessary: the Android build
+        # failed on a Gradle wrapper permission error under the old key,
+        # and ran cleanly through compilation once bumped.
+        prefix: flutter-ci-v1
       paths:
         - .pub-cache/
-    - key: gradle-android
+    - key: gradle-android-flutter-ci-v1
       paths:
         - .gradle-cache/
   script:
@@ -120,7 +171,6 @@ build-android-bundle:
     - |
       pushd /tmp/build/org.venkado.relagent/apps
       export PUB_CACHE="$(pwd)/.pub-cache"
-      ln -sfn "$ANDROID_HOME" /opt/android-sdk
       export ANDROID_HOME=/opt/android-sdk
       export ANDROID_SDK_ROOT=/opt/android-sdk
       flutter build appbundle --release
