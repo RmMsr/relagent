@@ -11,7 +11,7 @@ variables:
   APP_ANDROID_PLATFORMS: android-arm,android-arm64,android-x64
   PACKAGE_VERSION: "${CI_COMMIT_REF_NAME}"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/app-releases"
-  FLUTTER_VERSION: "3.41.9"
+  FLUTTER_VERSION: "3.47.1"
   FLUTTER_CI_IMAGE: "$CI_REGISTRY_IMAGE/flutter-ci:$FLUTTER_VERSION"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle-cache"
 

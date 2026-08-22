@@ -26,12 +26,25 @@ if [ -n "$(tail -c1 "$REPO_ROOT/.fvmrc")" ]; then
   printf '\n' >> "$REPO_ROOT/.fvmrc"
 fi
 
-printf '\n=== Updating apps/pubspec.yaml environment.flutter ===\n'
+printf '\n=== Resolving Dart SDK bundled with Flutter %s ===\n' "$VERSION"
+DART_VERSION="$(cd "$REPO_ROOT" && fvm flutter --version | sed -n 's/.*Dart \([0-9][0-9.]*\).*/\1/p')"
+if [ -z "$DART_VERSION" ]; then
+  echo "Failed to resolve bundled Dart SDK version from 'fvm flutter --version'" >&2
+  exit 1
+fi
+
+printf '\n=== Updating apps/pubspec.yaml environment.flutter and environment.sdk ===\n'
 sed -i.bak -E "s/^(  flutter: ).*/\1${VERSION}/" "$REPO_ROOT/apps/pubspec.yaml"
+sed -i.bak -E "s/^(  sdk: ).*/\1${DART_VERSION}/" "$REPO_ROOT/apps/pubspec.yaml"
 rm -f "$REPO_ROOT/apps/pubspec.yaml.bak"
 
 if ! grep -q "^  flutter: ${VERSION}\$" "$REPO_ROOT/apps/pubspec.yaml"; then
   echo "Failed to update apps/pubspec.yaml environment.flutter (expected line not found after sed)" >&2
+  exit 1
+fi
+
+if ! grep -q "^  sdk: ${DART_VERSION}\$" "$REPO_ROOT/apps/pubspec.yaml"; then
+  echo "Failed to update apps/pubspec.yaml environment.sdk (expected line not found after sed)" >&2
   exit 1
 fi
 
@@ -47,7 +60,7 @@ fi
 printf '\n=== Refreshing pub dependencies against the new SDK ===\n'
 (cd "$REPO_ROOT/apps" && fvm flutter pub get)
 
-printf '\nFlutter pinned to %s in .fvmrc, apps/pubspec.yaml, and .gitlab-ci.yml.\n' "$VERSION"
+printf '\nFlutter pinned to %s (with Dart %s) in .fvmrc, apps/pubspec.yaml, and .gitlab-ci.yml.\n' "$VERSION" "$DART_VERSION"
 printf 'CI will rebuild+publish flutter-ci:%s once these are committed and pushed.\n' "$VERSION"
 printf 'Review the diff, run tests, then commit .fvmrc, apps/pubspec.yaml, apps/pubspec.lock, and .gitlab-ci.yml.\n'
 printf 'If this is a minor/major Flutter bump, also re-check the Android SDK/NDK pins in ci/flutter.Containerfile against the new SDK'"'"'s packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt.\n'
