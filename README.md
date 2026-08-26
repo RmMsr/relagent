@@ -8,9 +8,6 @@
 
 **\#PrivacyFirst - \#SelfHosting - \#DataSovereignty - \#DigitalIndependence**
 
-<a href="https://f-droid.org/packages/org.venkado.relagent/">
-  <img src="https://f-droid.org/badge/get-it-on.png" alt="Relagent on F-Droid" width="120">
-</a>
 <a href="https://play.google.com/store/apps/details?id=org.venkado.relagent">
   <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Relagent on Google Play" width="120">
 </a>
