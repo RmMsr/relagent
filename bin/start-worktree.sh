@@ -57,7 +57,7 @@ REPO_NAME=$(basename "$(git rev-parse --show-toplevel)")
 if [ -z "$WORKTREE_NAME" ]; then
   # Generate random seed for variety
   if [ -r /dev/urandom ]; then
-    seed=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 16 | head -n 1)
+    seed=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 32 | head -n 1)
   else
     seed=$(date +%N | tail -c 24 | tr -dc '0-9' | head -c 16)
   fi
@@ -67,10 +67,10 @@ if [ -z "$WORKTREE_NAME" ]; then
   if command -v relagent-cli >/dev/null 2>&1; then
     echo "Fantasizing a nice name..."
     suffix=$(relagent-cli ask \
-        "Generate a brief, friendly and inpiring but unpredictable \
-        phrase made of 2-3 words. Quick and spontaneous. \
-        No spacing. Only lower case. No thinking. \
-        This is your seed: ${seed}"
+        "Generate 5 brief, friendly and inpiring but unpredictable \
+        phrase made of 2-3 lowercase words. Then pick the one that has \
+        least overlap with this secret: $seed. No thinking. \
+        Finally return just that phrase without spaces."
         )
     if [ -z "$suffix" ] || [ ${#suffix} -gt 20 ]; then
       suffix=""

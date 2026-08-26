@@ -1,9 +1,18 @@
 import configparser
+import os
 import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
 import pytest
+
+
+def reset_test_environment() -> None:
+    """Start engine tests without inherited application configuration."""
+    os.environ.clear()
+
+
+reset_test_environment()
 
 from engine.adapters.test_adapters import (
     MemoryEventStoreAdapter,

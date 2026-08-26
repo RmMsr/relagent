@@ -27,7 +27,12 @@ IMPORTANT: Check also the subproject: @engine/AGENTS.md for the python backend a
 - Thorough in reasoning, concise in output.
 - Skip files over 10KB unless required.
 - Friendly, but brief technical communication.
-- Use the openspec framework for all changes. Make sure the specs stay in sync.
+- Use OpenSpec for changes that affect user-visible behavior, public/API
+  contracts, architecture, multiple components, dependencies, or security and
+  privacy guarantees. Skip it for small, well-contained internal maintenance
+  such as test-only changes, formatting, or straightforward bug fixes that do
+  not alter those contracts. Keep an affected specification in sync whenever
+  OpenSpec applies.
 - Regard automated quality control and AI driven testing as a high priority.
 
 ### Major design principles
