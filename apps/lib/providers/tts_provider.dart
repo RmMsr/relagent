@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -169,9 +167,7 @@ class TtsNotifier extends Notifier<TtsState> {
     });
 
     // Detect if a previous TTS init crashed (SIGABRT leaves the guard set).
-    unawaited(Future.microtask(_checkCrashGuard).catchError((e) {
-      Logger.error('TtsProvider: Error checking crash guard: $e');
-    }));
+    Future.microtask(_checkCrashGuard);
 
     // Listen to settings changes
     ref.listen<Settings>(settingsProvider, (previous, next) {

@@ -1,4 +1,4 @@
-import 'dart:async' show Timer, unawaited;
+import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -76,9 +76,7 @@ class HealthCheckNotifier extends Notifier<HealthCheckState> {
 
   /// Trigger startup health check with retry logic for system recovery
   void triggerStartupHealthCheck() {
-    unawaited(Future.microtask(() => _performStartupHealthCheck()).catchError((e) {
-      Logger.error('Startup health check error: $e');
-    }));
+    Future.microtask(() => _performStartupHealthCheck());
   }
 
   Future<void> _performStartupHealthCheck() async {

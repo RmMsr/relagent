@@ -1,11 +1,11 @@
 name: relagent
 description: "Relatable Agentic Minion - Privacy focused and open AI assistant"
 publish_to: "none"
-version: 0.1.31-pre+28
+version: 0.1.30+27
 
 environment:
-  sdk: 3.13.1
-  flutter: 3.47.1
+  sdk: 3.11.5
+  flutter: 3.41.9
 
 dependencies:
   flutter:
@@ -23,22 +23,22 @@ dependencies:
   intl: ^0.20.2
   path_provider: ^2.1.5
   path: ^1.9.1
-  record: ^7.1.1
+  record: ^6.1.2
   shared_preferences: ^2.3.5
   sherpa_onnx: ^1.12.17
   audio_session: ^0.2.2
   just_audio: ^0.10.5
   just_audio_media_kit: ^2.1.0 # just_audio linux support
   media_kit_libs_linux: ^1.2.1 # just_audio linux support
-  package_info_plus: ^10.2.1
+  package_info_plus: ^9.0.1
   connectivity_plus: ^7.0.0
-  flutter_secure_storage: ^11.0.0
+  flutter_secure_storage: ^10.0.0
   url_launcher: ^6.3.2
   # 1.9.0 relies on Flutter's Gradle tooling auto-applying kotlin-android to
   # plugin subprojects, which isn't present until Flutter 3.44. Lift this
   # upper bound once the project's Flutter version reaches 3.44+.
-  receive_sharing_intent: ^1.9.0
-  file_picker: ^12.0.0
+  receive_sharing_intent: ">=1.8.1 <1.9.0"
+  file_picker: ^11.0.2
   archive: ^4.0.9
   wakelock_plus: ^1.5.2
 

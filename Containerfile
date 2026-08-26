@@ -1,13 +1,12 @@
-# syntax=docker/dockerfile:1
+FROM ghcr.io/cirruslabs/flutter:3.41.9 AS flutter-builder
 
-# Required: the flutter-ci image published by .gitlab-ci.yml's build-flutter-image job, e.g. $CI_REGISTRY_IMAGE/flutter-ci:3.41.9
-ARG FLUTTER_CI_IMAGE
-FROM ${FLUTTER_CI_IMAGE} AS flutter-builder
+RUN chown -R ubuntu:ubuntu /sdks/flutter && \
+    mkdir -p /dart_packages/sherpa_voice && \
+    chown ubuntu:ubuntu /dart_packages/sherpa_voice && \
+    mkdir /app && \
+    chown ubuntu:ubuntu /app
 
-USER root
-RUN mkdir -p /dart_packages/sherpa_voice /app && \
-    chown flutter:flutter /dart_packages/sherpa_voice /app
-USER flutter
+USER ubuntu
 
 RUN flutter precache --web
 
@@ -45,9 +44,7 @@ EXPOSE 8000
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -63,8 +60,7 @@ ADD pyproject.toml uv.lock VERSION ./
 
 USER app
 
-RUN --mount=type=cache,target=/app/.cache/uv,uid=1000,gid=1000 \
-    uv sync --locked --no-dev
+RUN uv sync --locked --no-dev --no-cache
 
 ADD engine ./engine
 
