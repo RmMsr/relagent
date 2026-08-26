@@ -8,6 +8,9 @@
 
 **\#PrivacyFirst - \#SelfHosting - \#DataSovereignty - \#DigitalIndependence**
 
+<a href="https://f-droid.org/packages/org.venkado.relagent/">
+  <img src="https://f-droid.org/badge/get-it-on.png" alt="Relagent on F-Droid" width="120">
+</a>
 <a href="https://play.google.com/store/apps/details?id=org.venkado.relagent">
   <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Relagent on Google Play" width="120">
 </a>
@@ -28,6 +31,7 @@ The goal of the Relagent project is an accessible solution for agentic AI servic
 - 🧰 Agentic tools (e.g., web search)
 - 🎤 Speech Integration: Input and Output on-device (mobile and desktop)
 - ⁉️ Reusable permission based on privacy sensitivity level
+- 🖥️ CLI (with limited features)
 
 ![Screenshots: App, Web, Desktop](docs/media/screenshots-0.1.12.png "Use Relagent anywhere - on your mobile, desktop or via a browser")
 
