@@ -53,7 +53,7 @@ title_summarizer_agent = Agent(
         summarize the nature and topic of the beginning of the conversation.
         Leave out formatting or punctuation.
     """,
-    model_settings=ModelSettings(thinking=False, max_tokens=32),
+    model_settings=ModelSettings(thinking=False),
 )
 
 
