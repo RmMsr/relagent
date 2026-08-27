@@ -10,16 +10,16 @@ import 'package:relagent/voice/model_download_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:wakelock_plus_platform_interface/wakelock_plus_platform_interface.dart';
 
-/// Redirects path_provider's cache directory to a temp directory for testing.
-class _FakeCachePathProvider extends PathProviderPlatform {
-  final String cachePath;
-  _FakeCachePathProvider(this.cachePath);
+/// Redirects path_provider's support + temp directories to a temp dir for tests.
+class _FakeSupportPathProvider extends PathProviderPlatform {
+  final String basePath;
+  _FakeSupportPathProvider(this.basePath);
 
   @override
-  Future<String?> getApplicationCachePath() async => cachePath;
+  Future<String?> getApplicationSupportPath() async => basePath;
 
   @override
-  Future<String?> getTemporaryPath() async => cachePath;
+  Future<String?> getTemporaryPath() async => basePath;
 }
 
 /// Fails the first [failCount] calls, then "succeeds" by writing a real
@@ -135,7 +135,7 @@ void main() {
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('model_dl_provider_test_');
-    PathProviderPlatform.instance = _FakeCachePathProvider(tempDir.path);
+    PathProviderPlatform.instance = _FakeSupportPathProvider(tempDir.path);
     fakeWakelock = _FakeWakelockPlatform();
     wakelockPlusPlatformInstance = fakeWakelock;
   });

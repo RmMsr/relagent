@@ -41,9 +41,12 @@ class ModelDownloadService {
   String? _activeModelId;
 
   /// Get the base directory for all downloaded models.
+  ///
+  /// Application support storage, not cache: the OS purges the cache dir
+  /// under storage pressure, which would silently delete downloaded models.
   Future<Directory> _modelsBaseDir() async {
-    final cacheDir = await getApplicationCacheDirectory();
-    return Directory(p.join(cacheDir.path, _modelsSubdir));
+    final supportDir = await getApplicationSupportDirectory();
+    return Directory(p.join(supportDir.path, _modelsSubdir));
   }
 
   /// Same as [_modelsBaseDir], but null when local storage is unavailable

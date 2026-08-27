@@ -8,12 +8,12 @@ import 'package:relagent/models/settings.dart';
 import 'package:relagent/providers/model_download_provider.dart';
 import 'package:relagent/voice/model_resolver.dart';
 
-class _FakeCachePathProvider extends PathProviderPlatform {
-  final String cachePath;
-  _FakeCachePathProvider(this.cachePath);
+class _FakeSupportPathProvider extends PathProviderPlatform {
+  final String basePath;
+  _FakeSupportPathProvider(this.basePath);
 
   @override
-  Future<String?> getApplicationCachePath() async => cachePath;
+  Future<String?> getApplicationSupportPath() async => basePath;
 }
 
 void main() {
@@ -342,7 +342,7 @@ void main() {
 
     setUp(() async {
       tempDir = await Directory.systemTemp.createTemp('resolver_lang_test_');
-      PathProviderPlatform.instance = _FakeCachePathProvider(tempDir.path);
+      PathProviderPlatform.instance = _FakeSupportPathProvider(tempDir.path);
     });
 
     tearDown(() async {
@@ -405,7 +405,7 @@ void main() {
 
     setUp(() async {
       tempDir = await Directory.systemTemp.createTemp('resolver_test_');
-      PathProviderPlatform.instance = _FakeCachePathProvider(tempDir.path);
+      PathProviderPlatform.instance = _FakeSupportPathProvider(tempDir.path);
     });
 
     tearDown(() async {

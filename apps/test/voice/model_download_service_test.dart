@@ -8,24 +8,24 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:relagent/models/model_catalog.dart';
 import 'package:relagent/voice/model_download_service.dart';
 
-/// Redirects path_provider cache directory to a temp directory for testing.
-class _FakeCachePathProvider extends PathProviderPlatform {
-  final String cachePath;
-  _FakeCachePathProvider(this.cachePath);
+/// Redirects path_provider support + temp directories to a temp dir for tests.
+class _FakeSupportPathProvider extends PathProviderPlatform {
+  final String basePath;
+  _FakeSupportPathProvider(this.basePath);
 
   @override
-  Future<String?> getApplicationCachePath() async => cachePath;
+  Future<String?> getApplicationSupportPath() async => basePath;
 
   @override
-  Future<String?> getTemporaryPath() async => cachePath;
+  Future<String?> getTemporaryPath() async => basePath;
 }
 
 /// Simulates a platform that ships no path_provider implementation, as on web.
 class _UnavailablePathProvider extends PathProviderPlatform {
   @override
-  Future<String?> getApplicationCachePath() async =>
+  Future<String?> getApplicationSupportPath() async =>
       throw MissingPluginException(
-        'No implementation found for method getApplicationCacheDirectory '
+        'No implementation found for method getApplicationSupportDirectory '
         'on channel plugins.flutter.io/path_provider',
       );
 }
@@ -44,7 +44,7 @@ void main() {
 
     setUp(() async {
       tempDir = await Directory.systemTemp.createTemp('model_dl_test_');
-      PathProviderPlatform.instance = _FakeCachePathProvider(tempDir.path);
+      PathProviderPlatform.instance = _FakeSupportPathProvider(tempDir.path);
       service = ModelDownloadService();
     });
 

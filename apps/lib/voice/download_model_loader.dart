@@ -7,18 +7,19 @@ import '/models/model_catalog.dart';
 import '/utils/logger.dart';
 import 'package:sherpa_voice/model_loader.dart';
 
-/// Loads models from the cache storage directory (re-downloadable).
+/// Loads models downloaded from the catalog (re-downloadable).
 ///
-/// Models are stored at `<cache_dir>/models/<type>/<model-id>/`.
+/// Models are stored at `<support_dir>/models/<type>/<model-id>/` — see
+/// ModelDownloadService for why support storage rather than cache.
 class DownloadModelLoader implements ModelLoader {
   final CatalogEntry _entry;
 
   DownloadModelLoader(this._entry);
 
   Future<String> _modelBasePath() async {
-    final cacheDir = await getApplicationCacheDirectory();
+    final supportDir = await getApplicationSupportDirectory();
     final typeDir = _entry.type == ModelType.asr ? 'asr' : 'tts';
-    return p.join(cacheDir.path, 'models', typeDir, _entry.id);
+    return p.join(supportDir.path, 'models', typeDir, _entry.id);
   }
 
   @override
