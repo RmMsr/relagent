@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import '/models/imported_model.dart';
 import '/models/model_catalog.dart';
+import '/models/settings.dart';
 import '/providers/credentials_pass_provider.dart';
 import '/providers/imported_models_provider.dart';
 import '/providers/model_download_provider.dart';
@@ -20,6 +21,18 @@ import '/voice/imported_model_service.dart';
 import '/voice/model_download_service.dart';
 import 'import_model_sheet.dart';
 import 'settings_apply_bar.dart';
+
+enum _CatalogFilter {
+  all,
+  downloaded,
+  selected;
+
+  String get label => switch (this) {
+    _CatalogFilter.all => 'All',
+    _CatalogFilter.downloaded => 'Downloaded',
+    _CatalogFilter.selected => 'Selected',
+  };
+}
 
 /// Full-screen catalog browser for downloading and selecting models.
 class ModelCatalogBrowser extends ConsumerStatefulWidget {
@@ -37,7 +50,7 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
   late TabController _tabController;
   late TextEditingController _searchController;
   String _searchQuery = '';
-  bool _downloadedOnly = false;
+  _CatalogFilter _filter = _CatalogFilter.all;
 
   @override
   void initState() {
@@ -147,10 +160,16 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
                     ),
                   ),
                   const SizedBox(width: 12),
-                  FilterChip(
-                    label: const Text('Downloaded'),
-                    selected: _downloadedOnly,
-                    onSelected: (v) => setState(() => _downloadedOnly = v),
+                  DropdownButton<_CatalogFilter>(
+                    value: _filter,
+                    underline: const SizedBox.shrink(),
+                    onChanged: (v) => setState(() => _filter = v!),
+                    items: _CatalogFilter.values
+                        .map(
+                          (f) =>
+                              DropdownMenuItem(value: f, child: Text(f.label)),
+                        )
+                        .toList(),
                   ),
                 ],
               ),
@@ -162,12 +181,12 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
                   _ModelList(
                     type: ModelType.asr,
                     filterQuery: _searchQuery,
-                    downloadedOnly: _downloadedOnly,
+                    filter: _filter,
                   ),
                   _ModelList(
                     type: ModelType.tts,
                     filterQuery: _searchQuery,
-                    downloadedOnly: _downloadedOnly,
+                    filter: _filter,
                   ),
                 ],
               ),
@@ -183,12 +202,12 @@ class _ModelCatalogBrowserState extends ConsumerState<ModelCatalogBrowser>
 class _ModelList extends ConsumerStatefulWidget {
   final ModelType type;
   final String filterQuery;
-  final bool downloadedOnly;
+  final _CatalogFilter filter;
 
   const _ModelList({
     required this.type,
     this.filterQuery = '',
-    this.downloadedOnly = false,
+    this.filter = _CatalogFilter.all,
   });
 
   @override
@@ -205,15 +224,14 @@ class _ModelListState extends ConsumerState<_ModelList> {
   void initState() {
     super.initState();
     final settings = ref.read(settingsProvider);
-    final selectedId = widget.type == ModelType.asr
-        ? settings.selectedAsrModelId
-        : settings.selectedTtsModelId;
+    final defaultId = widget.type == ModelType.asr
+        ? settings.defaultAsrModelId
+        : settings.defaultTtsModelId;
 
     double initialOffset = 0;
-    if (selectedId != null) {
-      final index = ModelCatalog.byType(
-        widget.type,
-      ).indexWhere((e) => e.id == selectedId);
+    if (defaultId != null) {
+      final index = ModelCatalog.byType(widget.type)
+          .indexWhere((e) => e.id == defaultId);
       if (index > 0) initialOffset = index * _cardHeight;
     }
 
@@ -226,19 +244,39 @@ class _ModelListState extends ConsumerState<_ModelList> {
     super.dispose();
   }
 
+  /// A model is "selected" (highlighted, and included by the "Selected"
+  /// filter) when it's assigned/enabled for the current type or is that
+  /// type's device default — the same shape of condition either way.
+  bool _isAssignedOrDefault(String modelId, Settings settings) {
+    if (widget.type == ModelType.asr) {
+      return settings.asrQuickPickModelIds.contains(modelId) ||
+          settings.defaultAsrModelId == modelId;
+    }
+    return settings.ttsLanguagePreferences.containsValue(modelId) ||
+        settings.defaultTtsModelId == modelId;
+  }
+
   List<CatalogEntry> _applyFilter(
     List<CatalogEntry> all,
     ModelDownloadState downloadState,
+    Settings settings,
   ) {
     var results = all;
-    if (widget.downloadedOnly) {
-      results = results
-          .where(
-            (e) =>
-                downloadState.isDownloaded(e.id) ||
-                downloadState.isDownloadingModel(e.id),
-          )
-          .toList();
+    switch (widget.filter) {
+      case _CatalogFilter.downloaded:
+        results = results
+            .where(
+              (e) =>
+                  downloadState.isDownloaded(e.id) ||
+                  downloadState.isDownloadingModel(e.id),
+            )
+            .toList();
+      case _CatalogFilter.selected:
+        results = results
+            .where((e) => _isAssignedOrDefault(e.id, settings))
+            .toList();
+      case _CatalogFilter.all:
+        break;
     }
     if (widget.filterQuery.isEmpty) return results;
     final q = widget.filterQuery.toLowerCase();
@@ -252,11 +290,21 @@ class _ModelListState extends ConsumerState<_ModelList> {
         .toList();
   }
 
-  List<ImportedModelEntry> _applyImportedFilter(List<ImportedModelEntry> all) {
-    // Imported models are always locally available; include them when downloadedOnly.
-    if (widget.filterQuery.isEmpty) return all;
+  List<ImportedModelEntry> _applyImportedFilter(
+    List<ImportedModelEntry> all,
+    Settings settings,
+  ) {
+    // Imported models are always locally available (never affected by the
+    // "Downloaded" filter, only "Selected").
+    var results = all;
+    if (widget.filter == _CatalogFilter.selected) {
+      results = results
+          .where((e) => _isAssignedOrDefault(e.id, settings))
+          .toList();
+    }
+    if (widget.filterQuery.isEmpty) return results;
     final q = widget.filterQuery.toLowerCase();
-    return all
+    return results
         .where(
           (e) =>
               e.displayName.toLowerCase().contains(q) ||
@@ -275,14 +323,14 @@ class _ModelListState extends ConsumerState<_ModelList> {
     final catalogEntries = _applyFilter(
       ModelCatalog.byType(widget.type),
       downloadState,
+      settings,
     );
     final importedEntries = _applyImportedFilter(
       ImportedModelRegistry.byType(widget.type),
+      settings,
     );
 
-    final selectedId = widget.type == ModelType.asr
-        ? settings.selectedAsrModelId
-        : settings.selectedTtsModelId;
+    bool isSelected(String id) => _isAssignedOrDefault(id, settings);
 
     if (downloadState.isScanning) {
       return const Center(child: CircularProgressIndicator());
@@ -304,14 +352,14 @@ class _ModelListState extends ConsumerState<_ModelList> {
                 final entry = importedEntries[index];
                 return _ImportedModelCard(
                   entry: entry,
-                  isSelected: selectedId == entry.id,
+                  isSelected: isSelected(entry.id),
                 );
               }
               final entry = catalogEntries[index - importedEntries.length];
               return _ModelEntryCard(
                 entry: entry,
                 isDownloaded: downloadState.isDownloaded(entry.id),
-                isSelected: selectedId == entry.id,
+                isSelected: isSelected(entry.id),
                 isDownloading: downloadState.isDownloadingModel(entry.id),
                 progress: downloadState.progressFor(entry.id),
               );
@@ -320,6 +368,115 @@ class _ModelListState extends ConsumerState<_ModelList> {
         ),
         _StorageFooter(totalBytes: downloadState.totalStorageBytes),
       ],
+    );
+  }
+}
+
+/// Matches [CatalogEntry.languages] entries that can't be individually
+/// assigned — mirrors `ModelCatalog._multiLanguageSentinel`.
+const _multiLanguageSentinel = 'multi';
+
+List<String> _concreteLanguages(List<String> languages) =>
+    languages.where((l) => l != _multiLanguageSentinel).toList();
+
+void _toggleTtsLanguageAssignment(
+  SettingsNotifier notifier,
+  String language,
+  String modelId,
+  bool checked,
+) {
+  checked
+      ? notifier.assignTtsModelToLanguage(language, modelId)
+      : notifier.removeTtsLanguagePreference(language);
+}
+
+/// Wildcard (star) control marking a model as its type's persisted device
+/// default — the same widget for ASR and TTS (design D14/D17). Meaning
+/// differs by type: for TTS, the model used when no language assignment
+/// matches a response; for ASR, the model used when no session-only
+/// quick-pick override is active.
+class _DefaultModelButton extends ConsumerWidget {
+  final String modelId;
+  final ModelType type;
+
+  const _DefaultModelButton({required this.modelId, required this.type});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+    final isTts = type == ModelType.tts;
+    final isDefault = isTts
+        ? settings.defaultTtsModelId == modelId
+        : settings.defaultAsrModelId == modelId;
+    final label = isTts ? 'TTS voice' : 'ASR model';
+
+    return IconButton(
+      icon: Icon(isDefault ? Icons.star : Icons.star_border),
+      iconSize: 20,
+      color: isDefault ? theme.colorScheme.primary : null,
+      onPressed: () {
+        final newDefault = isDefault ? null : modelId;
+        isTts
+            ? notifier.setDefaultTtsModel(newDefault)
+            : notifier.setDefaultAsrModel(newDefault);
+      },
+      visualDensity: VisualDensity.compact,
+      tooltip: isDefault
+          ? 'Remove as default $label'
+          : 'Mark as default $label',
+    );
+  }
+}
+
+/// Single checkbox shown on every downloaded/available model card — the same
+/// widget for ASR and TTS, one per model regardless of how many languages it
+/// declares (design D15/D18). Meaning differs by type: for TTS, assigns the
+/// model to its first declared language; for ASR, adds it to the mic
+/// long-press quick-pick set. A TTS model whose only declared language is
+/// the unenumerable "multi" sentinel has nothing concrete to assign, so it
+/// gets no checkbox at all.
+class _ModelToggleCheckbox extends ConsumerWidget {
+  final String modelId;
+  final ModelType type;
+  final List<String> languages;
+
+  const _ModelToggleCheckbox({
+    required this.modelId,
+    required this.type,
+    required this.languages,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+    final isTts = type == ModelType.tts;
+
+    if (isTts) {
+      final concrete = _concreteLanguages(languages);
+      if (concrete.isEmpty) return const SizedBox.shrink();
+      final language = concrete.first;
+      final isAssigned = settings.ttsLanguagePreferences[language] == modelId;
+      return Checkbox(
+        value: isAssigned,
+        onChanged: (checked) => _toggleTtsLanguageAssignment(
+          notifier,
+          language,
+          modelId,
+          checked == true,
+        ),
+        visualDensity: VisualDensity.compact,
+      );
+    }
+
+    final isEnabled = settings.asrQuickPickModelIds.contains(modelId);
+    return Checkbox(
+      value: isEnabled,
+      onChanged: (checked) =>
+          notifier.setAsrQuickPickEnabled(modelId, checked == true),
+      visualDensity: VisualDensity.compact,
     );
   }
 }
@@ -386,7 +543,6 @@ class _ModelEntryCard extends ConsumerWidget {
       color: isSelected ? theme.colorScheme.primaryContainer : null,
       elevation: isSelected ? 4 : null,
       child: InkWell(
-        onTap: isDownloaded ? () => _selectModel(ref) : null,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -412,8 +568,21 @@ class _ModelEntryCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  if (isSelected)
-                    Icon(Icons.check_circle, color: theme.colorScheme.primary),
+                  if (isDownloaded)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _DefaultModelButton(
+                          modelId: entry.id,
+                          type: entry.type,
+                        ),
+                        _ModelToggleCheckbox(
+                          modelId: entry.id,
+                          type: entry.type,
+                          languages: entry.languages,
+                        ),
+                      ],
+                    ),
                 ],
               ),
               const SizedBox(height: 2),
@@ -480,23 +649,13 @@ class _ModelEntryCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Align(
-                  alignment: Alignment.centerRight,
+                  alignment: Alignment.centerLeft,
                   child: isDownloaded
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (!isSelected)
-                              TextButton(
-                                onPressed: () => _selectModel(ref),
-                                child: const Text('Select'),
-                              ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 20),
-                              onPressed: () => _deleteModel(context, ref),
-                              visualDensity: VisualDensity.compact,
-                              tooltip: 'Delete',
-                            ),
-                          ],
+                      ? IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 20),
+                          onPressed: () => _deleteModel(context, ref),
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'Delete',
                         )
                       : FilledButton.tonalIcon(
                           onPressed: () => _downloadModel(ref),
@@ -518,15 +677,6 @@ class _ModelEntryCard extends ConsumerWidget {
 
   void _cancelDownload(WidgetRef ref) {
     ref.read(modelDownloadProvider.notifier).cancelDownload(entry.id);
-  }
-
-  void _selectModel(WidgetRef ref) {
-    final notifier = ref.read(settingsProvider.notifier);
-    if (entry.type == ModelType.asr) {
-      notifier.updateSelectedAsrModelId(entry.id);
-    } else {
-      notifier.updateSelectedTtsModelId(entry.id);
-    }
   }
 
   Future<void> _deleteModel(BuildContext context, WidgetRef ref) async {
@@ -579,7 +729,6 @@ class _ImportedModelCard extends ConsumerWidget {
       color: isSelected ? theme.colorScheme.primaryContainer : null,
       elevation: isSelected ? 4 : null,
       child: InkWell(
-        onTap: () => _selectModel(ref),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -596,16 +745,26 @@ class _ImportedModelCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  Chip(
-                    label: const Text('Imported'),
-                    labelStyle: theme.textTheme.labelSmall,
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Chip(
+                      label: const Text('Imported'),
+                      labelStyle: theme.textTheme.labelSmall,
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
-                  if (isSelected) ...[
-                    const SizedBox(width: 8),
-                    Icon(Icons.check_circle, color: theme.colorScheme.primary),
-                  ],
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _DefaultModelButton(modelId: entry.id, type: entry.type),
+                      _ModelToggleCheckbox(
+                        modelId: entry.id,
+                        type: entry.type,
+                        languages: entry.languages,
+                      ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 2),
@@ -626,15 +785,10 @@ class _ImportedModelCard extends ConsumerWidget {
               ],
               const SizedBox(height: 8),
               Align(
-                alignment: Alignment.centerRight,
+                alignment: Alignment.centerLeft,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (!isSelected)
-                      TextButton(
-                        onPressed: () => _selectModel(ref),
-                        child: const Text('Select'),
-                      ),
                     IconButton(
                       icon: const Icon(Icons.edit_outlined, size: 20),
                       onPressed: () => _editMetadata(context, ref),
@@ -655,15 +809,6 @@ class _ImportedModelCard extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  void _selectModel(WidgetRef ref) {
-    final notifier = ref.read(settingsProvider.notifier);
-    if (entry.type == ModelType.asr) {
-      notifier.updateSelectedAsrModelId(entry.id);
-    } else {
-      notifier.updateSelectedTtsModelId(entry.id);
-    }
   }
 
   Future<void> _editMetadata(BuildContext context, WidgetRef ref) async {
@@ -826,9 +971,8 @@ class _ImportModelActionState extends ConsumerState<_ImportModelAction> {
 
     final error = ref.read(importedModelsProvider).operationError;
     if (error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
       ref.read(importedModelsProvider.notifier).clearError();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

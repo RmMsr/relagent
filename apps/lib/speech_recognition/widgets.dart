@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/models/settings.dart';
 import '/providers/mic_preference_provider.dart';
+import '/providers/model_download_provider.dart';
 import '/providers/recording_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/voice_service_provider.dart';
 import '/speech_recognition/mic_selection_widgets.dart';
+import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 
 class RecordingStateIndicator extends StatelessWidget {
@@ -273,6 +275,7 @@ class RecorderButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final voiceMode = ref.watch(settingsProvider).voiceMode;
     final recordingState = ref.watch(recordingProvider);
     final inputSelectionAvailable = ref
@@ -281,6 +284,15 @@ class RecorderButton extends ConsumerWidget {
     final micCategory = inputSelectionAvailable
         ? ref.watch(micSelectionProvider).value?.device?.category
         : null;
+    final devices = inputSelectionAvailable
+        ? (ref.watch(micDevicesProvider).value ?? const <MicDevice>[])
+        : const <MicDevice>[];
+    final settings = ref.watch(settingsProvider);
+    final downloadState = ref.watch(modelDownloadProvider);
+    final languageOptionsAvailable =
+        quickPickAsrEntries(settings, downloadState).length >= 2;
+    final devicePickerAvailable = inputSelectionAvailable && devices.isNotEmpty;
+    final pickerAvailable = devicePickerAvailable || languageOptionsAvailable;
 
     String tooltip;
     if (voiceMode == VoiceMode.listening ||
@@ -295,9 +307,7 @@ class RecorderButton extends ConsumerWidget {
     return IconButton(
       // Long-press opens the mic picker; must be on the button itself, not a
       // wrapping GestureDetector, or the tooltip's long-press wins the arena.
-      onLongPress: inputSelectionAvailable
-          ? () => showMicPickerSheet(context)
-          : null,
+      onLongPress: pickerAvailable ? () => showMicPickerSheet(context) : null,
       onPressed: () {
         final voiceMode = ref.read(settingsProvider).voiceMode;
         final recordingState = ref.read(recordingProvider);
@@ -338,6 +348,19 @@ class RecorderButton extends ConsumerWidget {
                 micCategory: micCategory,
               ),
             ),
+            // Indicates the mic long-press picker has a recognition-language
+            // section, distinct in position from MicDeviceBadge (bottom-right
+            // of the mic symbol itself) so both can show at once.
+            if (languageOptionsAvailable)
+              Positioned(
+                left: 2,
+                top: 0,
+                child: Icon(
+                  Icons.translate,
+                  size: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
           ],
         ),
       ),

@@ -274,6 +274,7 @@ class AgenticMessage {
   final String? technicalDetails;
   final String? sessionId; // Returned by engine, used to track conversation
   final AgentStats? stats; // Stats from engine response
+  final String? languageCode; // ISO 639-1 code the LLM chose, if any
   final List<ApprovalData>? approvals; // SystemAction approvals
   final String? notification; // SystemAction notification
   final SensitivityLevel? sensitivityLevel; // From ChatResponse or approval
@@ -292,6 +293,7 @@ class AgenticMessage {
     this.technicalDetails,
     this.sessionId,
     this.stats,
+    this.languageCode,
     this.approvals,
     this.notification,
     this.sensitivityLevel,
@@ -313,6 +315,7 @@ class AgenticMessage {
       technicalDetails: technicalDetails,
       sessionId: sessionId,
       stats: stats,
+      languageCode: languageCode,
       approvals: approvals ?? this.approvals,
       notification: notification,
       sensitivityLevel: sensitivityLevel,
@@ -400,6 +403,7 @@ class AgenticMessage {
       timestamp: timestamp,
       sessionId: json['session_id'] as String?,
       stats: stats,
+      languageCode: json['language_code'] as String?,
       approvals: approvals,
       notification: notification,
       // Engine omits `final` for pre-cutover records; assume settled.

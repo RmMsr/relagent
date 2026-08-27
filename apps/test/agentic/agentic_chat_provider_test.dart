@@ -42,7 +42,11 @@ class _RecordingTtsNotifier extends TtsNotifier {
   TtsState build() => TtsState.initial();
 
   @override
-  Future<void> enqueue(String text, String messageId) async {
+  Future<void> enqueue(
+    String text,
+    String messageId, {
+    String? languageCode,
+  }) async {
     enqueuedMessageIds.add(messageId);
   }
 }

@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '/providers/mic_preference_provider.dart';
+import '/providers/model_download_provider.dart';
+import '/providers/recording_provider.dart';
+import '/providers/settings_provider.dart';
+import '/providers/voice_service_provider.dart';
+import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 
 /// Overlays a small badge identifying the input device category (Bluetooth,
@@ -87,8 +92,13 @@ void showMicPickerSheet(BuildContext context) {
   );
 }
 
-/// Lists "Automatic" plus the enumerated input devices; selecting an entry
-/// pins it as the microphone preference.
+/// Lists "Automatic" plus the enumerated input devices (when there's more
+/// than the trivial "Automatic" choice), and — independently — the ASR
+/// models enabled for quick-pick via `apps/lib/widgets/model_management_section.dart`
+/// (when there are at least two to pick between). Picking a model sets a
+/// session-only override (`activeAsrModelOverrideProvider`) — it does not
+/// persist and reverts to the device default on the next app launch (design
+/// D17). Each section is shown only when it actually offers a choice.
 class MicPickerSheet extends ConsumerWidget {
   const MicPickerSheet({super.key});
 
@@ -96,45 +106,81 @@ class MicPickerSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final preference = ref.watch(micPreferenceProvider);
-    final devices = ref.watch(micDevicesProvider).value ?? const <MicDevice>[];
+    final inputSelectionAvailable = ref
+        .watch(voiceCapabilitiesProvider)
+        .isInputSelectionAvailable;
+    final devices = inputSelectionAvailable
+        ? (ref.watch(micDevicesProvider).value ?? const <MicDevice>[])
+        : const <MicDevice>[];
+    final settings = ref.watch(settingsProvider);
+    final downloadState = ref.watch(modelDownloadProvider);
+    final quickPickEntries = quickPickAsrEntries(settings, downloadState);
+    final activeOverride = ref.watch(activeAsrModelOverrideProvider);
 
-    Future<void> select(MicPreference newPreference) async {
+    Future<void> selectDevice(MicPreference newPreference) async {
       await ref.read(micPreferenceProvider.notifier).set(newPreference);
       if (context.mounted) Navigator.of(context).pop();
+    }
+
+    void selectAsrModel(String modelId) {
+      final notifier = ref.read(activeAsrModelOverrideProvider.notifier);
+      notifier.set(activeOverride == modelId ? null : modelId);
+      Navigator.of(context).pop();
     }
 
     return SafeArea(
       child: ListView(
         shrinkWrap: true,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text('Microphone', style: theme.textTheme.titleMedium),
-          ),
-          ListTile(
-            leading: const Icon(Icons.mic_external_on),
-            title: const Text('Automatic'),
-            subtitle: const Text('Prefer Bluetooth headset when connected'),
-            trailing: preference.isAuto ? const Icon(Icons.check) : null,
-            onTap: () => select(const MicPreference.auto()),
-          ),
-          for (final device in devices)
+          if (devices.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Microphone', style: theme.textTheme.titleMedium),
+            ),
             ListTile(
-              leading: MicSymbol(category: device.category, size: 24),
-              title: Text(
-                device.name.isEmpty ? device.category.name : device.name,
-              ),
-              trailing: !preference.isAuto && preference.matches(device)
-                  ? const Icon(Icons.check)
-                  : null,
-              onTap: () => select(
-                MicPreference.pinned(
-                  category: device.category,
-                  address: device.address,
-                  name: device.name,
+              leading: const Icon(Icons.mic_external_on),
+              title: const Text('Automatic'),
+              subtitle: const Text('Prefer Bluetooth headset when connected'),
+              trailing: preference.isAuto ? const Icon(Icons.check) : null,
+              onTap: () => selectDevice(const MicPreference.auto()),
+            ),
+            for (final device in devices)
+              ListTile(
+                leading: MicSymbol(category: device.category, size: 24),
+                title: Text(
+                  device.name.isEmpty ? device.category.name : device.name,
+                ),
+                trailing: !preference.isAuto && preference.matches(device)
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () => selectDevice(
+                  MicPreference.pinned(
+                    category: device.category,
+                    address: device.address,
+                    name: device.name,
+                  ),
                 ),
               ),
+          ],
+          if (quickPickEntries.length >= 2) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Recognition Model',
+                style: theme.textTheme.titleMedium,
+              ),
             ),
+            for (final entry in quickPickEntries)
+              ListTile(
+                leading: const Icon(Icons.translate),
+                title: Text(entry.displayName),
+                subtitle: Text(languageCoverageLabel(entry.languages)),
+                trailing: activeOverride == entry.id
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () => selectAsrModel(entry.id),
+              ),
+          ],
         ],
       ),
     );

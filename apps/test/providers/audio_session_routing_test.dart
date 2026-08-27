@@ -89,6 +89,7 @@ class _TrackingVoiceService extends VoiceService {
   Future<Uint8List?> generateSpeech(
     String text,
     String messageId, {
+    ResolvedTtsModel? resolvedTtsModel,
     int speakerId = 0,
     double speed = 1.0,
   }) async => null;

@@ -9,6 +9,7 @@ import '/speech_recognition/asr_metadata.dart';
 import '/speech_recognition/sherpa_vad_asr.dart';
 import '/tts/tts_isolate_worker.dart';
 import '/utils/logger.dart';
+import '/voice/lru_pool.dart';
 import '/voice/mic_router.dart';
 import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
@@ -19,8 +20,6 @@ import 'package:record/record.dart' as record_pkg;
 /// only sequences it (ensureReady before the recorder opens, release after).
 class NativeVoiceService extends VoiceService {
   asr.AsrService? _asr;
-  TtsIsolateWorker? _ttsWorker;
-  bool _ttsInitialized = false;
 
   final MicRouter _micRouter;
   MicPreference _micPreference = const MicPreference.auto();
@@ -150,42 +149,61 @@ class NativeVoiceService extends VoiceService {
   }
 
   // --- TTS ---
+  //
+  // A small LRU pool of live TtsIsolateWorkers (each its own isolate holding
+  // one loaded native model), keyed by resolved model id, so switching
+  // between a handful of recently-used languages/models doesn't pay a
+  // dispose+reload cost every time — only on a genuine pool miss. Keyed by
+  // model id (a String) rather than the ResolvedTtsModel instance itself,
+  // since callers legitimately construct a fresh ResolvedTtsModel per call.
 
-  ResolvedTtsModel? _currentResolvedTtsModel;
+  static const _maxTtsPoolSize = 3;
+
+  late final _ttsPool = LruPool<String, TtsIsolateWorker>(
+    maxSize: _maxTtsPoolSize,
+    onEvict: (worker) {
+      Logger.debug('NativeVoiceService: TTS pool evicted a worker');
+      worker.dispose();
+    },
+  );
+
+  Future<TtsIsolateWorker?> _ttsWorkerFor(
+    ResolvedTtsModel? resolvedTtsModel,
+  ) async {
+    if (resolvedTtsModel == null) return null;
+    final key = resolvedTtsModel.modelId;
+
+    final existing = _ttsPool.get(key);
+    if (existing != null) return existing;
+
+    final worker = TtsIsolateWorker();
+    await worker.initialize(resolvedModel: resolvedTtsModel);
+    _ttsPool.put(key, worker);
+    return worker;
+  }
 
   @override
   Future<void> initializeTts({ResolvedTtsModel? resolvedTtsModel}) async {
-    // Check if we need to reinitialize with a different model
-    if (_ttsInitialized && resolvedTtsModel != _currentResolvedTtsModel) {
-      Logger.debug('NativeVoiceService: TTS model changed, reinitializing');
-      disposeTts();
-    }
-
-    if (_ttsInitialized) return;
-
     if (resolvedTtsModel == null) {
       Logger.debug('NativeVoiceService: No TTS model available, skipping init');
       return;
     }
-    _currentResolvedTtsModel = resolvedTtsModel;
-    _ttsWorker = TtsIsolateWorker();
-    await _ttsWorker!.initialize(resolvedModel: resolvedTtsModel);
-    _ttsInitialized = true;
+    await _ttsWorkerFor(resolvedTtsModel);
   }
 
   @override
   Future<Uint8List?> generateSpeech(
     String text,
     String messageId, {
+    ResolvedTtsModel? resolvedTtsModel,
     int speakerId = 0,
     double speed = 1.0,
   }) async {
-    if (!_ttsInitialized || _ttsWorker == null) {
-      await initializeTts(resolvedTtsModel: _currentResolvedTtsModel);
-    }
+    final worker = await _ttsWorkerFor(resolvedTtsModel);
+    if (worker == null) return null;
 
     try {
-      return await _ttsWorker!.generateAudio(
+      return await worker.generateAudio(
         text: text,
         messageId: messageId,
         speakerId: speakerId,
@@ -199,9 +217,7 @@ class NativeVoiceService extends VoiceService {
 
   @override
   void disposeTts() {
-    _ttsWorker?.dispose();
-    _ttsWorker = null;
-    _ttsInitialized = false;
+    _ttsPool.clear();
   }
 
   // --- Input device selection ---

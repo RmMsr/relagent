@@ -243,7 +243,7 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                                     .watch(voiceCapabilitiesProvider)
                                     .isTtsAvailable
                                 ? null
-                                : (text, messageId) {
+                                : (text, messageId, languageCode) {
                                     final status = ttsState
                                         .getMessageState(messageId)
                                         .status;
@@ -259,7 +259,11 @@ class _AgenticChatPageState extends ConsumerState<AgenticChatPage>
                                       case MessagePlaybackStatus.idle:
                                       case MessagePlaybackStatus.completed:
                                       case MessagePlaybackStatus.error:
-                                        ttsNotifier.playNow(text, messageId);
+                                        ttsNotifier.playNow(
+                                          text,
+                                          messageId,
+                                          languageCode: languageCode,
+                                        );
                                       case MessagePlaybackStatus.generating:
                                         break;
                                     }

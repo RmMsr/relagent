@@ -103,7 +103,7 @@ void main() {
     ).writeAsString('');
     await File(p.join(dir.path, '.complete')).writeAsString('done');
 
-    final settings = Settings.defaults().copyWith(selectedAsrModelId: id);
+    final settings = Settings.defaults().copyWith(defaultAsrModelId: id);
     final result = await resolveAsrMetadata(
       settings,
       const ModelDownloadState(),
@@ -136,7 +136,7 @@ void main() {
       );
       await _createCompleteMarker(id, ModelType.asr);
 
-      final settings = Settings.defaults().copyWith(selectedAsrModelId: id);
+      final settings = Settings.defaults().copyWith(defaultAsrModelId: id);
       final result = await resolveAsrMetadata(
         settings,
         const ModelDownloadState(),
@@ -164,7 +164,7 @@ void main() {
       );
       // No .complete marker created
 
-      final settings = Settings.defaults().copyWith(selectedAsrModelId: id);
+      final settings = Settings.defaults().copyWith(defaultAsrModelId: id);
       final result = await resolveAsrMetadata(
         settings,
         const ModelDownloadState(),

@@ -6,91 +6,121 @@ import 'package:relagent/tts/services.dart';
 import 'package:relagent/voice/model_resolver.dart';
 import 'package:relagent/voice/voice_service_stub.dart';
 
-/// Tracks calls so tests can tell whether TtsService actually reached the
-/// underlying VoiceService again on a retry, versus believing it was
-/// already initialized.
-class _TrackingVoiceService extends NoOpVoiceService {
+/// Records the model passed to each call so tests can assert TtsService
+/// forwards the right one, without touching real sherpa-onnx/isolates.
+class _RecordingVoiceService extends NoOpVoiceService {
   int initializeCallCount = 0;
-  bool initialized = false;
+  final List<ResolvedTtsModel?> generateCalls = [];
 
   @override
   Future<void> initializeTts({ResolvedTtsModel? resolvedTtsModel}) async {
     initializeCallCount++;
-    // Mirrors NativeVoiceService.initializeTts: a null model is a
-    // legitimate no-op, not a failure — it doesn't throw.
-    if (resolvedTtsModel != null) {
-      initialized = true;
-    }
   }
 
   @override
   Future<Uint8List?> generateSpeech(
     String text,
     String messageId, {
+    ResolvedTtsModel? resolvedTtsModel,
     int speakerId = 0,
     double speed = 1.0,
   }) async {
-    if (!initialized) return null;
+    generateCalls.add(resolvedTtsModel);
+    if (resolvedTtsModel == null) return null;
     return Uint8List.fromList([1, 2, 3]);
   }
 }
 
-const _testModel = ResolvedTtsModel(
-  modelId: 'test-model',
+const _modelA = ResolvedTtsModel(
+  modelId: 'model-a',
   architecture: ModelArchitecture.vitsPiper,
+  resolvedPaths: {},
+);
+
+const _modelB = ResolvedTtsModel(
+  modelId: 'model-b',
+  architecture: ModelArchitecture.kokoro,
   resolvedPaths: {},
 );
 
 void main() {
   group('TtsService', () {
-    test('a null resolvedTtsModel does not permanently stick the service as '
-        'initialized — a later call after it resolves succeeds without '
-        'needing an explicit reinitializeWithModel', () async {
-      final voiceService = _TrackingVoiceService();
-      final service = TtsService(voiceService);
-      // resolvedTtsModel starts null: e.g. a model is selected, but
-      // settings or the downloaded-models scan hadn't finished loading the
-      // moment this first ran.
-      expect(service.resolvedTtsModel, isNull);
+    test(
+      'generate with no model at all and no resolvedTtsModel set returns null',
+      () async {
+        final voiceService = _RecordingVoiceService();
+        final service = TtsService(voiceService);
 
-      final firstResult = await service.generate('hello', 'msg#0');
-      expect(firstResult, isNull);
-      // Nothing to initialize with, so the underlying VoiceService isn't
-      // even called — the bug this guards against is _isInitialized
-      // getting stuck true from a call that reported success without
-      // resolvedTtsModel, not this call itself failing.
-      expect(voiceService.initializeCallCount, 0);
-      expect(voiceService.initialized, isFalse);
+        final result = await service.generate('hello', 'msg#0');
 
-      // TtsNotifier._getService() would re-resolve and set this once the
-      // race has settled — no dispose/reinitializeWithModel involved.
-      service.resolvedTtsModel = _testModel;
+        expect(result, isNull);
+        expect(voiceService.generateCalls, [null]);
+      },
+    );
 
-      final secondResult = await service.generate('hello again', 'msg#1');
-      expect(secondResult, isNotNull);
-      expect(voiceService.initializeCallCount, 1);
-      expect(voiceService.initialized, isTrue);
-    });
+    test('generate passes the per-call model through, ignoring any '
+        'previously-resolved default', () async {
+      final voiceService = _RecordingVoiceService();
+      final service = TtsService(voiceService)..resolvedTtsModel = _modelA;
 
-    test('a resolved model initializes normally on the first call', () async {
-      final voiceService = _TrackingVoiceService();
-      final service = TtsService(voiceService)..resolvedTtsModel = _testModel;
-
-      final result = await service.generate('hello', 'msg#0');
+      final result = await service.generate('hello', 'msg#0', model: _modelB);
 
       expect(result, isNotNull);
+      expect(voiceService.generateCalls, [_modelB]);
+    });
+
+    test(
+      'generate without a per-call model falls back to resolvedTtsModel',
+      () async {
+        final voiceService = _RecordingVoiceService();
+        final service = TtsService(voiceService)..resolvedTtsModel = _modelA;
+
+        await service.generate('hello', 'msg#0');
+
+        expect(voiceService.generateCalls, [_modelA]);
+      },
+    );
+
+    test('initialize pre-warms with resolvedTtsModel', () async {
+      final voiceService = _RecordingVoiceService();
+      final service = TtsService(voiceService)..resolvedTtsModel = _modelA;
+
+      await service.initialize();
+
       expect(voiceService.initializeCallCount, 1);
     });
 
-    test('a second call with the same resolved model does not '
-        're-initialize', () async {
-      final voiceService = _TrackingVoiceService();
-      final service = TtsService(voiceService)..resolvedTtsModel = _testModel;
+    test('initialize is a no-op when resolvedTtsModel is unset', () async {
+      final voiceService = _RecordingVoiceService();
+      final service = TtsService(voiceService);
 
-      await service.generate('hello', 'msg#0');
-      await service.generate('world', 'msg#1');
+      await service.initialize();
 
-      expect(voiceService.initializeCallCount, 1);
+      expect(voiceService.initializeCallCount, 0);
+    });
+
+    test(
+      'reinitializeWithModel updates resolvedTtsModel and pre-warms it',
+      () async {
+        final voiceService = _RecordingVoiceService();
+        final service = TtsService(voiceService);
+
+        await service.reinitializeWithModel(_modelB);
+
+        expect(service.resolvedTtsModel, _modelB);
+        expect(voiceService.initializeCallCount, 1);
+      },
+    );
+
+    test('a second call with the same messageId returns cached audio '
+        'without calling generateSpeech again', () async {
+      final voiceService = _RecordingVoiceService();
+      final service = TtsService(voiceService);
+
+      await service.generate('hello', 'msg#0', model: _modelA);
+      await service.generate('hello', 'msg#0', model: _modelA);
+
+      expect(voiceService.generateCalls, [_modelA]);
     });
   });
 }

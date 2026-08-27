@@ -170,19 +170,25 @@ abstract class VoiceService implements VoiceCapabilities {
 
   // TTS
 
-  /// Initialize TTS engine (may spawn background isolate).
-  /// Pass [resolvedTtsModel] to use a downloaded model instead of bundled.
+  /// Pre-warm the TTS engine pool with [resolvedTtsModel] (may spawn a
+  /// background isolate) so the first [generateSpeech] call for it is fast.
+  /// Not required before calling [generateSpeech] — it resolves/warms
+  /// pool entries lazily on its own.
   Future<void> initializeTts({ResolvedTtsModel? resolvedTtsModel});
 
-  /// Generate speech audio from text. Returns WAV bytes or null on failure.
+  /// Generate speech audio from text using [resolvedTtsModel] (null = bundled
+  /// default). Implementations keep a small pool of recently-used models so
+  /// switching between a handful of models across calls doesn't reload each
+  /// time. Returns WAV bytes or null on failure.
   Future<Uint8List?> generateSpeech(
     String text,
     String messageId, {
+    ResolvedTtsModel? resolvedTtsModel,
     int speakerId = 0,
     double speed = 1.0,
   });
 
-  /// Dispose TTS resources.
+  /// Dispose all pooled TTS engines.
   void disposeTts();
 
   // Audio session

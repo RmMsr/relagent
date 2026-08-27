@@ -7,6 +7,7 @@ import 'package:relagent/providers/audio_coordinator_provider.dart';
 import 'package:relagent/providers/playback_provider.dart';
 import 'package:relagent/providers/tts_provider.dart';
 import 'package:relagent/tts/text_chunker.dart';
+import 'package:relagent/voice/model_resolver.dart';
 import 'package:relagent/voice/voice_service_stub.dart';
 
 import '../fixtures/audio_test_fixtures.dart';
@@ -25,6 +26,7 @@ class _FakeTtsVoiceService extends NoOpVoiceService {
   Future<Uint8List?> generateSpeech(
     String text,
     String messageId, {
+    ResolvedTtsModel? resolvedTtsModel,
     int speakerId = 0,
     double speed = 1.0,
   }) async {

@@ -135,15 +135,21 @@ class _ChunkItemInfo {
   );
 }
 
-/// Per-message chunk bookkeeping: the full ordered chunks, and how far
-/// ahead synthesis has already been kicked off (drives one-chunk-ahead
-/// prefetch and gets reset on a backward chunk jump).
+/// Per-message chunk bookkeeping: the full ordered chunks, how far ahead
+/// synthesis has already been kicked off (drives one-chunk-ahead prefetch
+/// and gets reset on a backward chunk jump), and the TTS model resolved for
+/// this message's language — every chunk of a message speaks with the same
+/// model, resolved once up front.
 class _ChunkedMessage {
   final List<SpeechChunk> chunks;
   int maxEnqueuedIndex;
+  final ResolvedTtsModel? resolvedModel;
 
-  _ChunkedMessage(this.chunks, {required int firstIndex})
-    : maxEnqueuedIndex = firstIndex;
+  _ChunkedMessage(
+    this.chunks, {
+    required int firstIndex,
+    required this.resolvedModel,
+  }) : maxEnqueuedIndex = firstIndex;
 
   int get lastIndex => chunks.length - 1;
 }
@@ -353,7 +359,10 @@ class TtsNotifier extends Notifier<TtsState> {
       chunk.sourceParagraphIndex,
     );
 
-    final contentFuture = service.generate(chunk.text, key).then((bytes) {
+    final resolvedModel = _chunkedMessages[messageId]?.resolvedModel;
+    final contentFuture = service
+        .generate(chunk.text, key, model: resolvedModel)
+        .then((bytes) {
       if (bytes == null) {
         throw Exception('Generation failed');
       }
@@ -383,7 +392,11 @@ class TtsNotifier extends Notifier<TtsState> {
 
   /// Play a message immediately (user clicked play button)
   /// Stops current playback and plays this message
-  Future<void> playNow(String text, String messageId) async {
+  Future<void> playNow(
+    String text,
+    String messageId, {
+    String? languageCode,
+  }) async {
     if (_pendingTasks.containsKey(messageId)) return;
 
     final chunks = _prepareChunks(text);
@@ -391,6 +404,17 @@ class TtsNotifier extends Notifier<TtsState> {
       _updateMessageState(messageId, status: MessagePlaybackStatus.completed);
       return;
     }
+
+    // Resolved once per message and reused for every chunk. A null result
+    // (no TTS model available at all, per the language-aware-tts-playback
+    // fallback chain) flows through to generation like any other model, and
+    // the existing "generation failed" handling below leaves the message
+    // completed with its text visible and no audio, without a special case.
+    final resolvedModel = await resolveTtsModelForLanguage(
+      languageCode,
+      ref.read(settingsProvider),
+      ref.read(modelDownloadProvider),
+    );
 
     final service = await _getService();
     _updateMessageState(
@@ -400,7 +424,11 @@ class TtsNotifier extends Notifier<TtsState> {
       totalChunks: chunks.length,
     );
 
-    _chunkedMessages[messageId] = _ChunkedMessage(chunks, firstIndex: 0);
+    _chunkedMessages[messageId] = _ChunkedMessage(
+      chunks,
+      firstIndex: 0,
+      resolvedModel: resolvedModel,
+    );
     final firstItem = _buildChunkItem(service, messageId, chunks, 0);
 
     final task = Future<void>(() async {
@@ -462,7 +490,11 @@ class TtsNotifier extends Notifier<TtsState> {
   /// 1. Trigger generation of the first chunk (async)
   /// 2. Enqueue it directly to PlaybackService; later chunks follow via
   ///    one-chunk-ahead prefetch as earlier ones start playing.
-  Future<void> enqueue(String text, String messageId) async {
+  Future<void> enqueue(
+    String text,
+    String messageId, {
+    String? languageCode,
+  }) async {
     if (_pendingTasks.containsKey(messageId)) return;
 
     final chunks = _prepareChunks(text);
@@ -470,6 +502,17 @@ class TtsNotifier extends Notifier<TtsState> {
       _updateMessageState(messageId, status: MessagePlaybackStatus.completed);
       return;
     }
+
+    // Resolved once per message and reused for every chunk. A null result
+    // (no TTS model available at all, per the language-aware-tts-playback
+    // fallback chain) flows through to generation like any other model, and
+    // the existing "generation failed" handling below leaves the message
+    // completed with its text visible and no audio, without a special case.
+    final resolvedModel = await resolveTtsModelForLanguage(
+      languageCode,
+      ref.read(settingsProvider),
+      ref.read(modelDownloadProvider),
+    );
 
     final service = await _getService();
     _updateMessageState(
@@ -479,7 +522,11 @@ class TtsNotifier extends Notifier<TtsState> {
       totalChunks: chunks.length,
     );
 
-    _chunkedMessages[messageId] = _ChunkedMessage(chunks, firstIndex: 0);
+    _chunkedMessages[messageId] = _ChunkedMessage(
+      chunks,
+      firstIndex: 0,
+      resolvedModel: resolvedModel,
+    );
     final firstItem = _buildChunkItem(service, messageId, chunks, 0);
 
     // We wrap the enqueue in a pending task to prevent duplicates

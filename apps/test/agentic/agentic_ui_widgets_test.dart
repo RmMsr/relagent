@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agentic_client/agentic_client.dart';
 import 'package:relagent/agentic/widgets.dart';
+import 'package:relagent/providers/tts_provider.dart';
 import 'package:relagent/providers/voice_service_provider.dart';
 import 'package:relagent/voice/voice_service.dart';
 import 'package:relagent/widgets/message_markdown_actions.dart';
@@ -560,6 +561,99 @@ void main() {
         await tester.pump();
 
         expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('Agent stats row — language visibility', () {
+    AgenticMessage assistantMessage({
+      required String messageId,
+      String? languageCode,
+    }) => AgenticMessage(
+      messageId: messageId,
+      localId: messageId,
+      text: 'Bonjour',
+      role: AgenticRole.assistant,
+      languageCode: languageCode,
+      isFinal: true,
+    );
+
+    testWidgets(
+      'language hidden until "Show stats" is expanded',
+      (tester) async {
+        final message = assistantMessage(
+          messageId: 'm-fr',
+          languageCode: 'fr',
+        );
+
+        await tester.pumpWidget(
+          _wrap(AgenticChatHistory(messages: [message])),
+        );
+        await tester.pump();
+
+        // The "Show stats" toggle is available (a language code alone makes
+        // there something to expand) but the language isn't shown yet.
+        expect(find.byIcon(Icons.insights), findsOneWidget);
+        expect(find.textContaining('French'), findsNothing);
+
+        await tester.tap(find.byIcon(Icons.insights));
+        await tester.pump();
+
+        expect(find.textContaining('French'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'default-language responses show their language too, once expanded',
+      (tester) async {
+        final message = assistantMessage(messageId: 'm-en', languageCode: 'en');
+
+        await tester.pumpWidget(
+          _wrap(AgenticChatHistory(messages: [message])),
+        );
+        await tester.pump();
+
+        await tester.tap(find.byIcon(Icons.insights));
+        await tester.pump();
+
+        // Not hidden just because it matches the app's default language.
+        expect(find.textContaining('English'), findsOneWidget);
+      },
+    );
+
+    testWidgets('no language code and no stats hides the toggle entirely', (
+      tester,
+    ) async {
+      final message = assistantMessage(messageId: 'm-none');
+
+      await tester.pumpWidget(_wrap(AgenticChatHistory(messages: [message])));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.translate), findsNothing);
+      expect(find.byIcon(Icons.insights), findsNothing);
+    });
+
+    testWidgets(
+      'does not mention which model played the message',
+      (tester) async {
+        final message = assistantMessage(
+          messageId: 'm-fr-2',
+          languageCode: 'fr',
+        );
+
+        await tester.pumpWidget(
+          _wrap(
+            AgenticChatHistory(
+              messages: [message],
+              getMessageTtsState: (id) => const MessageTtsState(),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.tap(find.byIcon(Icons.insights));
+        await tester.pump();
+
+        expect(find.textContaining('played'), findsNothing);
       },
     );
   });

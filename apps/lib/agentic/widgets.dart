@@ -4,7 +4,9 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 
 import '/agentic/approval_card.dart';
+
 import 'package:agentic_client/agentic_client.dart' hide Logger;
+
 import '/models/app_info.dart';
 import '/providers/recording_provider.dart';
 import '/providers/tts_provider.dart';
@@ -155,9 +157,8 @@ class AgenticChatInputState extends ConsumerState<AgenticChatInput>
   @override
   void onError(String error) {
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
     }
   }
 
@@ -264,7 +265,8 @@ List<_MessageGroup> _groupMessages(List<AgenticMessage> messages) {
 class AgenticChatHistory extends StatelessWidget {
   final List<AgenticMessage> messages;
   final bool showAssistantPending;
-  final void Function(String, String)? onSpeak;
+  final void Function(String text, String messageId, String? languageCode)?
+  onSpeak;
   final MessageTtsState Function(String)? getMessageTtsState;
   final void Function(String messageId)? onSkipPrevious;
   final void Function(String messageId)? onSkipNext;
@@ -382,9 +384,8 @@ class AgenticChatHistory extends StatelessWidget {
           if (hasApprovals) {
             // Approval group with actionable cards
             // Historical approvals (not the latest) render as resolved
-            final formattedTime = DateFormat(
-              'HH:mm:ss',
-            ).format(message.timestamp.toLocal());
+            final formattedTime = DateFormat('HH:mm:ss')
+                .format(message.timestamp.toLocal());
             chatWidgets.add(
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,7 +473,8 @@ class _AgenticMessageBubble extends StatelessWidget {
   final AgenticMessage message;
   final bool isFirstInGroup;
   final bool isLastInGroup;
-  final void Function(String, String)? onSpeak;
+  final void Function(String text, String messageId, String? languageCode)?
+  onSpeak;
   final MessageTtsState Function(String)? getMessageTtsState;
   final void Function(String messageId)? onSkipPrevious;
   final void Function(String messageId)? onSkipNext;
@@ -571,7 +573,11 @@ class _AgenticMessageBubble extends StatelessWidget {
                 messageId: message.localId,
                 messageText: message.text,
                 stats: message.stats,
-                onSpeak: onSpeak,
+                languageCode: message.languageCode,
+                onSpeak: onSpeak == null
+                    ? null
+                    : (text, messageId) =>
+                          onSpeak!(text, messageId, message.languageCode),
                 getMessageTtsState: getMessageTtsState,
                 onSkipPrevious: onSkipPrevious,
                 onSkipNext: onSkipNext,
@@ -758,6 +764,7 @@ class _MessageActionsRow extends StatefulWidget {
   final String messageId;
   final String messageText;
   final AgentStats? stats;
+  final String? languageCode;
   final void Function(String, String)? onSpeak;
   final MessageTtsState Function(String)? getMessageTtsState;
   final void Function(String messageId)? onSkipPrevious;
@@ -767,6 +774,7 @@ class _MessageActionsRow extends StatefulWidget {
     required this.messageId,
     required this.messageText,
     this.stats,
+    this.languageCode,
     this.onSpeak,
     this.getMessageTtsState,
     this.onSkipPrevious,
@@ -784,6 +792,7 @@ class _MessageActionsRowState extends State<_MessageActionsRow> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasStats = widget.stats != null && widget.stats!.hasData;
+    final hasExpandableContent = hasStats || widget.languageCode != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -803,8 +812,8 @@ class _MessageActionsRowState extends State<_MessageActionsRow> {
               const SizedBox(width: 8),
             ],
             MessageCopyButton(text: widget.messageText),
-            if (hasStats) const SizedBox(width: 8),
-            if (hasStats)
+            if (hasExpandableContent) const SizedBox(width: 8),
+            if (hasExpandableContent)
               IconButton(
                 icon: Icon(
                   _statsExpanded ? Icons.insights_outlined : Icons.insights,
@@ -824,21 +833,75 @@ class _MessageActionsRowState extends State<_MessageActionsRow> {
               ),
           ],
         ),
-        if (_statsExpanded && hasStats)
+        if (_statsExpanded && hasExpandableContent)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: _StatsContent(stats: widget.stats!),
+            child: _StatsContent(
+              stats: widget.stats,
+              languageCode: widget.languageCode,
+            ),
           ),
       ],
     );
   }
 }
 
+/// Language indicator shown inside the "Show stats" panel, for every
+/// message that has a detected language — including the app's default
+/// language, not just deviations from it.
+class _LanguageBadge extends StatelessWidget {
+  final String languageCode;
+
+  const _LanguageBadge({required this.languageCode});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.translate,
+          size: 14,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 2),
+        Text(_languageDisplayName(languageCode), style: textStyle),
+      ],
+    );
+  }
+}
+
+/// ISO 639-1 code -> human-readable name, for the languages the model
+/// catalog targets (see the model-catalog spec) plus a few common extras.
+/// Falls back to the raw code for anything else.
+const _languageNames = {
+  'en': 'English',
+  'de': 'German',
+  'no': 'Norwegian',
+  'nb': 'Norwegian',
+  'sv': 'Swedish',
+  'fr': 'French',
+  'ru': 'Russian',
+  'es': 'Spanish',
+  'it': 'Italian',
+  'pt': 'Portuguese',
+  'ja': 'Japanese',
+  'zh': 'Chinese',
+  'nl': 'Dutch',
+};
+
+String _languageDisplayName(String code) => _languageNames[code] ?? code;
+
 class _StatsContent extends StatelessWidget {
-  final AgentStats stats;
+  final AgentStats? stats;
+  final String? languageCode;
   static final _numberFormat = NumberFormat('#,###');
 
-  const _StatsContent({required this.stats});
+  const _StatsContent({this.stats, this.languageCode});
 
   String _formatNumber(int number) => _numberFormat.format(number);
 
@@ -862,114 +925,131 @@ class _StatsContent extends StatelessWidget {
     );
     final iconColor = theme.colorScheme.onSurfaceVariant;
     const iconSize = 14.0;
+    final s = stats;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (stats.agentName != null || stats.answeringModelName != null)
+        if (languageCode != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
-            child: Wrap(
-              spacing: 16,
-              runSpacing: 4,
-              children: [
-                if (stats.agentName != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.smart_toy_outlined,
-                        size: iconSize,
-                        color: iconColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          'Agent: ${stats.agentName!}',
-                          style: textStyle,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                if (stats.answeringModelName != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.memory, size: iconSize, color: iconColor),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          'Model: ${stats.answeringModelName!}',
-                          style: textStyle,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
+            child: _LanguageBadge(languageCode: languageCode!),
           ),
-        Wrap(
-          spacing: 16,
-          runSpacing: 8,
-          children: [
-            if (stats.inputTokens != null)
-              Row(
-                mainAxisSize: MainAxisSize.min,
+        if (s != null) ...[
+          if (s.agentName != null || s.answeringModelName != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Wrap(
+                spacing: 16,
+                runSpacing: 4,
                 children: [
-                  Icon(Icons.arrow_downward, size: iconSize, color: iconColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${_formatNumber(stats.inputTokens!)} tokens in',
-                    style: textStyle,
-                  ),
+                  if (s.agentName != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.smart_toy_outlined,
+                          size: iconSize,
+                          color: iconColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            'Agent: ${s.agentName!}',
+                            style: textStyle,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (s.answeringModelName != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.memory, size: iconSize, color: iconColor),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            'Model: ${s.answeringModelName!}',
+                            style: textStyle,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
-            if (stats.outputTokens != null)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.arrow_upward, size: iconSize, color: iconColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${_formatNumber(stats.outputTokens!)} tokens out',
-                    style: textStyle,
-                  ),
-                ],
-              ),
-            if (stats.toolCallsCount != null && stats.toolCallsCount! > 0)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.build_outlined, size: iconSize, color: iconColor),
-                  const SizedBox(width: 4),
-                  Text('${stats.toolCallsCount} tool calls', style: textStyle),
-                ],
-              ),
-            if (stats.requestsCount != null && stats.requestsCount! > 1)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.sync, size: iconSize, color: iconColor),
-                  const SizedBox(width: 4),
-                  Text('${stats.requestsCount} requests', style: textStyle),
-                ],
-              ),
-            if (stats.durationSeconds != null)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.timer_outlined, size: iconSize, color: iconColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    _formatDuration(stats.durationSeconds!),
-                    style: textStyle,
-                  ),
-                ],
-              ),
-          ],
-        ),
+            ),
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              if (s.inputTokens != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.arrow_downward,
+                      size: iconSize,
+                      color: iconColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_formatNumber(s.inputTokens!)} tokens in',
+                      style: textStyle,
+                    ),
+                  ],
+                ),
+              if (s.outputTokens != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_upward, size: iconSize, color: iconColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_formatNumber(s.outputTokens!)} tokens out',
+                      style: textStyle,
+                    ),
+                  ],
+                ),
+              if (s.toolCallsCount != null && s.toolCallsCount! > 0)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.build_outlined,
+                      size: iconSize,
+                      color: iconColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text('${s.toolCallsCount} tool calls', style: textStyle),
+                  ],
+                ),
+              if (s.requestsCount != null && s.requestsCount! > 1)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.sync, size: iconSize, color: iconColor),
+                    const SizedBox(width: 4),
+                    Text('${s.requestsCount} requests', style: textStyle),
+                  ],
+                ),
+              if (s.durationSeconds != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.timer_outlined,
+                      size: iconSize,
+                      color: iconColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(_formatDuration(s.durationSeconds!), style: textStyle),
+                  ],
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }

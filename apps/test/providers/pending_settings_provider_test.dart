@@ -11,7 +11,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({
       'user_settings':
-          '{"simpleChatBaseUrl":"http://localhost:1234/api/v1","simpleChatModel":"test-model","primeMessage":"test","ttsSpeakerId":0,"ttsSpeed":1.0,"voiceMode":"silent","backgroundListeningDuration":"oneHour","selectedAsrModelId":"asr-saved","selectedTtsModelId":"tts-saved"}',
+          '{"simpleChatBaseUrl":"http://localhost:1234/api/v1","simpleChatModel":"test-model","primeMessage":"test","ttsSpeakerId":0,"ttsSpeed":1.0,"voiceMode":"silent","backgroundListeningDuration":"oneHour","defaultAsrModelId":"asr-saved","selectedTtsModelId":"tts-saved"}',
     });
     final sharedPreferences = await SharedPreferences.getInstance();
 
@@ -42,16 +42,16 @@ void main() {
 
   test('build seeds the draft from current settings', () {
     final draft = container.read(pendingSettingsProvider);
-    expect(draft.selectedAsrModelId, 'asr-saved');
+    expect(draft.defaultAsrModelId, 'asr-saved');
     expect(draft.simpleChatModel, 'test-model');
   });
 
   test('updateDraft applies a partial change, leaving the rest untouched', () {
     container
         .read(pendingSettingsProvider.notifier)
-        .updateDraft((s) => s.copyWith(selectedAsrModelId: 'asr-new'));
+        .updateDraft((s) => s.copyWith(defaultAsrModelId: 'asr-new'));
     final draft = container.read(pendingSettingsProvider);
-    expect(draft.selectedAsrModelId, 'asr-new');
+    expect(draft.defaultAsrModelId, 'asr-new');
     expect(draft.selectedTtsModelId, 'tts-saved');
     expect(draft.simpleChatModel, 'test-model');
   });

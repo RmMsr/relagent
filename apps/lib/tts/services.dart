@@ -8,7 +8,6 @@ import '/voice/voice_service.dart';
 
 class TtsService {
   final VoiceService _voiceService;
-  bool _isInitialized = false;
   final Map<String, Uint8List> _audioCache = {};
 
   // LRU cache management (max 60 chunks, since cache keys are now
@@ -20,59 +19,52 @@ class TtsService {
   int speakerId = 0;
   double speed = 1.0;
 
-  /// Resolved TTS model for downloaded models (null = bundled).
+  /// Model to pre-warm on [initialize] and to use for [generate] calls that
+  /// don't pass their own model (the app's single "selected" TTS model).
+  /// Per-call callers that resolve a per-message/per-language model instead
+  /// pass it directly to [generate].
   ResolvedTtsModel? resolvedTtsModel;
 
   TtsService(this._voiceService);
 
-  Future<void> _init() async {
-    if (_isInitialized) return;
+  /// Pre-warm the engine pool with [resolvedTtsModel] so the first
+  /// [generate] call doesn't pay the pool-miss cost.
+  Future<void> initialize() async {
     if (resolvedTtsModel == null) {
       // Nothing resolved yet — e.g. a model is selected but settings or
       // the downloaded-models scan hadn't finished loading the moment this
-      // was first called. NativeVoiceService.initializeTts(null) is a
-      // legitimate no-op (genuinely "no model"), not a failure, so it
-      // won't throw here — but treating that no-op as a real success would
-      // leave _isInitialized stuck true forever with nothing actually
-      // initialized. Stay uninitialized instead, so the next call (once
-      // TtsNotifier._getService has re-resolved resolvedTtsModel) retries
-      // for real instead of silently no-op'ing again.
+      // was first called. Nothing to pre-warm; generate() resolves lazily
+      // per call regardless.
       return;
     }
     developer.Timeline.startSync('TTS_BackgroundInitialization');
     try {
       await _voiceService.initializeTts(resolvedTtsModel: resolvedTtsModel);
-      _isInitialized = true;
-      Logger.debug('TTS initialized via VoiceService');
+      Logger.debug('TTS pre-warmed via VoiceService');
     } catch (e) {
-      Logger.error('Failed to initialize TTS: $e');
+      Logger.error('Failed to pre-warm TTS: $e');
       rethrow;
     } finally {
       developer.Timeline.finishSync();
     }
   }
 
-  /// Public method to pre-initialize TTS in background
-  Future<void> initialize() async {
-    await _init();
-  }
-
-  /// Reinitialize with a different model (disposes current, loads new).
+  /// Updates the model used to pre-warm and for calls without their own
+  /// model, and pre-warms it. Does not evict other pooled models.
   Future<void> reinitializeWithModel(ResolvedTtsModel? model) async {
-    if (_isInitialized) {
-      _voiceService.disposeTts();
-      _isInitialized = false;
-      _audioCache.clear();
-      _cacheOrder.clear();
-    }
     resolvedTtsModel = model;
-    await _init();
+    _audioCache.clear();
+    _cacheOrder.clear();
+    await initialize();
   }
 
-  /// Generate audio and return bytes
-  Future<Uint8List?> generate(String text, String messageId) async {
-    await _init();
-
+  /// Generate audio and return bytes, using [model] (falling back to
+  /// [resolvedTtsModel] when omitted).
+  Future<Uint8List?> generate(
+    String text,
+    String messageId, {
+    ResolvedTtsModel? model,
+  }) async {
     // Check cache first
     if (_audioCache.containsKey(messageId)) {
       Logger.debug('TtsService [$messageId]: Returning cached audio');
@@ -88,6 +80,7 @@ class TtsService {
       final wavBytes = await _voiceService.generateSpeech(
         text,
         messageId,
+        resolvedTtsModel: model ?? resolvedTtsModel,
         speakerId: speakerId,
         speed: speed,
       );

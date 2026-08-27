@@ -13,6 +13,22 @@ import '/voice/model_resolver.dart';
 import '/voice/voice_service.dart';
 import '../utils/logger.dart';
 
+/// Session-only override for which ASR model is active, picked via the mic
+/// long-press quick-pick. Deliberately not part of Settings/SharedPreferences
+/// — it resets to null on every app launch and never overwrites the
+/// persisted device default (design D17).
+final activeAsrModelOverrideProvider =
+    NotifierProvider<ActiveAsrModelOverrideNotifier, String?>(
+      ActiveAsrModelOverrideNotifier.new,
+    );
+
+class ActiveAsrModelOverrideNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String? modelId) => state = modelId;
+}
+
 class RecordingState {
   final bool isRecording;
   final bool isContinuous;
@@ -111,11 +127,24 @@ class RecordingNotifier extends Notifier<RecordingState> {
     });
 
     ref.listen<Settings>(settingsProvider, (previous, next) {
-      if (previous?.selectedAsrModelId != next.selectedAsrModelId) {
+      final override = ref.read(activeAsrModelOverrideProvider);
+      final previousModelId = previous == null
+          ? null
+          : selectActiveAsrModelId(previous, override);
+      final nextModelId = selectActiveAsrModelId(next, override);
+      if (previousModelId != nextModelId) {
         _asrInitialized = false;
+        _restartIfRecording('ASR model changed via settings');
       }
       if (previous?.voiceMode != next.voiceMode) {
         _handleVoiceModeChanged(previous?.voiceMode, next.voiceMode);
+      }
+    });
+
+    ref.listen<String?>(activeAsrModelOverrideProvider, (previous, next) {
+      if (previous != next) {
+        _asrInitialized = false;
+        _restartIfRecording('ASR model changed via mic quick-pick');
       }
     });
 
@@ -147,19 +176,26 @@ class RecordingNotifier extends Notifier<RecordingState> {
     ref.listen<ModelDownloadState>(modelDownloadProvider, (
       previous,
       next,
-    ) async {
-      final selectedId = ref.read(settingsProvider).selectedAsrModelId;
-      if (selectedId != null &&
-          !(previous?.isDownloaded(selectedId) ?? false) &&
-          next.isDownloaded(selectedId) &&
-          state.isContinuous &&
-          state.isRecording) {
-        Logger.debug(
-          'RecordingProvider: Selected ASR model now downloaded, restarting...',
-        );
-        await internalStop();
-        await internalStart();
-      }
+    ) {
+      // Wrap async work to avoid unawaited futures and race conditions
+      Future.microtask(() async {
+        final settings = ref.read(settingsProvider);
+        final override = ref.read(activeAsrModelOverrideProvider);
+        final selectedId = selectActiveAsrModelId(settings, override);
+        if (selectedId != null &&
+            !(previous?.isDownloaded(selectedId) ?? false) &&
+            next.isDownloaded(selectedId) &&
+            state.isContinuous &&
+            state.isRecording) {
+          Logger.debug(
+            'RecordingProvider: Selected ASR model now downloaded, restarting...',
+          );
+          await internalStop();
+          await internalStart();
+        }
+      }).catchError((Object e) {
+        Logger.error('RecordingProvider: Error in model download listener: $e');
+      });
     });
 
     return RecordingState.initial();
@@ -450,6 +486,24 @@ class RecordingNotifier extends Notifier<RecordingState> {
     return heights;
   }
 
+  /// If recording is currently active, stop and restart it so the switch to
+  /// a different resolved ASR model (default, quick-pick override, or a
+  /// just-downloaded selection — see the two `ref.listen` calls in [build])
+  /// takes effect immediately instead of silently continuing on the
+  /// already-loaded model until some later, unrelated stop/start.
+  void _restartIfRecording(String reason) {
+    if (!state.isRecording) return;
+    // Wrap async work to avoid unawaited futures and race conditions, same
+    // as the other side-effecting listeners in build().
+    Future.microtask(() async {
+      Logger.debug('RecordingProvider: $reason, restarting...');
+      await internalStop();
+      await internalStart();
+    }).catchError((Object e) {
+      Logger.error('RecordingProvider: Error restarting for $reason: $e');
+    });
+  }
+
   Future<void> internalStop() async {
     Logger.debug('RecordingProvider: internalStop() called by coordinator');
     _stopHealthMonitoring();
@@ -516,7 +570,12 @@ class RecordingNotifier extends Notifier<RecordingState> {
   Future<void> _startASR() async {
     final settings = ref.read(settingsProvider);
     final downloadState = ref.read(modelDownloadProvider);
-    final asrMetadata = await resolveAsrMetadata(settings, downloadState);
+    final override = ref.read(activeAsrModelOverrideProvider);
+    final asrMetadata = await resolveAsrMetadata(
+      settings,
+      downloadState,
+      sessionOverride: override,
+    );
 
     if (asrMetadata == null) {
       throw Exception('No ASR model selected. Download one in Settings.');

@@ -190,8 +190,20 @@ class Settings {
   final bool continuousVoiceEnabled;
 
   // Selected voice model IDs (null = no model selected)
-  final String? selectedAsrModelId;
   final String? selectedTtsModelId;
+
+  // Per-device TTS language routing: language code -> TTS model ID, and the
+  // device default TTS model used when no language-specific model is assigned.
+  final Map<String, String> ttsLanguagePreferences;
+  final String? defaultTtsModelId;
+
+  // Per-device ASR model: the persisted default (used when no session-only
+  // quick-pick override is active — see the recording/mic providers, not
+  // this model) and the set of models offered in the mic long-press picker.
+  // A model's whole declared language set is covered by one entry here,
+  // never one entry per language (see design D15/D17).
+  final String? defaultAsrModelId;
+  final List<String> asrQuickPickModelIds;
 
   const Settings({
     required this.simpleChatBaseUrl,
@@ -213,8 +225,11 @@ class Settings {
     this.engineHasApiKey = false,
     this.simpleChatHasApiKey = false,
     this.continuousVoiceEnabled = false,
-    this.selectedAsrModelId,
     this.selectedTtsModelId,
+    this.ttsLanguagePreferences = const {},
+    this.defaultTtsModelId,
+    this.defaultAsrModelId,
+    this.asrQuickPickModelIds = const [],
   });
 
   factory Settings.defaults() {
@@ -259,8 +274,11 @@ class Settings {
     bool? engineHasApiKey,
     bool? simpleChatHasApiKey,
     bool? continuousVoiceEnabled,
-    Object? selectedAsrModelId = _unset,
     Object? selectedTtsModelId = _unset,
+    Map<String, String>? ttsLanguagePreferences,
+    Object? defaultTtsModelId = _unset,
+    Object? defaultAsrModelId = _unset,
+    List<String>? asrQuickPickModelIds,
   }) {
     return Settings(
       simpleChatBaseUrl: simpleChatBaseUrl ?? this.simpleChatBaseUrl,
@@ -286,12 +304,18 @@ class Settings {
       simpleChatHasApiKey: simpleChatHasApiKey ?? this.simpleChatHasApiKey,
       continuousVoiceEnabled:
           continuousVoiceEnabled ?? this.continuousVoiceEnabled,
-      selectedAsrModelId: selectedAsrModelId == _unset
-          ? this.selectedAsrModelId
-          : selectedAsrModelId as String?,
       selectedTtsModelId: selectedTtsModelId == _unset
           ? this.selectedTtsModelId
           : selectedTtsModelId as String?,
+      ttsLanguagePreferences:
+          ttsLanguagePreferences ?? this.ttsLanguagePreferences,
+      defaultTtsModelId: defaultTtsModelId == _unset
+          ? this.defaultTtsModelId
+          : defaultTtsModelId as String?,
+      defaultAsrModelId: defaultAsrModelId == _unset
+          ? this.defaultAsrModelId
+          : defaultAsrModelId as String?,
+      asrQuickPickModelIds: asrQuickPickModelIds ?? this.asrQuickPickModelIds,
     );
   }
 
@@ -323,8 +347,11 @@ class Settings {
       'engineHasApiKey': engineHasApiKey,
       'simpleChatHasApiKey': simpleChatHasApiKey,
       'continuousVoiceEnabled': continuousVoiceEnabled,
-      'selectedAsrModelId': selectedAsrModelId,
       'selectedTtsModelId': selectedTtsModelId,
+      'ttsLanguagePreferences': ttsLanguagePreferences,
+      'defaultTtsModelId': defaultTtsModelId,
+      'defaultAsrModelId': defaultAsrModelId,
+      'asrQuickPickModelIds': asrQuickPickModelIds,
     };
   }
 
@@ -447,8 +474,19 @@ class Settings {
       engineHasApiKey: (json['engineHasApiKey'] as bool?) ?? false,
       simpleChatHasApiKey: (json['simpleChatHasApiKey'] as bool?) ?? false,
       continuousVoiceEnabled: continuousVoiceEnabled,
-      selectedAsrModelId: json['selectedAsrModelId'] as String?,
       selectedTtsModelId: json['selectedTtsModelId'] as String?,
+      ttsLanguagePreferences: Map<String, String>.from(
+        (json['ttsLanguagePreferences'] as Map<dynamic, dynamic>?) ?? {},
+      ),
+      defaultTtsModelId: json['defaultTtsModelId'] as String?,
+      // Migration: the field was named selectedAsrModelId before it gained
+      // per-device quick-pick/default semantics.
+      defaultAsrModelId:
+          (json['defaultAsrModelId'] ?? json['selectedAsrModelId'])
+              as String?,
+      asrQuickPickModelIds: List<String>.from(
+        (json['asrQuickPickModelIds'] as List<dynamic>?) ?? [],
+      ),
     );
   }
 
@@ -475,8 +513,11 @@ class Settings {
         other.engineHasApiKey == engineHasApiKey &&
         other.simpleChatHasApiKey == simpleChatHasApiKey &&
         other.continuousVoiceEnabled == continuousVoiceEnabled &&
-        other.selectedAsrModelId == selectedAsrModelId &&
-        other.selectedTtsModelId == selectedTtsModelId;
+        other.selectedTtsModelId == selectedTtsModelId &&
+        _mapEquals(other.ttsLanguagePreferences, ttsLanguagePreferences) &&
+        other.defaultTtsModelId == defaultTtsModelId &&
+        other.defaultAsrModelId == defaultAsrModelId &&
+        _listEquals(other.asrQuickPickModelIds, asrQuickPickModelIds);
   }
 
   @override
@@ -503,8 +544,11 @@ class Settings {
       engineHasApiKey,
       simpleChatHasApiKey,
       continuousVoiceEnabled,
-      selectedAsrModelId,
       selectedTtsModelId,
+      _mapHash(ttsLanguagePreferences),
+      defaultTtsModelId,
+      defaultAsrModelId,
+      Object.hashAll(asrQuickPickModelIds),
     ),
   );
 
@@ -516,6 +560,24 @@ class Settings {
       if (a[i] != b[i]) return false;
     }
     return true;
+  }
+
+  // Helper for order-independent map equality
+  static bool _mapEquals<K, V>(Map<K, V> a, Map<K, V> b) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+
+  // Order-independent hash of a map's entries, to match _mapEquals.
+  static int _mapHash<K, V>(Map<K, V> map) {
+    var hash = 0;
+    for (final entry in map.entries) {
+      hash ^= Object.hash(entry.key, entry.value);
+    }
+    return hash;
   }
 }
 

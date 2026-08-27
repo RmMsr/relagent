@@ -42,10 +42,24 @@ def adapter(approval_service: ApprovalService) -> PydanticAgentAdapter:
     return PydanticAgentAdapter(approval_service=approval_service)
 
 
+def _final_output(content: str, language_code: str | None = None) -> ModelResponse:
+    """A ModelResponse that ends the run via the discussion_agent output tool.
+
+    The agent's output_type is DiscussionResponse, so a plain TextPart no longer
+    terminates the run — the model must call the `final_result` tool.
+    """
+    args: dict[str, object] = {"content": content}
+    if language_code is not None:
+        args["language_code"] = language_code
+    return ModelResponse(parts=[ToolCallPart(tool_name="final_result", args=args)])
+
+
 class TestPydanticExecutionAdapterQueries:
     async def test_run_basic_query(self, adapter: PydanticAgentAdapter):
         context = ChatContext(messages=[])
-        test_model = TestModel(custom_output_text="Test response", call_tools=[])
+        test_model = TestModel(
+            custom_output_args={"content": "Test response"}, call_tools=[]
+        )
         with discussion_agent.override(model=test_model):
             result = await adapter.run_basic_query(context=context, query="test")
 
@@ -53,6 +67,35 @@ class TestPydanticExecutionAdapterQueries:
         assert result.message_id is not None
         assert result.stats is not None
         assert result.stats.answering_model_name == "test"
+        assert result.content == "Test response"
+
+    async def test_run_basic_query_captures_language_code(
+        self, adapter: PydanticAgentAdapter
+    ):
+        context = ChatContext(messages=[])
+        test_model = TestModel(
+            custom_output_args={"content": "Bonjour.", "language_code": "fr"},
+            call_tools=[],
+        )
+        with discussion_agent.override(model=test_model):
+            result = await adapter.run_basic_query(context=context, query="test")
+
+        assert isinstance(result, AssistantMessage)
+        assert result.language_code == "fr"
+        assert result.content == "Bonjour."
+
+    async def test_run_basic_query_without_language_code_leaves_it_unset(
+        self, adapter: PydanticAgentAdapter
+    ):
+        context = ChatContext(messages=[])
+        test_model = TestModel(
+            custom_output_args={"content": "Test response"}, call_tools=[]
+        )
+        with discussion_agent.override(model=test_model):
+            result = await adapter.run_basic_query(context=context, query="test")
+
+        assert isinstance(result, AssistantMessage)
+        assert result.language_code is None
         assert result.content == "Test response"
 
     async def test_generate_title(self, adapter: PydanticAgentAdapter):
@@ -70,7 +113,7 @@ class TestPydanticExecutionAdapterQueries:
         def model_function(
             messages: list[ModelMessage], info: AgentInfo
         ) -> ModelResponse:
-            return ModelResponse(parts=[TextPart(content="Test response")])
+            return _final_output("Test response")
 
         test_model = FunctionModel(function=model_function)
 
@@ -512,7 +555,7 @@ class TestExecutionLoop:
     ):
         context = ChatContext(messages=[])
         with discussion_agent.override(
-            model=TestModel(custom_output_text="Response", call_tools=[])
+            model=TestModel(custom_output_args={"content": "Response"}, call_tools=[])
         ):
             result = await adapter.run_agent_and_handle_permissions(
                 context=context, query="Hello", agent=discussion_agent
@@ -534,9 +577,7 @@ class TestExecutionLoop:
         ) -> ModelResponse:
             assert len(messages) == 3
             assert isinstance(messages[-1], ModelRequest)
-            return ModelResponse(
-                parts=[TextPart(content=f"Response: {messages[-1].parts[0].content}")]
-            )
+            return _final_output(f"Response: {messages[-1].parts[0].content}")
 
         with discussion_agent.override(model=FunctionModel(model_function)):
             result = await adapter.run_agent_and_handle_permissions(
@@ -621,11 +662,7 @@ class TestExecutionLoop:
                     ],
                 )
 
-            return ModelResponse(
-                parts=[
-                    TextPart(content="I'm done"),
-                ],
-            )
+            return _final_output("I'm done")
 
         with (
             discussion_agent.override(model=FunctionModel(function=model_function)),
@@ -673,11 +710,7 @@ class TestExecutionLoop:
             messages: list[ModelMessage], info: AgentInfo
         ) -> ModelResponse:
             assert messages[-1].kind == "request"
-            return ModelResponse(
-                parts=[
-                    TextPart(content="It is sunny"),
-                ],
-            )
+            return _final_output("It is sunny")
 
         with (
             discussion_agent.override(model=FunctionModel(function=model_function)),
@@ -726,9 +759,7 @@ class TestExecutionLoop:
         ) -> ModelResponse:
             nonlocal model_called
             model_called = True
-            return ModelResponse(
-                parts=[TextPart(content="I won't search the web")],
-            )
+            return _final_output("I won't search the web")
 
         with discussion_agent.override(model=FunctionModel(function=model_function)):
             await adapter.run_agent_and_handle_permissions(
@@ -813,7 +844,7 @@ class TestExecutionLoop:
                         )
                     ]
                 )
-            return ModelResponse(parts=[TextPart(content="Done")])
+            return _final_output("Done")
 
         with (
             discussion_agent.override(model=FunctionModel(function=model_function)),

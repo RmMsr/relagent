@@ -34,6 +34,7 @@ from engine.domain.types import ApprovalType, SensitivityLevel
 from engine.log_config import get_logger
 
 from .agent_definitions import (
+    DiscussionResponse,
     discussion_agent,
     title_summarizer_agent,
 )
@@ -166,8 +167,11 @@ class PydanticAgentAdapter(AgentExecution):
                 )
                 if open_approvals:
                     final_message = SystemAction(approvals=open_approvals)
-            elif isinstance(response.text, str):
-                final_message = AssistantMessage(content=response.text)
+            elif isinstance(result.output, DiscussionResponse):
+                final_message = AssistantMessage(
+                    content=result.output.content,
+                    language_code=result.output.language_code,
+                )
             else:
                 logger.warning("No usable output in %s. Retrying", response)
 

@@ -1,5 +1,11 @@
 from openai import AsyncOpenAI
-from pydantic_ai import Agent, DeferredToolRequests, InstrumentationSettings
+from pydantic import BaseModel
+from pydantic_ai import (
+    Agent,
+    DeferredToolRequests,
+    InstrumentationSettings,
+    ModelSettings,
+)
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -45,8 +51,16 @@ title_summarizer_agent = Agent(
 
         Based on the given input you respond quickly with just a few word that
         summarize the nature and topic of the beginning of the conversation.
+        Leave out formatting or punctuation.
     """,
+    model_settings=ModelSettings(thinking=False, max_tokens=32),
 )
+
+
+class DiscussionResponse(BaseModel):
+    content: str
+    language_code: str | None = None
+
 
 discussion_agent = Agent(
     model=default_model,
@@ -62,5 +76,5 @@ discussion_agent = Agent(
         Be transparent about unclear data or low confidence levels.
     """,
     tools=[user_name_tool, current_date_and_time_tool, web_search_tool],
-    output_type=[str, DeferredToolRequests],
+    output_type=[DiscussionResponse, DeferredToolRequests],
 )

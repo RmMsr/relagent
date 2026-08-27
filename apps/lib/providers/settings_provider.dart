@@ -65,13 +65,13 @@ class SettingsNotifier extends Notifier<Settings> {
   }
 
   Future<void> _validateModelSelections(Set<String> downloadedModels) async {
-    final asrId = state.selectedAsrModelId;
+    final asrId = state.defaultAsrModelId;
     final ttsId = state.selectedTtsModelId;
     bool changed = false;
     if (asrId != null &&
         !downloadedModels.contains(asrId) &&
         ImportedModelRegistry.findById(asrId) == null) {
-      state = state.copyWith(selectedAsrModelId: null);
+      state = state.copyWith(defaultAsrModelId: null);
       changed = true;
     }
     if (ttsId != null &&
@@ -345,11 +345,6 @@ class SettingsNotifier extends Notifier<Settings> {
     return await _persistenceManager.saveSettings(state);
   }
 
-  Future<bool> updateSelectedAsrModelId(String? modelId) async {
-    state = state.copyWith(selectedAsrModelId: modelId);
-    return await _persistenceManager.saveSettings(state);
-  }
-
   Future<bool> updateSelectedTtsModelId(String? modelId) async {
     state = state.copyWith(selectedTtsModelId: modelId);
     return await _persistenceManager.saveSettings(state);
@@ -357,17 +352,84 @@ class SettingsNotifier extends Notifier<Settings> {
 
   Future<bool> clearModelSelection(String modelId) async {
     bool changed = false;
-    if (state.selectedAsrModelId == modelId) {
-      state = state.copyWith(selectedAsrModelId: null);
+    if (state.defaultAsrModelId == modelId) {
+      state = state.copyWith(defaultAsrModelId: null);
       changed = true;
     }
     if (state.selectedTtsModelId == modelId) {
       state = state.copyWith(selectedTtsModelId: null);
       changed = true;
     }
+    if (state.ttsLanguagePreferences.containsValue(modelId)) {
+      final preferences = Map<String, String>.from(
+        state.ttsLanguagePreferences,
+      )..removeWhere((_, id) => id == modelId);
+      state = state.copyWith(ttsLanguagePreferences: preferences);
+      changed = true;
+    }
+    if (state.defaultTtsModelId == modelId) {
+      state = state.copyWith(defaultTtsModelId: null);
+      changed = true;
+    }
+    if (state.asrQuickPickModelIds.contains(modelId)) {
+      final quickPick = List<String>.from(state.asrQuickPickModelIds)
+        ..remove(modelId);
+      state = state.copyWith(asrQuickPickModelIds: quickPick);
+      changed = true;
+    }
     if (changed) {
       return await _persistenceManager.saveSettings(state);
     }
     return true;
+  }
+
+  /// Assigns [modelId] to [languageCode], replacing any previous assignment
+  /// for that language.
+  Future<bool> assignTtsModelToLanguage(
+    String languageCode,
+    String modelId,
+  ) async {
+    final preferences = Map<String, String>.from(state.ttsLanguagePreferences)
+      ..[languageCode] = modelId;
+    state = state.copyWith(ttsLanguagePreferences: preferences);
+    return await _persistenceManager.saveSettings(state);
+  }
+
+  /// Removes the language assignment for [languageCode], if any.
+  Future<bool> removeTtsLanguagePreference(String languageCode) async {
+    if (!state.ttsLanguagePreferences.containsKey(languageCode)) return true;
+    final preferences = Map<String, String>.from(state.ttsLanguagePreferences)
+      ..remove(languageCode);
+    state = state.copyWith(ttsLanguagePreferences: preferences);
+    return await _persistenceManager.saveSettings(state);
+  }
+
+  /// Sets the device default TTS model, or clears it when [modelId] is null.
+  Future<bool> setDefaultTtsModel(String? modelId) async {
+    state = state.copyWith(defaultTtsModelId: modelId);
+    return await _persistenceManager.saveSettings(state);
+  }
+
+  /// Sets the persisted device default ASR model, or clears it when
+  /// [modelId] is null. Used whenever no session-only quick-pick override
+  /// is active (see `activeAsrModelOverrideProvider` in recording_provider.dart).
+  Future<bool> setDefaultAsrModel(String? modelId) async {
+    state = state.copyWith(defaultAsrModelId: modelId);
+    return await _persistenceManager.saveSettings(state);
+  }
+
+  /// Adds or removes [modelId] from the mic long-press quick-pick set. A
+  /// multi-language model is a single entry here, covering its whole
+  /// declared language set at once — never one entry per language.
+  Future<bool> setAsrQuickPickEnabled(String modelId, bool enabled) async {
+    final quickPick = List<String>.from(state.asrQuickPickModelIds);
+    if (enabled) {
+      if (quickPick.contains(modelId)) return true;
+      quickPick.add(modelId);
+    } else {
+      if (!quickPick.remove(modelId)) return true;
+    }
+    state = state.copyWith(asrQuickPickModelIds: quickPick);
+    return await _persistenceManager.saveSettings(state);
   }
 }

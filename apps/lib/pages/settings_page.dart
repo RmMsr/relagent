@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:agentic_client/agentic_client.dart';
+
 import '/models/model_catalog.dart';
 import '/voice/imported_model_registry.dart';
 import '/models/settings.dart';
 import '/providers/credentials_pass_provider.dart';
 import '/providers/pending_settings_provider.dart';
+import '/providers/recording_provider.dart';
 import '/providers/settings_provider.dart';
 import '/providers/settings_tab_request_provider.dart';
 import '/providers/voice_service_provider.dart';
@@ -404,9 +406,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               const SizedBox(height: 8),
               Text(
                 'Request Details:',
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.labelSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               _buildDebugInfo('Method', 'POST'),
@@ -506,9 +507,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               const SizedBox(height: 8),
               Text(
                 'Request Details:',
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.labelSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               _buildDebugInfo('Method', 'GET'),
@@ -748,9 +748,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
   }
 
   Widget _modelSubtitle(BuildContext context, String? id) {
-    final muted = Theme.of(context).textTheme.bodySmall?.copyWith(
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-    );
+    final muted = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
     if (id == null) {
       return const Text('None');
     }
@@ -789,6 +788,130 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
       );
     }
     return Text(id);
+  }
+
+  /// One row per language→model assignment, plus a row for the device
+  /// default if it isn't already covered by a language assignment. No
+  /// "Imported" tag — just the plain model name, unlike [_modelSubtitle].
+  Widget _ttsMappingSubtitle(BuildContext context, Settings settings) {
+    final muted = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
+    String modelName(String id) =>
+        ModelCatalog.findById(id)?.displayName ??
+        ImportedModelRegistry.findById(id)?.displayName ??
+        id;
+
+    final languages = settings.ttsLanguagePreferences.keys.toList()..sort();
+    final defaultId = settings.defaultTtsModelId;
+
+    Widget mappingRow(String label, String modelId) {
+      final isDefault = modelId == defaultId;
+      return Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('$label: ', style: muted),
+            Flexible(
+              child: Text(modelName(modelId), overflow: TextOverflow.ellipsis),
+            ),
+            if (isDefault) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.star,
+                size: 14,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    final rows = [
+      for (final language in languages)
+        mappingRow(language, settings.ttsLanguagePreferences[language]!),
+      if (defaultId != null &&
+          !settings.ttsLanguagePreferences.containsValue(defaultId))
+        mappingRow('Default', defaultId),
+    ];
+
+    if (rows.isEmpty) return const Text('None');
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
+  }
+
+  /// One row per quick-pick-enabled ASR model, naming the model and its
+  /// language coverage — mirrors [_ttsMappingSubtitle]'s row-plus-default
+  /// structure, keyed by model rather than by language. The persisted
+  /// device default is starred; this session's active quick-pick override
+  /// (if any) is marked separately. Falls back to the existing single-model
+  /// summary when nothing is quick-picked, so a user who never touches the
+  /// quick-pick feature still sees which model is in use.
+  Widget _asrMappingSubtitle(BuildContext context, Settings settings) {
+    if (settings.asrQuickPickModelIds.isEmpty) {
+      return _modelSubtitle(context, settings.defaultAsrModelId);
+    }
+
+    final muted = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
+    String modelName(String id) =>
+        ModelCatalog.findById(id)?.displayName ??
+        ImportedModelRegistry.findById(id)?.displayName ??
+        id;
+    List<String> modelLanguages(String id) =>
+        ModelCatalog.findById(id)?.languages ??
+        ImportedModelRegistry.findById(id)?.languages ??
+        const [];
+
+    final quickPick = settings.asrQuickPickModelIds.toList()
+      ..sort((a, b) => modelName(a).compareTo(modelName(b)));
+    final defaultId = settings.defaultAsrModelId;
+    final activeOverride = ref.watch(activeAsrModelOverrideProvider);
+
+    Widget mappingRow(String modelId) {
+      final isDefault = modelId == defaultId;
+      final isActive = modelId == activeOverride;
+      return Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                '${modelName(modelId)} · ${languageCoverageLabel(modelLanguages(modelId))}',
+                overflow: TextOverflow.ellipsis,
+                style: muted,
+              ),
+            ),
+            if (isDefault) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.star,
+                size: 14,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ],
+            if (isActive) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.translate,
+                size: 14,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    final rows = [
+      for (final modelId in quickPick) mappingRow(modelId),
+      if (defaultId != null && !quickPick.contains(defaultId))
+        mappingRow(defaultId),
+    ];
+
+    if (rows.isEmpty) return const Text('None');
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
   }
 
   @override
@@ -1247,7 +1370,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.mic),
               title: const Text('Speech Recognition'),
-              subtitle: _modelSubtitle(context, settings.selectedAsrModelId),
+              subtitle: _asrMappingSubtitle(context, settings),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/voice-models', extra: 0),
             ),
@@ -1255,7 +1378,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.record_voice_over),
               title: const Text('Text-to-Speech'),
-              subtitle: _modelSubtitle(context, settings.selectedTtsModelId),
+              subtitle: _ttsMappingSubtitle(context, settings),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/voice-models', extra: 1),
             ),
@@ -1321,9 +1444,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                         'Experimental',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onPrimaryContainer,
                         ),
                       ),
                     ),

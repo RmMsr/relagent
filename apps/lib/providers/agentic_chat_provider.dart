@@ -371,7 +371,13 @@ class AgenticChatNotifier extends Notifier<AgenticChatState> {
       // response was still in flight, and that must still apply to it.
       if (ref.read(settingsProvider).isAutoPlayback &&
           response.role == AgenticRole.assistant) {
-        ref.read(ttsProvider.notifier).enqueue(response.text, response.localId);
+        ref
+            .read(ttsProvider.notifier)
+            .enqueue(
+              response.text,
+              response.localId,
+              languageCode: response.languageCode,
+            );
       }
 
       if (response.isFinal) _dispatchQueuedIfAny();

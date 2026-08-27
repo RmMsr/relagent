@@ -8,7 +8,7 @@ import 'package:relagent/voice/model_resolver.dart';
 
 /// Task 10.6: Verify that the app handles missing bundled assets gracefully.
 ///
-/// When no model is selected (selectedAsrModelId == null) and no bundled asset
+/// When no model is selected (defaultAsrModelId == null) and no bundled asset
 /// is configured (AppConfig returns null), the resolver returns null and the
 /// app should enter the "model unavailable" state without crashing.
 void main() {
@@ -23,9 +23,9 @@ void main() {
     test(
       'resolveAsrMetadata returns null with default settings (no selection)',
       () async {
-        // Default settings have no selectedAsrModelId
+        // Default settings have no defaultAsrModelId
         final settings = Settings.defaults();
-        expect(settings.selectedAsrModelId, isNull);
+        expect(settings.defaultAsrModelId, isNull);
 
         final result = await resolveAsrMetadata(
           settings,

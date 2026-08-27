@@ -182,6 +182,10 @@ class AssistantMessage(BaseModel):
     role: Literal["assistant"] = "assistant"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     content: str
+    language_code: str | None = Field(
+        default=None,
+        description="ISO 639-1 language code",
+    )
     stats: AgentStats | None = None
     final: bool = Field(
         default=True,
