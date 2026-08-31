@@ -172,6 +172,8 @@ class PydanticAgentAdapter(AgentExecution):
                     content=result.output.content,
                     language_code=result.output.language_code,
                 )
+            elif isinstance(result.output, str):
+                final_message = AssistantMessage(content=result.output)
             else:
                 logger.warning("No usable output in %s. Retrying", response)
 

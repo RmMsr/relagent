@@ -62,6 +62,12 @@ class DiscussionResponse(BaseModel):
     language_code: str | None = None
 
 
+# The discussion agent currently answers with a plain string. Structured
+# DiscussionResponse output (which lets the model tag a per-turn language_code)
+# is still supported by the adapter but not requested here. Some models
+# run into issues in combination with other tools. Until we have more solid
+# LLM evluation, semantic output stays disabled.
+# Then switch output_type back to [DiscussionResponse, DeferredToolRequests]
 discussion_agent = Agent(
     model=default_model,
     instructions="""
@@ -76,5 +82,5 @@ discussion_agent = Agent(
         Be transparent about unclear data or low confidence levels.
     """,
     tools=[user_name_tool, current_date_and_time_tool, web_search_tool],
-    output_type=[DiscussionResponse, DeferredToolRequests],
+    output_type=[str, DeferredToolRequests],
 )
